@@ -4,10 +4,11 @@ Procesa mensajes de forma concurrente (no uno a la vez) — esto es lo que
 demuestra que una verificación lenta o fallida (ej. la certificadora caída)
 NO bloquea el resto de la cola, que es exactamente la respuesta exigida por
 DISP-03."""
+
 import asyncio
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import aio_pika
 
@@ -23,9 +24,7 @@ CONCURRENCIA = 10
 semaforo = asyncio.Semaphore(CONCURRENCIA)
 
 
-def actualizar_db(
-    verificacion_id: str, exito: bool, intentos: int, motivo: str | None
-) -> None:
+def actualizar_db(verificacion_id: str, exito: bool, intentos: int, motivo: str | None) -> None:
     with SessionLocal() as sesion:
         fila = sesion.get(VerificacionORM, uuid.UUID(verificacion_id))
         if fila is None:
@@ -33,51 +32,48 @@ def actualizar_db(
         fila.intentos = intentos
         if exito:
             fila.estado = "COMPLETADA"
-            fila.completado_en = datetime.utcnow()
+            fila.completado_en = datetime.now(timezone.utc)
         else:
             fila.estado = "FALLIDA_DLQ"
             fila.motivo_falla = motivo
-            fila.en_dlq_desde = datetime.utcnow()
+            fila.en_dlq_desde = datetime.now(timezone.utc)
         sesion.commit()
 
 
 async def _procesar_mensaje(
     mensaje: aio_pika.IncomingMessage, publicador: PublicadorRabbitMQ
 ) -> None:
-    async with semaforo:
-        async with mensaje.process(requeue=False):
-            payload = json.loads(mensaje.body)
-            verificacion_id = payload["verificacion_id"]
-            proveedor_id = payload["proveedor_id"]
-            tipo_verificador = payload["tipo_verificador"]
+    async with semaforo, mensaje.process(requeue=False):
+        payload = json.loads(mensaje.body)
+        verificacion_id = payload["verificacion_id"]
+        proveedor_id = payload["proveedor_id"]
+        tipo_verificador = payload["tipo_verificador"]
 
-            resultado = await procesar_verificacion(
-                verificacion_id, proveedor_id, tipo_verificador
+        resultado = await procesar_verificacion(verificacion_id, proveedor_id, tipo_verificador)
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            actualizar_db,
+            verificacion_id,
+            resultado.exito,
+            resultado.intentos,
+            resultado.motivo_falla,
+        )
+        if not resultado.exito:
+            await publicador.publicar_fallida(
+                {
+                    **payload,
+                    "motivo_falla": resultado.motivo_falla,
+                    "intentos": resultado.intentos,
+                    "fallido_en": datetime.now(timezone.utc).isoformat(),
+                }
             )
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                actualizar_db,
-                verificacion_id,
-                resultado.exito,
-                resultado.intentos,
-                resultado.motivo_falla,
-            )
-            if not resultado.exito:
-                await publicador.publicar_fallida(
-                    {
-                        **payload,
-                        "motivo_falla": resultado.motivo_falla,
-                        "intentos": resultado.intentos,
-                        "fallido_en": datetime.utcnow().isoformat(),
-                    }
-                )
-            log_evento(
-                logger,
-                "verificacion_procesada",
-                verificacion_id=verificacion_id,
-                exito=resultado.exito,
-                intentos=resultado.intentos,
-            )
+        log_evento(
+            logger,
+            "verificacion_procesada",
+            verificacion_id=verificacion_id,
+            exito=resultado.exito,
+            intentos=resultado.intentos,
+        )
 
 
 async def main() -> None:

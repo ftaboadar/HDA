@@ -1,0 +1,9 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# Reglas por defecto de ruff (pyflakes, pycodestyle, pyupgrade, flake8-datetimez,
+# pylint, ruff) — capturan justo el tipo de descuido típico de código generado
+# rápido: nombres no definidos, imports sin usar, datetimes naive, subprocess sin
+# `check=` explícito, etc. No se restringe la selección para no perder cobertura.

@@ -54,6 +54,7 @@ services:
   api:
     build: .
     command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    restart: on-failure:5
     environment:
       TRANSPORTE: rabbitmq
       DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/verificacion
@@ -72,6 +73,7 @@ services:
   worker:
     build: .
     command: python -m app.worker.main
+    restart: on-failure:5
     environment:
       TRANSPORTE: rabbitmq
       DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/verificacion
