@@ -11,6 +11,7 @@ porque procesar_verificacion() ya agotó sus propios reintentos internamente.
 Devolver un error HTTP aquí haría que Pub/Sub reintregue el mensaje y
 duplique reintentos a dos niveles distintos (el nuestro y el de la
 suscripción), lo cual no es lo que DISP-03 pide."""
+
 import base64
 import json
 import os

@@ -4,6 +4,7 @@ Es un resumen MECÁNICO (valor medido vs. umbral, por caso) — el mismo tipo
 de "datos crudos" que experimento-runner produce y le entrega a
 validador-hipotesis. No emite un veredicto global; eso es tarea de ese
 agente, no de este script."""
+
 import json
 import pathlib
 
@@ -20,13 +21,15 @@ def main() -> None:
     ancho_caso = max(len(f["caso"]) for f in filas)
     ancho_metrica = max(len(f["metrica"]) for f in filas)
 
-    print(f"{'caso':<{ancho_caso}}  {'métrica':<{ancho_metrica}}  {'valor':>10}  {'umbral':>10}  cumple")
+    print(
+        f"{'caso':<{ancho_caso}}  {'métrica':<{ancho_metrica}}  {'valor':>10}  {'umbral':>10}  cumple"
+    )
     print("-" * (ancho_caso + ancho_metrica + 40))
     for f in filas:
         marca = "SI" if f["cumple"] else "NO"
         print(
             f"{f['caso']:<{ancho_caso}}  {f['metrica']:<{ancho_metrica}}  "
-            f"{str(f['valor']):>10}  {str(f['umbral']):>10}  {marca}"
+            f"{f['valor']!s:>10}  {f['umbral']!s:>10}  {marca}"
         )
 
     total = len(filas)

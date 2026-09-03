@@ -3,9 +3,9 @@
 `POST /verificaciones` acepta y encola de inmediato — nunca espera al sistema
 externo. Esa respuesta 202 inmediata es, en sí misma, la primera evidencia de
 desacople que exige DISP-03."""
+
 import uuid
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import select
@@ -22,7 +22,7 @@ logger = configurar_logging("api.main")
 app = FastAPI(title="Verificación de Proveedores — API (DISP-03 PoC)")
 
 _conexion = None
-_publicador: Optional[Publicador] = None
+_publicador: Publicador | None = None
 
 
 @app.on_event("startup")
@@ -56,7 +56,7 @@ async def salud():
     return {"estado": "ok"}
 
 
-def _consultar(estado: Optional[str] = None, proveedor_id: Optional[str] = None):
+def _consultar(estado: str | None = None, proveedor_id: str | None = None):
     with SessionLocal() as sesion:
         consulta = select(VerificacionORM)
         if estado:
@@ -69,7 +69,7 @@ def _consultar(estado: Optional[str] = None, proveedor_id: Optional[str] = None)
 
 @app.post("/verificaciones", response_model=VerificacionOut, status_code=202)
 async def crear_verificacion(payload: VerificacionCreate):
-    inicio = datetime.utcnow()
+    inicio = datetime.now(timezone.utc)
     verificacion_id = uuid.uuid4()
 
     with SessionLocal() as sesion:
@@ -99,7 +99,7 @@ async def crear_verificacion(payload: VerificacionCreate):
         "verificacion_aceptada",
         verificacion_id=str(verificacion_id),
         tipo_verificador=payload.tipo_verificador,
-        latencia_aceptacion_ms=int((datetime.utcnow() - inicio).total_seconds() * 1000),
+        latencia_aceptacion_ms=int((datetime.now(timezone.utc) - inicio).total_seconds() * 1000),
     )
     return resultado
 
@@ -113,14 +113,12 @@ async def obtener_verificacion(verificacion_id: uuid.UUID):
         return VerificacionOut.model_validate(fila)
 
 
-@app.get("/verificaciones", response_model=List[VerificacionOut])
-async def listar_verificaciones(
-    estado: Optional[str] = None, proveedor_id: Optional[str] = None
-):
+@app.get("/verificaciones", response_model=list[VerificacionOut])
+async def listar_verificaciones(estado: str | None = None, proveedor_id: str | None = None):
     return _consultar(estado=estado, proveedor_id=proveedor_id)
 
 
-@app.get("/dlq", response_model=List[VerificacionOut])
+@app.get("/dlq", response_model=list[VerificacionOut])
 async def listar_dlq():
     return _consultar(estado="FALLIDA_DLQ")
 
@@ -147,11 +145,9 @@ async def reprocesar_dlq(verificacion_id: uuid.UUID):
             "verificacion_id": str(verificacion_id),
             "proveedor_id": resultado.proveedor_id,
             "tipo_verificador": resultado.tipo_verificador,
-            "solicitado_en": datetime.utcnow().isoformat(),
+            "solicitado_en": datetime.now(timezone.utc).isoformat(),
             "reprocesado": True,
         }
     )
-    log_evento(
-        logger, "verificacion_reencolada_desde_dlq", verificacion_id=str(verificacion_id)
-    )
+    log_evento(logger, "verificacion_reencolada_desde_dlq", verificacion_id=str(verificacion_id))
     return resultado

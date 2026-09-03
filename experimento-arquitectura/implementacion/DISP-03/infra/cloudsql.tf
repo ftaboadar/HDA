@@ -23,7 +23,7 @@ resource "google_sql_database_instance" "verificacion" {
   }
 
   deletion_protection = false
-  depends_on           = [google_project_service.apis]
+  depends_on          = [google_project_service.apis]
 }
 
 resource "google_sql_database" "verificacion_db" {
@@ -51,6 +51,6 @@ resource "google_secret_manager_secret" "db_url" {
 }
 
 resource "google_secret_manager_secret_version" "db_url" {
-  secret = google_secret_manager_secret.db_url.id
+  secret      = google_secret_manager_secret.db_url.id
   secret_data = "postgresql+psycopg2://hda:${random_password.db_password.result}@/verificacion?host=/cloudsql/${google_sql_database_instance.verificacion.connection_name}"
 }
