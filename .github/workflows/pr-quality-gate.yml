@@ -1,0 +1,109 @@
+name: Validación de PR
+
+# Capa de validación previa al merge — pensada especialmente para código generado
+# o asistido por IA: detecta lo que un lector humano rápido puede pasar por alto
+# (nombres no definidos, imports sin usar, subprocess sin manejo explícito de
+# errores, datetimes naive, sintaxis rota) antes de que llegue a main.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  python-lint-y-pruebas:
+    name: Python — lint, formato y suite de pruebas (DISP-03)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experimento-arquitectura/implementacion/DISP-03
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff check)
+        run: ruff check .
+
+      - name: Formato (ruff format --check)
+        run: ruff format --check .
+
+      - name: Compilación (sintaxis y nombres no definidos)
+        run: |
+          python -m py_compile $(find app tests cli -name "*.py")
+
+      - name: Levantar el stack local (docker compose)
+        run: docker compose up -d --build
+
+      - name: Esperar a que la API esté sana
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/salud > /dev/null && exit 0
+            sleep 2
+          done
+          echo "La API no quedó sana a tiempo"
+          docker compose logs
+          exit 1
+
+      - name: Correr la suite de pruebas (CP-1..CP-7)
+        run: pytest tests/ -v
+
+      - name: Publicar reporte de métricas crudas
+        if: always()
+        run: python tests/reporte.py || true
+
+      - name: Logs de los servicios (solo si algo falló)
+        if: failure()
+        run: docker compose logs
+
+      - name: Apagar el stack
+        if: always()
+        run: docker compose down -v
+
+  terraform:
+    name: Terraform — formato y validación (infra GCP)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experimento-arquitectura/implementacion/DISP-03/infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: terraform fmt (verificación, sin escribir)
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (sin backend, sin credenciales de GCP)
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate
+        run: terraform validate
+
+  higiene-general:
+    name: Higiene general del repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sin marcadores de conflicto de merge sin resolver
+        run: |
+          if grep -rIn '^<<<<<<< \|^=======$\|^>>>>>>> ' \
+              --include="*.py" --include="*.md" --include="*.tf" --include="*.yml" --include="*.yaml" . ; then
+            echo "Se encontraron marcadores de conflicto de merge sin resolver"
+            exit 1
+          fi
+
+      - name: Sin patrones obvios de secretos filtrados
+        run: |
+          if grep -rIEn 'AKIA[0-9A-Z]{16}|-----BEGIN (RSA|EC|OPENSSH|PGP) PRIVATE KEY-----' \
+              --include="*.py" --include="*.tf" --include="*.md" --include="*.yml" --include="*.yaml" --include="*.env*" . ; then
+            echo "Posible secreto detectado — revisar antes de mergear"
+            exit 1
+          fi

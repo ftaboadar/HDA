@@ -7,6 +7,7 @@ contra RabbitMQ o Pub/Sub directamente. Es la razón por la que
 portable — y también, honestamente, dónde puede dejar de serlo: las garantías
 de entrega/orden de RabbitMQ y Pub/Sub no son idénticas, ver
 implementacion/DISP-03/README.md (rutas relativas al repo, no al propio archivo), sección "Diferencias local vs. GCP"."""
+
 from __future__ import annotations
 
 import abc
@@ -59,9 +60,7 @@ class PublicadorPubSub(Publicador):
 
         self._cliente = pubsub_v1.PublisherClient()
         self._ruta_sol = (
-            self._cliente.topic_path(project_id, topic_solicitudes)
-            if topic_solicitudes
-            else None
+            self._cliente.topic_path(project_id, topic_solicitudes) if topic_solicitudes else None
         )
         self._ruta_dlq = self._cliente.topic_path(project_id, topic_fallidas)
 

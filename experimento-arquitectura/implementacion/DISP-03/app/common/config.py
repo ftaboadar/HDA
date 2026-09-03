@@ -4,6 +4,7 @@ Los valores por defecto asumen el entorno local (docker-compose). En GCP, cada
 variable se sobreescribe vía las env vars que Terraform inyecta en Cloud Run
 (ver ../../infra/cloudrun.tf).
 """
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

@@ -6,10 +6,11 @@ mismo artefacto para los tres.
 Comportamiento controlable en caliente vía POST /_control/config, que es lo
 que los casos de prueba (tests/test_escenarios_disp03.py) usan para inyectar
 fallas exactamente cuando el caso lo requiere."""
+
 import asyncio
 import os
 import random
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
@@ -29,8 +30,8 @@ app = FastAPI(title=f"Mock — {MOCK_NAME}")
 
 class ConfigMock(BaseModel):
     modo: Literal["ok", "error_parcial", "caido", "timeout"]
-    latencia_ms: Optional[int] = None
-    tasa_error: Optional[float] = None
+    latencia_ms: int | None = None
+    tasa_error: float | None = None
 
 
 class SolicitudVerificar(BaseModel):

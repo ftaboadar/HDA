@@ -6,6 +6,7 @@ servicio — se mantiene deliberadamente "gordo" (incluye proveedor_id y
 tipo_verificador completos) para que el worker no necesite una consulta
 adicional a la BD antes de poder actuar (Regla 4 de la rúbrica: distinguir el
 tipo de evento y su forma explícitamente)."""
+
 import aio_pika
 
 from app.common.config import settings

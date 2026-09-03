@@ -1,6 +1,7 @@
 """Logging estructurado (JSON lines) — es la fuente de datos crudos que
 tests/reporte.py y el análisis de validador-hipotesis usan para calcular
 las métricas del experimento (ver plan.md, sección 6)."""
+
 import json
 import logging
 import sys

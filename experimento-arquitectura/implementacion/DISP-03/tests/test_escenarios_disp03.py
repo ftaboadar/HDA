@@ -20,6 +20,7 @@ generalización de esa invariante al 99.9% real es, precisamente, el tipo de
 salto que validador-hipotesis debe señalar como amenaza a la validez, no
 algo que este archivo pueda resolver por sí mismo.
 """
+
 import asyncio
 import time
 
@@ -46,9 +47,7 @@ async def test_cp1_baseline_todo_disponible(api):
     completadas = sum(1 for r in resultados if r["estado"] == "COMPLETADA")
     disponibilidad = completadas / len(resultados)
 
-    registrar(
-        "CP-1", "disponibilidad_baseline", disponibilidad, 1.0, disponibilidad == 1.0
-    )
+    registrar("CP-1", "disponibilidad_baseline", disponibilidad, 1.0, disponibilidad == 1.0)
     assert disponibilidad == 1.0, f"esperado 100% completadas, obtuvo {disponibilidad:.2%}"
 
 
@@ -65,21 +64,32 @@ async def test_cp2_certificadora_lenta_dentro_de_sla(api):
     )
 
     resultados_rapidas = await asyncio.gather(
-        *[esperar_estado(api, r["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=10) for r in rapidas]
+        *[
+            esperar_estado(api, r["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=10)
+            for r in rapidas
+        ]
     )
     duracion_rapidas_s = time.time() - inicio
-    resultado_lenta = await esperar_estado(api, lenta["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=15)
+    resultado_lenta = await esperar_estado(
+        api, lenta["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=15
+    )
 
     todas_policia_ok = all(r["estado"] == "COMPLETADA" for r in resultados_rapidas)
 
     registrar(
-        "CP-2", "duracion_verificaciones_rapidas_s", duracion_rapidas_s, 1.5,
+        "CP-2",
+        "duracion_verificaciones_rapidas_s",
+        duracion_rapidas_s,
+        1.5,
         duracion_rapidas_s < 1.5,
         detalle="deben completarse sin esperar a la certificadora lenta",
     )
     registrar(
-        "CP-2", "certificadora_lenta_completa", resultado_lenta["estado"] == "COMPLETADA",
-        True, resultado_lenta["estado"] == "COMPLETADA",
+        "CP-2",
+        "certificadora_lenta_completa",
+        resultado_lenta["estado"] == "COMPLETADA",
+        True,
+        resultado_lenta["estado"] == "COMPLETADA",
     )
 
     assert todas_policia_ok
@@ -150,7 +160,9 @@ async def test_cp4_certificadora_caida_dura(api):
     registrar("CP-4", "pct_fallidas_en_dlq", todas_en_dlq, True, todas_en_dlq)
     registrar("CP-4", "pct_con_motivo_trazado", todas_con_motivo, True, todas_con_motivo)
     registrar("CP-4", "policia_no_afectada", policia_no_afectada, True, policia_no_afectada)
-    registrar("CP-4", "visibles_en_endpoint_dlq", todas_visibles_en_dlq, True, todas_visibles_en_dlq)
+    registrar(
+        "CP-4", "visibles_en_endpoint_dlq", todas_visibles_en_dlq, True, todas_visibles_en_dlq
+    )
 
     assert todas_en_dlq
     assert todas_con_motivo
@@ -171,7 +183,10 @@ async def test_cp5_aislamiento_policia_rues_sin_certificadora(api):
         ]
     )
     resultados = await asyncio.gather(
-        *[esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=10) for c in creadas]
+        *[
+            esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=10)
+            for c in creadas
+        ]
     )
 
     impacto = sum(1 for r in resultados if r["estado"] != "COMPLETADA") / len(resultados)
@@ -202,7 +217,10 @@ async def test_cp6_recuperacion_y_reproceso_desde_dlq(api):
         r.raise_for_status()
 
     finales = await asyncio.gather(
-        *[esperar_estado(api, item["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=20) for item in en_dlq]
+        *[
+            esperar_estado(api, item["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=20)
+            for item in en_dlq
+        ]
     )
     duracion_reproceso_s = time.time() - inicio_reproceso
 
@@ -211,9 +229,14 @@ async def test_cp6_recuperacion_y_reproceso_desde_dlq(api):
     # en esta ejecución exigimos que el reproceso concluya en segundos.
     umbral_ventana_s = 60
 
-    registrar("CP-6", "pct_reprocesadas_exitosas", pct_reprocesadas_ok, 1.0, pct_reprocesadas_ok == 1.0)
     registrar(
-        "CP-6", "duracion_reproceso_s", duracion_reproceso_s, umbral_ventana_s,
+        "CP-6", "pct_reprocesadas_exitosas", pct_reprocesadas_ok, 1.0, pct_reprocesadas_ok == 1.0
+    )
+    registrar(
+        "CP-6",
+        "duracion_reproceso_s",
+        duracion_reproceso_s,
+        umbral_ventana_s,
         duracion_reproceso_s < umbral_ventana_s,
     )
 
@@ -248,7 +271,11 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     umbral_p95_ms = 500
 
     registrar(
-        "CP-7", "p95_latencia_aceptacion_ms", p95_ms, umbral_p95_ms, p95_ms < umbral_p95_ms,
+        "CP-7",
+        "p95_latencia_aceptacion_ms",
+        p95_ms,
+        umbral_p95_ms,
+        p95_ms < umbral_p95_ms,
         detalle="la aceptación debe seguir siendo rápida aunque el externo esté caído",
     )
 

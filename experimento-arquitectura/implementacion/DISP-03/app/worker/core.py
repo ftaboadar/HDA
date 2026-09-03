@@ -6,9 +6,9 @@ La usan tanto el consumidor pull de RabbitMQ (worker/main.py, local) como el
 handler push de Pub/Sub (worker/push_handler.py, GCP) — es la evidencia de que
 la táctica de resiliencia en sí es portable, aunque el transporte que la
 invoca no sea idéntico entre ambos entornos."""
+
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 import httpx
 from tenacity import (
@@ -32,7 +32,7 @@ class FallaExterna(Exception):
 class ResultadoProceso:
     exito: bool
     intentos: int
-    motivo_falla: Optional[str] = None
+    motivo_falla: str | None = None
 
 
 def _url_externa(tipo_verificador: str) -> str:
@@ -56,17 +56,13 @@ async def procesar_verificacion(
     verificacion_id: str, proveedor_id: str, tipo_verificador: str
 ) -> ResultadoProceso:
     intentos = 0
-    ultimo_error: Optional[str] = None
+    ultimo_error: str | None = None
 
     @retry(
         reraise=True,
         stop=stop_after_attempt(settings.max_reintentos),
-        wait=wait_exponential_jitter(
-            initial=settings.backoff_base_s, max=settings.backoff_max_s
-        ),
-        retry=retry_if_exception_type(
-            (FallaExterna, httpx.TransportError, httpx.TimeoutException)
-        ),
+        wait=wait_exponential_jitter(initial=settings.backoff_base_s, max=settings.backoff_max_s),
+        retry=retry_if_exception_type((FallaExterna, httpx.TransportError, httpx.TimeoutException)),
     )
     async def _intentar():
         nonlocal intentos, ultimo_error
@@ -82,7 +78,7 @@ async def procesar_verificacion(
                 intento=intentos,
                 duracion_ms=int((time.time() - inicio) * 1000),
             )
-        except Exception as exc:  # noqa: BLE001 — se reclasifica y se re-lanza intencionalmente
+        except Exception as exc:
             ultimo_error = str(exc)
             log_evento(
                 logger,

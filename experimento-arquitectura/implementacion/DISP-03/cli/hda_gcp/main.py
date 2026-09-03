@@ -16,6 +16,7 @@ Ningún comando que crea o destruye recursos reales en GCP (`infra apply`,
 salvo que se pase --yes explícitamente — aprovisionar es una acción
 facturable y con efecto en un sistema externo, no algo para automatizar sin
 mirar."""
+
 from __future__ import annotations
 
 import json
@@ -42,7 +43,7 @@ def _ejecutar(cmd: list[str], cwd: pathlib.Path | None = None, env: dict | None 
     entorno = os.environ.copy()
     if env:
         entorno.update(env)
-    resultado = subprocess.run(cmd, cwd=cwd, env=entorno)
+    resultado = subprocess.run(cmd, cwd=cwd, env=entorno, check=False)
     if resultado.returncode != 0:
         typer.secho(f"Comando falló con código {resultado.returncode}", fg=typer.colors.RED)
         raise typer.Exit(resultado.returncode)
@@ -56,10 +57,13 @@ def check():
     faltantes = [h for h in herramientas if shutil.which(h) is None]
     for h in herramientas:
         ok = h not in faltantes
-        typer.secho(f"{h}: {'OK' if ok else 'NO ENCONTRADO'}", fg=typer.colors.GREEN if ok else typer.colors.RED)
+        typer.secho(
+            f"{h}: {'OK' if ok else 'NO ENCONTRADO'}",
+            fg=typer.colors.GREEN if ok else typer.colors.RED,
+        )
 
     if "gcloud" not in faltantes:
-        subprocess.run(["gcloud", "config", "list"])
+        subprocess.run(["gcloud", "config", "list"], check=False)
 
     if faltantes:
         typer.secho(
@@ -102,7 +106,13 @@ def infra_apply(
             abort=True,
         )
     _ejecutar(
-        ["terraform", "apply", "-auto-approve", f"-var=project_id={project}", f"-var=region={region}"],
+        [
+            "terraform",
+            "apply",
+            "-auto-approve",
+            f"-var=project_id={project}",
+            f"-var=region={region}",
+        ],
         cwd=DIR_INFRA,
     )
 
@@ -120,7 +130,13 @@ def infra_destroy(
             abort=True,
         )
     _ejecutar(
-        ["terraform", "destroy", "-auto-approve", f"-var=project_id={project}", f"-var=region={region}"],
+        [
+            "terraform",
+            "destroy",
+            "-auto-approve",
+            f"-var=project_id={project}",
+            f"-var=region={region}",
+        ],
         cwd=DIR_INFRA,
     )
 
@@ -133,7 +149,11 @@ def infra_output():
 
 def _terraform_output_json() -> dict:
     resultado = subprocess.run(
-        ["terraform", "output", "-json"], cwd=DIR_INFRA, capture_output=True, text=True
+        ["terraform", "output", "-json"],
+        cwd=DIR_INFRA,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if resultado.returncode != 0:
         typer.secho(
@@ -148,7 +168,11 @@ def _terraform_output_json() -> dict:
 def images_build_push(
     project: str = typer.Option(..., "--project", "-p"),
     region: str = typer.Option("southamerica-east1"),
-    repo: str = typer.Option(..., "--repo", help="repository_id de Artifact Registry (output de terraform: artifact_registry_repo)"),
+    repo: str = typer.Option(
+        ...,
+        "--repo",
+        help="repository_id de Artifact Registry (output de terraform: artifact_registry_repo)",
+    ),
 ):
     """Construye la imagen compartida (api/worker/mocks) y la publica en
     Artifact Registry, lista para que 'infra apply' la despliegue."""
@@ -185,7 +209,7 @@ def run_experiment(
         cmd += ["-k", solo]
     resultado_env = os.environ.copy()
     resultado_env.update(env)
-    resultado = subprocess.run(cmd, cwd=RAIZ, env=resultado_env)
+    resultado = subprocess.run(cmd, cwd=RAIZ, env=resultado_env, check=False)
 
     _ejecutar([sys.executable, "tests/reporte.py"], cwd=RAIZ)
 

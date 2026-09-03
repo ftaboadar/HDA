@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,9 +21,9 @@ class VerificacionOut(BaseModel):
     tipo_verificador: TipoVerificador
     estado: EstadoVerificacion
     intentos: int
-    motivo_falla: Optional[str] = None
+    motivo_falla: str | None = None
     creado_en: datetime
     actualizado_en: datetime
-    completado_en: Optional[datetime] = None
-    en_dlq_desde: Optional[datetime] = None
+    completado_en: datetime | None = None
+    en_dlq_desde: datetime | None = None
     reprocesos: int

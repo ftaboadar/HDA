@@ -4,6 +4,7 @@ síntesis global. La síntesis (¿se valida o refuta H1 en conjunto?, ¿qué
 amenazas a la validez aplican?) es responsabilidad exclusiva del agente
 validador-hipotesis (ver .claude/agents/validador-hipotesis.md) — este
 archivo solo produce los datos que ese análisis necesita."""
+
 import json
 import pathlib
 import time
@@ -16,9 +17,7 @@ def reiniciar() -> None:
     RUTA_RESULTADOS.write_text("")
 
 
-def registrar(
-    caso: str, metrica: str, valor, umbral, cumple: bool, detalle: str = ""
-) -> None:
+def registrar(caso: str, metrica: str, valor, umbral, cumple: bool, detalle: str = "") -> None:
     RUTA_RESULTADOS.parent.mkdir(parents=True, exist_ok=True)
     with RUTA_RESULTADOS.open("a", encoding="utf-8") as f:
         f.write(
