@@ -9,8 +9,11 @@ El enunciado del proyecto (`experimento-arquitectura/utils/Proyecto-202614-Hogar
 sección "Objetivo") pide explícitamente: *"Su documento debe considerar los diferentes puntos de
 vista y la estructura de equipo que necesita para lograr el cometido."* Este documento responde esa
 parte del enunciado, y a la vez sirve como especificación operativa real: los "roles de equipo" que
-describe están implementados como subagentes de Claude Code en `.claude/agents/`, invocables durante
-el desarrollo de esta entrega.
+describe están implementados como texto plano en `.claude/agents/*.md`, invocables como subagentes
+nativos en Claude Code y legibles/seguibles por cualquier otro asistente (Gemini CLI, Codex CLI, u
+otro) que el resto del equipo use — ver `AGENTS.md` en la raíz del repo, que es el punto de entrada
+pensado para eso. El equipo no usa una sola herramienta: cada rol se documentó como instrucción
+autocontenida precisamente para no depender de que todos usen Claude Code.
 
 El fin último de esta estructura, tal como se definió con el usuario, es doble:
 
@@ -110,11 +113,20 @@ flowchart TD
 
 ## Cómo se invoca esto en la práctica
 
-Estos agentes son subagentes de Claude Code (`.claude/agents/*.md`), invocables desde la sesión
-principal con la herramienta `Agent` indicando `subagent_type` con el nombre del rol (p. ej.
-`rubrica-auditor`, `validador-hipotesis`). La sesión principal actúa como **orquestador**: decide
+**En Claude Code**: estos agentes son subagentes nativos (`.claude/agents/*.md`), invocables desde
+la sesión principal con la herramienta `Agent` indicando `subagent_type` con el nombre del rol (p.
+ej. `rubrica-auditor`, `validador-hipotesis`). La sesión principal actúa como **orquestador**: decide
 cuándo invocar cada rol, en qué orden, y sintetiza los hallazgos de vuelta al usuario — el
 equivalente al arquitecto/líder técnico del equipo dentro de esta estructura.
+
+**En Gemini CLI, Codex CLI, o cualquier otro asistente** sin soporte nativo de subagentes: el mismo
+archivo `.claude/agents/<rol>.md` se lee y se sigue manualmente — quien esté trabajando en una tarea
+que calce con un rol lo abre primero y adopta sus instrucciones para esa tarea, incluyendo qué leer
+antes y qué NO hacer (en particular, respetar la separación entre `experimento-runner` y
+`validador-hipotesis` es la parte que más se presta a saltarse por comodidad, y es la que más importa
+no saltarse). No hace falta reescribir nada tool-específico: el contenido de cada rol ya es una
+instrucción autocontenida en markdown plano. Ver `AGENTS.md` en la raíz del repo, que es el punto de
+entrada común a cualquier herramienta.
 
 Esto no reemplaza el criterio del usuario: cada transición del flujo (por ejemplo, "el veredicto es
 H1 refutada, ¿ajustamos el diseño o aceptamos el resultado como está?") se reporta para que el
