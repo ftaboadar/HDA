@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Event Storming TO-BE</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 2700px; height: 1520px; background: #eef0f2; font-family: "Segoe UI", Arial, sans-serif; color: #1a1a1a; padding: 30px 40px 40px 40px; }
+  h1 { font-size: 30px; margin: 0 0 4px 0; }
+  h2 { font-size: 18px; font-weight: 400; margin: 0 0 18px 0; color: #444; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; padding: 10px 14px; background: #fff; border-radius: 6px; border: 1px solid #ccc; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.25); }
+  .lane { display: flex; align-items: stretch; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 14px; background: #fff; overflow: hidden; }
+  .lane-label { width: 200px; flex-shrink: 0; background: #37474f; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-weight: 700; font-size: 14.5px; padding: 10px; }
+  .lane-body { display: flex; align-items: center; gap: 6px; padding: 14px; flex-wrap: nowrap; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 195px; flex-shrink: 0; }
+  .arrow { font-size: 22px; color: #888; flex-shrink: 0; }
+  .trigger { width: 195px; font-size: 11px; color: #37474f; text-align: center; font-weight: 700; flex-shrink: 0; }
+  .note { width: 190px; min-height: 62px; border-radius: 3px; padding: 8px; font-size: 12.5px; line-height: 1.3; box-shadow: 2px 3px 6px rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 600; }
+  .note.small { min-height: 46px; font-size: 11.5px; }
+  .actor { background: #fff59d; }
+  .external { background: #f8bbd0; }
+  .command { background: #90caf9; }
+  .event { background: #ffb74d; border: 2px solid #7a3e00; }
+  .event.pivotal { border: 3px solid #b71c1c; }
+  .rule { background: #ce93d8; font-style: italic; font-weight: 500; }
+  .readmodel { background: #a5d6a7; }
+  .definition { background: #f5f5f5; border: 1px solid #999; font-weight: 500; }
+  .footnote { margin-top: 10px; font-size: 13px; color: #333; background: #fff; border-left: 4px solid #2e7d32; padding: 10px 14px; border-radius: 4px; max-width: 1150px; }
+</style>
+</head>
+<body>
+
+  <h1>Event Storming BigPicture &mdash; TO-BE</h1>
+  <h2>Flujo Marketplace: de la solicitud del trabajo al pago y la rese&ntilde;a &middot; Hogar de los Alpes (HdA)</h2>
+
+  <div class="legend">
+    <div class="legend-item"><div class="swatch" style="background:#fff59d"></div>Actor</div>
+    <div class="legend-item"><div class="swatch" style="background:#f8bbd0"></div>Sistema externo</div>
+    <div class="legend-item"><div class="swatch" style="background:#90caf9"></div>Comando</div>
+    <div class="legend-item"><div class="swatch" style="background:#ffb74d;border-color:#7a3e00"></div>Evento de dominio</div>
+    <div class="legend-item"><div class="swatch" style="background:#ffb74d;border:3px solid #b71c1c"></div>Evento pivote (cruza contextos, v&iacute;a OHS/PL)</div>
+    <div class="legend-item"><div class="swatch" style="background:#ce93d8"></div>Regla de negocio</div>
+    <div class="legend-item"><div class="swatch" style="background:#a5d6a7"></div>Modelo de lectura</div>
+    <div class="legend-item"><div class="swatch" style="background:#f5f5f5;border-color:#999"></div>Definici&oacute;n</div>
+  </div>
+
+  <!-- LANE: Marketplace -->
+  <div class="lane">
+    <div class="lane-label">ContextoMarketplace</div>
+    <div class="lane-body">
+      <div class="step">
+        <div class="note actor">Due&ntilde;o de Hogar</div>
+        <div class="note command">Describir y Diagnosticar Problema (Asistente IA)</div>
+        <div class="note event pivotal">Solicitud Diagnosticada</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="trigger" style="width:190px">&#9889; escucha "Trabajo Creado" + "Proveedores Elegibles Publicados" (ACL)</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note command">Publicar Trabajo a Proveedores Elegibles</div>
+        <div class="note event">Trabajo Publicado</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note actor">Proveedor de Servicio</div>
+        <div class="note command">Cotizar Trabajo</div>
+        <div class="note event">Cotizaci&oacute;n Recibida</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note actor">Due&ntilde;o de Hogar</div>
+        <div class="note command">Seleccionar Cotizaci&oacute;n</div>
+        <div class="note event pivotal">Proveedor Seleccionado</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE: GestionDeTrabajos -->
+  <div class="lane">
+    <div class="lane-label">ContextoGestionDe<br>Trabajos</div>
+    <div class="lane-body">
+      <div class="trigger">&#9889; escucha "Solicitud Diagnosticada" (ACL)</div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note command">Crear Trabajo</div>
+        <div class="note event pivotal">Trabajo Creado</div>
+        <div class="note rule small">Publicado como OHS/PL: Proveedores, Reputaci&oacute;n, Scoring y Pagos se suscriben sin tocar esta base de datos</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="trigger" style="width:190px">&#9889; escucha "Proveedor Seleccionado" (ACL)</div>
+        <div class="note command">Asignar Proveedor</div>
+        <div class="note event">Proveedor Asignado</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="trigger" style="width:190px">&#9889; escucha "Novedad Resuelta" (de Operaci&oacute;n de Agentes, ACL)</div>
+        <div class="note rule small">Un cambio de alcance re-inicia la cotizaci&oacute;n (evento hacia Marketplace, no bloquea a los dem&aacute;s)</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note command">Cerrar Trabajo</div>
+        <div class="note event pivotal">Trabajo Finalizado</div>
+        <div class="note definition small">Trabajo: unidad central que representa una necesidad de servicio, con categor&iacute;a, urgencia y ubicaci&oacute;n</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE: Proveedores -->
+  <div class="lane">
+    <div class="lane-label">ContextoProveedores</div>
+    <div class="lane-body">
+      <div class="trigger">&#9889; escucha "Trabajo Creado" (ACL)</div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note command">Filtrar Proveedores Elegibles (categor&iacute;a + zona + verificaci&oacute;n)</div>
+        <div class="note event pivotal">Proveedores Elegibles Publicados</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE: OperacionDeAgentes -->
+  <div class="lane">
+    <div class="lane-label">ContextoOperacionDe<br>Agentes</div>
+    <div class="lane-body">
+      <div class="trigger">&#9889; escucha eventos de novedad desde Gesti&oacute;n de Trabajos (ACL)</div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note actor">Agente de Gesti&oacute;n</div>
+        <div class="note command">Gestionar Novedad / Disputa</div>
+        <div class="note event pivotal">Novedad Resuelta</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE: Reputacion -->
+  <div class="lane">
+    <div class="lane-label">ContextoReputacion</div>
+    <div class="lane-body">
+      <div class="trigger">&#9889; escucha "Trabajo Finalizado" (ACL)</div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note actor">Due&ntilde;o de Hogar</div>
+        <div class="note command">Calificar Proveedor</div>
+        <div class="note event pivotal">Proveedor Calificado</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note readmodel">Perfil de Reputaci&oacute;n del Proveedor</div>
+        <div class="note rule small">Publicado como OHS/PL propio: Marketplace lo consume para futuras asignaciones</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE: Pagos -->
+  <div class="lane">
+    <div class="lane-label">ContextoPagos</div>
+    <div class="lane-body">
+      <div class="trigger">&#9889; escucha "Trabajo Finalizado" (ACL)</div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note external">Pasarela de Pago (tercero)</div>
+        <div class="note command">Liberar Pago Retenido</div>
+        <div class="note event">Pago Liberado</div>
+      </div>
+      <div class="arrow">&rarr;</div>
+      <div class="step">
+        <div class="note readmodel">Vista de Trabajo en tiempo real (estado + pago)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <b>Lectura TO-BE:</b> cada carril es un contexto acotado independiente, con su propia base de datos
+    y ciclo de despliegue -listo para desplegarse por pa&iacute;s (moneda, regulaci&oacute;n, huso horario) sin tocar a los
+    dem&aacute;s-. Los eventos en rojo son <i>pivotales</i>: cruzan la frontera de contexto publicados como Open Host
+    Service + Published Language, y cada contexto consumidor los traduce a su propio modelo mediante un
+    Anticorruption Layer. Una novedad que cambia el alcance ya no bloquea todo el sistema (como en el AS-IS):
+    Operaci&oacute;n de Agentes la resuelve de forma independiente y notifica de vuelta de forma as&iacute;ncrona.
+  </div>
+
+</body>
+</html>

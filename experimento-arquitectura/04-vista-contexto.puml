@@ -1,0 +1,73 @@
+@startuml 04-vista-contexto
+
+' Hogar de los Alpes (HdA) - Vista de Contexto (TO-BE)
+' Diseño táctico - Diagrama de contexto (C4 Model: System Context / Container)
+' Muestra los actores externos, los sistemas externos (SaaS/ERP genéricos comprados)
+' y los módulos/servicios (microservicios) que constituyen la arquitectura interna,
+' derivados 1:1 de los Bounded Contexts definidos en 03-contextos-acotados-TO-BE.cml
+'
+' Nota: no se dibujan las relaciones puramente internas Core->Core (coreografía de
+' eventos entre microservicios): esas pertenecen al diagrama de Módulo. Aquí solo se
+' muestra lo que cruza el límite del sistema (actor<->módulo, módulo<->externo),
+' salvo Gestión de Trabajos<->Reputación, que se conserva para no dejar aislado a
+' ese módulo en esta vista.
+
+!define RELATIVE_INCLUDE
+!include ./C4-PlantUML/C4_Container.puml
+
+AddRelTag("async", $lineStyle = DashedLine())
+
+title Hogar de los Alpes (HdA) — Vista de Contexto (TO-BE)
+
+Person(duenoHogar, "Dueño de Hogar", "Cliente B2C")
+Person(proveedor, "Proveedor de Servicio", "Ejecuta Trabajos")
+Person(agenteGestion, "Agente de Gestión", "Verificación y novedades")
+
+System_Ext(sistemasVerificacion, "Sistemas de Verificación", "Policía, RUES, certificadoras")
+System_Ext(partnersB2B2C, "Partners B2B2C", "Aseguradoras, bancos, comercios")
+
+System_Boundary(hda, "Hogar de los Alpes — Módulos Core") {
+  Container(marketplace, "Marketplace", "Microservicio", "Canal B2C")
+  Container(siniestros, "Siniestros", "Microservicio", "Canal B2B2C")
+  Container(suscripciones, "Suscripciones", "Microservicio", "Servicios recurrentes")
+  Container(proveedores, "Proveedores", "Microservicio", "Registro y verificación")
+  Container(reputacion, "Reputación y Calidad", "Microservicio", "Cálculo de reputación")
+  Container(gestionTrabajos, "Gestión de Trabajos", "Microservicio", "Motor de orquestación\ndueño del Trabajo")
+  Container(scoring, "Scoring y Crédito", "Microservicio", "Score crediticio")
+}
+
+System_Ext(notificaciones, "Notificaciones", "SaaS Push/SMS/Email")
+System_Ext(documental, "Gestor Documental", "Repositorio S3/CMS")
+System_Ext(pagos, "Pagos", "Pasarela de pagos")
+System_Ext(contabilidad, "Contabilidad", "ERP externo")
+System_Ext(agentesSaaS, "Gestión de Agentes", "CRM (ej. Zendesk)")
+
+' --- Actores externos ---
+Rel_R(duenoHogar, marketplace, "Solicita trabajo")
+Rel(duenoHogar, suscripciones, "Contrata suscripción")
+Rel_R(proveedor, proveedores, "Se registra")
+Rel(proveedor, marketplace, "Cotiza trabajo")
+Rel(proveedor, scoring, "Consulta score")
+Rel_R(agenteGestion, agentesSaaS, "Atiende tickets")
+Rel_L(partnersB2B2C, siniestros, "Crea siniestro")
+
+' --- Único enlace Core->Core conservado (evita aislar a Reputación) ---
+Rel(gestionTrabajos, reputacion, "Trabajo completado", $tags="async")
+Rel(reputacion, marketplace, "Score actualizado", $tags="async")
+
+' --- Módulos -> sistemas externos (vía ACL) ---
+Rel_U(proveedores, sistemasVerificacion, "Verifica antecedentes")
+Rel_R(gestionTrabajos, notificaciones, "Notifica")
+Rel(marketplace, notificaciones, "Notifica")
+Rel_R(gestionTrabajos, documental, "Evidencias")
+Rel(proveedores, documental, "Certificados")
+Rel_R(gestionTrabajos, agentesSaaS, "Levanta ticket")
+Rel(proveedores, agentesSaaS, "Levanta ticket")
+Rel_R(gestionTrabajos, pagos, "Cobro")
+Rel(suscripciones, pagos, "Cobro recurrente")
+Rel_D(pagos, contabilidad, "Sincroniza")
+Rel(scoring, contabilidad, "Sincroniza")
+
+SHOW_LEGEND()
+
+@enduml

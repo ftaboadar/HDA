@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+*.tfplan
+
+# Resultados de ejecución de experimentos (datos crudos, no versionados)
+experimento-arquitectura/09-experimento-DISP-03/tests/results/*.jsonl
+
+# SO
+.DS_Store

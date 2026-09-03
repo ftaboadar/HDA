@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Event Storming AS-IS</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    width: 2650px;
+    height: 720px;
+    background: #eef0f2;
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #1a1a1a;
+    padding: 30px 40px 60px 40px;
+  }
+  h1 { font-size: 30px; margin: 0 0 4px 0; }
+  h2 { font-size: 18px; font-weight: 400; margin: 0 0 20px 0; color: #444; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; padding: 10px 14px; background: #fff; border-radius: 6px; border: 1px solid #ccc; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.25); }
+  .monolith-band { position: relative; border: 3px dashed #999; border-radius: 10px; padding: 50px 24px 24px 24px;
+    background: repeating-linear-gradient(135deg, #f5f5f5, #f5f5f5 18px, #eeeeee 18px, #eeeeee 36px); }
+  .monolith-label { position: absolute; top: -18px; left: 24px; background: #555; color: #fff; padding: 6px 14px; border-radius: 5px; font-size: 14px; font-weight: 600; }
+  .timeline { display: flex; align-items: flex-start; gap: 6px; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 195px; flex-shrink: 0; }
+  .arrow { align-self: center; margin-top: 90px; font-size: 26px; color: #888; flex-shrink: 0; }
+  .note { width: 190px; min-height: 74px; border-radius: 3px; padding: 9px; font-size: 12.5px; line-height: 1.32;
+    box-shadow: 2px 3px 6px rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 600; }
+  .note.small { min-height: 54px; font-size: 11.5px; }
+  .actor { background: #fff59d; }
+  .external { background: #f8bbd0; }
+  .command { background: #90caf9; }
+  .event { background: #ffb74d; border: 2px solid #7a3e00; }
+  .rule { background: #ce93d8; font-style: italic; font-weight: 500; }
+  .readmodel { background: #a5d6a7; }
+  .definition { background: #f5f5f5; border: 1px solid #999; font-weight: 500; }
+  .footnote { margin-top: 18px; font-size: 13px; color: #333; background: #fff; border-left: 4px solid #b71c1c; padding: 10px 14px; border-radius: 4px; max-width: 1100px; }
+</style>
+</head>
+<body>
+
+  <h1>Event Storming BigPicture &mdash; AS-IS</h1>
+  <h2>Flujo Marketplace: de la solicitud del trabajo al pago y la rese&ntilde;a &middot; Hogar de los Alpes (HdA)</h2>
+
+  <div class="legend">
+    <div class="legend-item"><div class="swatch" style="background:#fff59d"></div>Actor</div>
+    <div class="legend-item"><div class="swatch" style="background:#f8bbd0"></div>Sistema externo</div>
+    <div class="legend-item"><div class="swatch" style="background:#90caf9"></div>Comando</div>
+    <div class="legend-item"><div class="swatch" style="background:#ffb74d;border-color:#7a3e00"></div>Evento de dominio</div>
+    <div class="legend-item"><div class="swatch" style="background:#ce93d8"></div>Regla de negocio</div>
+    <div class="legend-item"><div class="swatch" style="background:#a5d6a7"></div>Modelo de lectura</div>
+    <div class="legend-item"><div class="swatch" style="background:#f5f5f5;border-color:#999"></div>Definici&oacute;n</div>
+  </div>
+
+  <div class="monolith-band">
+    <div class="monolith-label">Monolito HdA &mdash; una misma fuente de c&oacute;digo y un mismo despliegue</div>
+    <div class="timeline">
+
+      <div class="step">
+        <div class="note actor">Due&ntilde;o de Hogar</div>
+        <div class="note command">Describir Problema (chat)</div>
+        <div class="note command">Diagnosticar Problema (Asistente IA)</div>
+        <div class="note event">Trabajo Creado</div>
+        <div class="note rule small">El asistente debe producir categor&iacute;a + urgencia + ubicaci&oacute;n + evidencia antes de crear el trabajo</div>
+      </div>
+
+      <div class="arrow">&rarr;</div>
+
+      <div class="step">
+        <div class="note command">Publicar Trabajo</div>
+        <div class="note event">Trabajo Publicado</div>
+        <div class="note rule small">Solo lo ven proveedores acreditados en esa categor&iacute;a y zona</div>
+      </div>
+
+      <div class="arrow">&rarr;</div>
+
+      <div class="step">
+        <div class="note actor">Proveedor de Servicio</div>
+        <div class="note command">Cotizar Trabajo</div>
+        <div class="note event">Cotizaci&oacute;n Recibida</div>
+        <div class="note rule small">Algunos proveedores requieren informaci&oacute;n adicional o visita al predio</div>
+      </div>
+
+      <div class="arrow">&rarr;</div>
+
+      <div class="step">
+        <div class="note actor">Due&ntilde;o de Hogar</div>
+        <div class="note command">Seleccionar Cotizaci&oacute;n</div>
+        <div class="note event">Proveedor Seleccionado</div>
+      </div>
+
+      <div class="arrow">&rarr;</div>
+
+      <div class="step">
+        <div class="note actor">Agente de Gesti&oacute;n</div>
+        <div class="note command">Monitorear Avance</div>
+        <div class="note event">Novedad Detectada</div>
+        <div class="note rule small">Un cambio de alcance puede re-iniciar la cotizaci&oacute;n</div>
+      </div>
+
+      <div class="arrow">&rarr;</div>
+
+      <div class="step">
+        <div class="note command">Ejecutar Trabajo</div>
+        <div class="note event">Trabajo Ejecutado</div>
+        <div class="note definition small">Novedad: evento imprevisto que puede cambiar la naturaleza del trabajo en plena ejecuci&oacute;n</div>
+      </div>
+
+      <div class="arrow">&rarr;</div>
+
+      <div class="step">
+        <div class="note external">Pasarela de Pago (tercero)</div>
+        <div class="note command">Procesar y Retener Pago</div>
+        <div class="note event">Pago Retenido</div>
+        <div class="note event">Pago Liberado</div>
+      </div>
+
+      <div class="arrow">&rarr;</div>
+
+      <div class="step">
+        <div class="note actor">Due&ntilde;o de Hogar</div>
+        <div class="note command">Calificar Proveedor</div>
+        <div class="note event">Proveedor Calificado</div>
+        <div class="note readmodel">Vista de Trabajo en tiempo real</div>
+        <div class="note readmodel">Perfil de Reputaci&oacute;n del Proveedor</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footnote">
+    <b>Lectura AS-IS:</b> todo el flujo -diagn&oacute;stico, publicaci&oacute;n, cotizaci&oacute;n, ejecuci&oacute;n, pago y calificaci&oacute;n- corre
+    sobre el mismo c&oacute;digo fuente y el mismo despliegue. Por eso en el Context Map AS-IS los m&oacute;dulos de Marketplace,
+    Proveedores, Fintech y Operaciones est&aacute;n unidos por Shared Kernel con Gesti&oacute;n de Trabajos: un cambio de alcance
+    en el paso de "Novedad Detectada" puede requerir tocar y redesplegar todo el sistema, no solo el m&oacute;dulo afectado.
+  </div>
+
+</body>
+</html>

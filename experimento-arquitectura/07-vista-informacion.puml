@@ -1,0 +1,117 @@
+@startuml 07-vista-informacion
+
+' Hogar de los Alpes (HdA) - Vista de Información (TO-BE)
+' Diseño táctico - Diagrama de Entidades
+'
+' Un Agregado por Bounded Context (coherente con 03-contextos-acotados-TO-BE.cml).
+' No se detallan atributos/métodos: solo entidades, objetos valor y relaciones.
+' Se marca explícitamente la Entidad Raíz de cada agregado (Aggregate Root).
+' Las referencias entre agregados de distintos módulos son solo por id (sin
+' composición), como corresponde entre Bounded Contexts independientes.
+
+hide circle
+hide empty members
+
+skinparam class {
+  BackgroundColor<<AggregateRoot>> #FFE6CC
+  BorderColor<<AggregateRoot>> #D79B00
+  BackgroundColor<<Entity>> #DAE8FC
+  BorderColor<<Entity>> #6C8EBF
+  BackgroundColor<<ValueObject>> #E1D5E7
+  BorderColor<<ValueObject>> #9673A6
+}
+
+title Hogar de los Alpes — Vista de Información (TO-BE)\nEntidades, Objetos Valor y Agregados
+
+package "Gestión de Trabajos" {
+  class Trabajo <<AggregateRoot>>
+  class SubTrabajo <<Entity>>
+  class Cotizacion <<Entity>>
+  class Novedad <<Entity>>
+  class Direccion <<ValueObject>>
+  class Urgencia <<ValueObject>>
+  class CategoriaServicio <<ValueObject>>
+
+  Trabajo "1" *-- "1..*" SubTrabajo
+  SubTrabajo "1" *-- "0..*" Cotizacion
+  Trabajo "1" *-- "0..*" Novedad
+  Trabajo *-- Direccion
+  Trabajo *-- Urgencia
+  SubTrabajo *-- CategoriaServicio
+}
+
+package "Marketplace" {
+  class Cliente <<AggregateRoot>>
+  class SolicitudTrabajo <<AggregateRoot>>
+  class Diagnostico <<ValueObject>>
+
+  SolicitudTrabajo *-- Diagnostico
+}
+
+package "Siniestros" {
+  class Siniestro <<AggregateRoot>>
+  class Partner <<AggregateRoot>>
+  class SLA <<ValueObject>>
+
+  Partner "1" *-- "0..*" SLA
+}
+
+package "Suscripciones" {
+  class Suscripcion <<AggregateRoot>>
+  class AsignacionProveedor <<Entity>>
+  class CicloFacturacion <<ValueObject>>
+
+  Suscripcion "1" *-- "1..*" AsignacionProveedor
+  Suscripcion *-- CicloFacturacion
+}
+
+package "Proveedores" {
+  class Proveedor <<AggregateRoot>>
+  class Empleado <<Entity>>
+  class Certificado <<ValueObject>>
+  class Cobertura <<ValueObject>>
+
+  Proveedor "1" *-- "0..*" Empleado
+  Proveedor "1" *-- "0..*" Certificado
+  Proveedor *-- Cobertura
+}
+
+package "Reputación y Calidad" {
+  class PerfilReputacion <<AggregateRoot>>
+  class Calificacion <<Entity>>
+  class Garantia <<ValueObject>>
+
+  PerfilReputacion "1" *-- "0..*" Calificacion
+  Calificacion *-- Garantia
+}
+
+package "Scoring y Crédito" {
+  class PerfilCrediticio <<AggregateRoot>>
+  class Prestamo <<AggregateRoot>>
+  class HistorialScore <<Entity>>
+
+  PerfilCrediticio "1" *-- "0..*" HistorialScore
+}
+
+' --- Referencias entre agregados de distintos módulos (solo por id) ---
+Cotizacion ..> Proveedor : referencia (id)
+Siniestro ..> Trabajo : referencia (id)
+Suscripcion ..> Trabajo : genera (id)
+AsignacionProveedor ..> Proveedor : referencia (id)
+Calificacion ..> Trabajo : referencia (id)
+PerfilReputacion ..> Proveedor : referencia (id)
+PerfilCrediticio ..> Proveedor : referencia (id)
+Prestamo ..> PerfilCrediticio : referencia (id)
+SolicitudTrabajo ..> Cliente : referencia (id)
+SolicitudTrabajo ..> Trabajo : deriva en (id)
+
+legend right
+  |= símbolo |= significado |
+  | <back:#FFE6CC>  </back> | Entidad Raíz de Agregado (Aggregate Root) |
+  | <back:#DAE8FC>  </back> | Entidad (parte del agregado) |
+  | <back:#E1D5E7>  </back> | Objeto Valor (Value Object) |
+  | *-- | composición (pertenece al agregado) |
+  | ..> | referencia entre agregados de otro módulo (solo por id) |
+endlegend
+
+@enduml

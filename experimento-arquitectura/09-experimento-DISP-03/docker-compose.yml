@@ -1,0 +1,96 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: hda
+      RABBITMQ_DEFAULT_PASS: hda
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hda
+      POSTGRES_PASSWORD: hda
+      POSTGRES_DB: verificacion
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hda"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  mock-policia:
+    build: .
+    command: uvicorn app.mocks.main:app --host 0.0.0.0 --port 8000
+    environment:
+      MOCK_NAME: policia
+    ports:
+      - "8101:8000"
+
+  mock-rues:
+    build: .
+    command: uvicorn app.mocks.main:app --host 0.0.0.0 --port 8000
+    environment:
+      MOCK_NAME: rues
+    ports:
+      - "8102:8000"
+
+  mock-certificadora:
+    build: .
+    command: uvicorn app.mocks.main:app --host 0.0.0.0 --port 8000
+    environment:
+      MOCK_NAME: certificadora
+    ports:
+      - "8103:8000"
+
+  api:
+    build: .
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      TRANSPORTE: rabbitmq
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/verificacion
+      RABBITMQ_URL: amqp://hda:hda@rabbitmq:5672/
+      MOCK_POLICIA_URL: http://mock-policia:8000
+      MOCK_RUES_URL: http://mock-rues:8000
+      MOCK_CERTIFICADORA_URL: http://mock-certificadora:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python -m app.worker.main
+    environment:
+      TRANSPORTE: rabbitmq
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/verificacion
+      RABBITMQ_URL: amqp://hda:hda@rabbitmq:5672/
+      MOCK_POLICIA_URL: http://mock-policia:8000
+      MOCK_RUES_URL: http://mock-rues:8000
+      MOCK_CERTIFICADORA_URL: http://mock-certificadora:8000
+      MAX_REINTENTOS: "4"
+      TIMEOUT_EXTERNO_S: "3.0"
+      BACKOFF_BASE_S: "0.5"
+      BACKOFF_MAX_S: "8.0"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mock-policia:
+        condition: service_started
+      mock-rues:
+        condition: service_started
+      mock-certificadora:
+        condition: service_started

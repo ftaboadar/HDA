@@ -1,0 +1,113 @@
+/*
+ * Hogar de los Alpes (HdA)
+ * Entrega 1 - Contextos Acotados TO-BE
+ *
+ * Migración a un sistema reactivo distribuido basado en eventos.
+ * Se incluyen las capacidades genéricas (SaaS comprados) conectadas mediante Capas Anticorrupción (ACL).
+ */
+
+import "./01-dominios-subdominios.cml"
+
+BoundedContext ContextoGestionDeTrabajos implements GestionDeTrabajos {
+  domainVisionStatement = "El motor de orquestación de HdA: dueño único del 'Trabajo'. Publica eventos (OHS/PL) y consume servicios externos vía ACL."
+}
+
+BoundedContext ContextoMarketplace implements Marketplace {
+  domainVisionStatement = "Dueño único del canal B2C. Publica intención de Trabajo hacia Gestión de Trabajos."
+}
+
+BoundedContext ContextoSuscripciones implements GestionDeSuscripciones {
+  domainVisionStatement = "Dueño único del ciclo de vida de suscripciones. Contexto nuevo (greenfield)."
+}
+
+BoundedContext ContextoSiniestros implements SiniestrosYPartners {
+  domainVisionStatement = "Dueño único del canal B2B2C: integraciones y reglas de partners."
+}
+
+BoundedContext ContextoProveedores implements ProveedoresDeServicio {
+  domainVisionStatement = "Dueño único del registro y verificación. Publica eventos de habilitación."
+}
+
+BoundedContext ContextoReputacion implements ReputacionYCalidad {
+  domainVisionStatement = "Calcula reputación consumiendo eventos de Gestión de Trabajos."
+}
+
+BoundedContext ContextoScoring implements ScoringYCredito {
+  domainVisionStatement = "Calcula score crediticio. Expone API para originación de créditos."
+}
+
+/* --- Sistemas Genéricos Externos (Comprados/SaaS) --- */
+
+BoundedContext ContextoGestionAgentes implements OperacionDeAgentes {
+  domainVisionStatement = "Plataforma SaaS (CRM) para los agentes humanos."
+}
+
+BoundedContext ContextoContabilidad implements Contabilidad {
+  domainVisionStatement = "Sistema contable externo (ERP)."
+}
+
+BoundedContext ContextoGestorDocumental implements GestorDocumental {
+  domainVisionStatement = "Repositorio documental externo."
+}
+
+BoundedContext ContextoNotificaciones implements Notificaciones {
+  domainVisionStatement = "SaaS de notificaciones push, SMS y Email."
+}
+
+BoundedContext ContextoPagos implements Pagos {
+  domainVisionStatement = "Pasarela de pagos genérica para marketplace (ej. Stripe Connect)."
+}
+
+ContextMap HogarDeLosAlpesTOBE {
+  type = SYSTEM_LANDSCAPE
+  state = TO_BE
+
+  contains ContextoGestionDeTrabajos
+  contains ContextoMarketplace
+  contains ContextoSiniestros
+  contains ContextoSuscripciones
+  contains ContextoProveedores
+  contains ContextoReputacion
+  contains ContextoScoring
+  
+  /* Sistemas Genéricos */
+  contains ContextoGestionAgentes
+  contains ContextoContabilidad
+  contains ContextoGestorDocumental
+  contains ContextoNotificaciones
+  contains ContextoPagos
+
+  /* Relaciones Core -> Core (Basadas en Eventos) */
+  ContextoMarketplace [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
+  ContextoSiniestros [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
+  ContextoSuscripciones [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
+
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de dominio" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSiniestros { implementationTechnology = "Eventos de dominio" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSuscripciones { implementationTechnology = "Eventos de dominio" }
+
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoReputacion { implementationTechnology = "Eventos de dominio" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoScoring { implementationTechnology = "Eventos de dominio" }
+  ContextoReputacion [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de dominio" }
+
+  /* Relaciones con Sistemas Genéricos Externos (Normalmente APIs / REST / ACL) */
+  
+  /* Gestión de agentes reacciona a los eventos de trabajos y proveedores para levantar tickets */
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoGestionAgentes { implementationTechnology = "Eventos -> Webhooks" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoGestionAgentes { implementationTechnology = "Eventos -> Webhooks" }
+
+  /* Módulos Core consumen APIs externas de Notificaciones y Documentos mediante un ACL para no acoplarse al SDK */
+  ContextoNotificaciones [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "API REST" }
+  ContextoNotificaciones [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "API REST" }
+  
+  ContextoGestorDocumental [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "API REST / S3" }
+  ContextoGestorDocumental [U, OHS, PL] -> [D, ACL] ContextoProveedores { implementationTechnology = "API REST / S3" }
+
+  /* Gestión de trabajos y Suscripciones orquestan los cobros vía la plataforma de pagos genérica */
+  ContextoPagos [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "API REST" }
+  ContextoPagos [U, OHS, PL] -> [D, ACL] ContextoSuscripciones { implementationTechnology = "API REST" }
+
+  /* La plataforma de pagos y el Scoring se sincronizan con la contabilidad formal */
+  ContextoContabilidad [U, OHS, PL] -> [D, ACL] ContextoPagos { implementationTechnology = "Batch / API REST" }
+  ContextoContabilidad [U, OHS, PL] -> [D, ACL] ContextoScoring { implementationTechnology = "Batch / API REST" }
+}

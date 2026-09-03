@@ -1,0 +1,143 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Página-1" id="oXGlwOsYPvMtIgMw23v7">
+    <mxGraphModel dx="1248" dy="826" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Actores externos (columna izquierda) -->
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-7" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;align=center;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Dueño de Hogar&amp;nbsp;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="30" x="30" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-5" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Proveedor del servicio&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="30" x="30" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-6" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;align=center;" value="&lt;span style=&quot;font-size: 13px;&quot;&gt;Agente de Gestión&amp;nbsp;&lt;/span&gt;" vertex="1">
+          <mxGeometry height="60" width="30" x="30" y="660" as="geometry" />
+        </mxCell>
+
+        <!-- Frame: Hogar de los Alpes (módulos core) -->
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-10" parent="1" style="shape=umlFrame;whiteSpace=wrap;html=1;pointerEvents=0;recursiveResize=0;container=1;collapsible=0;width=160;dashed=1;dashPattern=8 8;" value="Hogar de los Alpes" vertex="1">
+          <mxGeometry height="340" width="700" x="240" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-21" parent="VeQMvI9p6Okwz45_UUxn-10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Marketplace" vertex="1">
+          <mxGeometry height="60" width="120" x="30" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-16" parent="VeQMvI9p6Okwz45_UUxn-10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Siniestros" vertex="1">
+          <mxGeometry height="60" width="120" x="200" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-17" parent="VeQMvI9p6Okwz45_UUxn-10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Suscripciones" vertex="1">
+          <mxGeometry height="60" width="120" x="370" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-15" parent="VeQMvI9p6Okwz45_UUxn-10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Proveedores" vertex="1">
+          <mxGeometry height="60" width="120" x="540" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-20" parent="VeQMvI9p6Okwz45_UUxn-10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Reputación y calidad" vertex="1">
+          <mxGeometry height="60" width="120" x="30" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-18" parent="VeQMvI9p6Okwz45_UUxn-10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Gestión de Trabajos" vertex="1">
+          <mxGeometry height="60" width="120" x="200" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-19" parent="VeQMvI9p6Okwz45_UUxn-10" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Scoring y Crédito&amp;nbsp;" vertex="1">
+          <mxGeometry height="60" width="120" x="370" y="220" as="geometry" />
+        </mxCell>
+
+        <!-- Sistemas externos genéricos (columna derecha) -->
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="Sistema de Verificación&amp;nbsp;" vertex="1">
+          <mxGeometry height="60" width="120" x="1010" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="Partners B2B2C" vertex="1">
+          <mxGeometry height="60" width="120" x="1010" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-notificaciones" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="Notificaciones" vertex="1">
+          <mxGeometry height="60" width="120" x="1010" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="Gestor Documental" vertex="1">
+          <mxGeometry height="60" width="120" x="1010" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="Pagos" vertex="1">
+          <mxGeometry height="60" width="120" x="1010" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="Contabilidad" vertex="1">
+          <mxGeometry height="60" width="120" x="1010" y="560" as="geometry" />
+        </mxCell>
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-13" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="Gestor de Agentes" vertex="1">
+          <mxGeometry height="60" width="120" x="1010" y="660" as="geometry" />
+        </mxCell>
+
+        <!-- Relaciones: solo número, texto completo va en la tabla de referencia -->
+        <mxCell id="VeQMvI9p6Okwz45_UUxn-22" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-6" target="VeQMvI9p6Okwz45_UUxn-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e1" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-7" target="VeQMvI9p6Okwz45_UUxn-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e2" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-7" target="VeQMvI9p6Okwz45_UUxn-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e3" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-5" target="VeQMvI9p6Okwz45_UUxn-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e4" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-5" target="VeQMvI9p6Okwz45_UUxn-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e5" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-5" target="VeQMvI9p6Okwz45_UUxn-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e6" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-14" target="VeQMvI9p6Okwz45_UUxn-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e14" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-18" target="VeQMvI9p6Okwz45_UUxn-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;dashed=1;labelBackgroundColor=#ffffff;" value="8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e16" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-20" target="VeQMvI9p6Okwz45_UUxn-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;dashed=1;labelBackgroundColor=#ffffff;" value="9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e13" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-15" target="VeQMvI9p6Okwz45_UUxn-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e17" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-18" target="ctx-notificaciones" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e18" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-21" target="ctx-notificaciones" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e19" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-18" target="VeQMvI9p6Okwz45_UUxn-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e20" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-15" target="VeQMvI9p6Okwz45_UUxn-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e21" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-18" target="VeQMvI9p6Okwz45_UUxn-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e22" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-15" target="VeQMvI9p6Okwz45_UUxn-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e23" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-18" target="VeQMvI9p6Okwz45_UUxn-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e24" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-17" target="VeQMvI9p6Okwz45_UUxn-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e25" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-9" target="VeQMvI9p6Okwz45_UUxn-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-e26" edge="1" parent="1" source="VeQMvI9p6Okwz45_UUxn-19" target="VeQMvI9p6Okwz45_UUxn-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;" value="20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Leyenda: línea punteada = evento de dominio async; línea sólida = llamada síncrona (API/Webhook/Batch/CRM) -->
+        <mxCell id="ctx-legend-title" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontStyle=1;fontSize=13;" value="Referencia de relaciones (línea punteada = evento de dominio asíncrono; línea sólida = llamada síncrona API/Webhook/Batch/CRM)" vertex="1">
+          <mxGeometry height="30" width="1000" x="30" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-legend" parent="1" style="text;html=1;align=left;verticalAlign=top;fontSize=11;spacing=4;" value="&lt;div&gt;1. Dueño de Hogar → Marketplace: solicita y da seguimiento a Trabajos [Web/App + Chat]&lt;/div&gt;&lt;div&gt;2. Dueño de Hogar → Suscripciones: contrata y gestiona servicios recurrentes [Web/App]&lt;/div&gt;&lt;div&gt;3. Proveedor → Proveedores: se registra y sube documentos de verificación [Web/App]&lt;/div&gt;&lt;div&gt;4. Proveedor → Marketplace: cotiza y ejecuta Trabajos asignados [Web/App]&lt;/div&gt;&lt;div&gt;5. Proveedor → Scoring: consulta score y solicita micro-préstamos [API/App]&lt;/div&gt;&lt;div&gt;6. Partners B2B2C → Siniestros: crea trabajos, sincroniza estado/evidencias/facturación [API REST]&lt;/div&gt;&lt;div&gt;7. Agente de Gestión → Gestor de Agentes: atiende tickets de verificación y novedades [CRM]&lt;/div&gt;&lt;div&gt;8. Gestión de Trabajos → Reputación: publica evento de Trabajo completado [Eventos de dominio]&lt;/div&gt;&lt;div&gt;9. Reputación → Marketplace: publica score de reputación actualizado [Eventos de dominio]&lt;/div&gt;&lt;div&gt;10. Proveedores → Sistema de Verificación: consulta antecedentes/registro mercantil/certificaciones [APIs externas]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="220" width="600" x="30" y="840" as="geometry" />
+        </mxCell>
+        <mxCell id="ctx-legend2" parent="1" style="text;html=1;align=left;verticalAlign=top;fontSize=11;spacing=4;" value="&lt;div&gt;11. Gestión de Trabajos → Notificaciones: envía notificaciones de estado [API REST vía ACL]&lt;/div&gt;&lt;div&gt;12. Marketplace → Notificaciones: envía notificaciones de estado [API REST vía ACL]&lt;/div&gt;&lt;div&gt;13. Gestión de Trabajos → Gestor Documental: almacena y consulta evidencias [API REST/S3 vía ACL]&lt;/div&gt;&lt;div&gt;14. Proveedores → Gestor Documental: almacena certificados y documentos [API REST/S3 vía ACL]&lt;/div&gt;&lt;div&gt;15. Gestión de Trabajos → Gestor de Agentes: notifica eventos para levantar tickets [Webhooks vía ACL]&lt;/div&gt;&lt;div&gt;16. Proveedores → Gestor de Agentes: notifica eventos para levantar tickets [Webhooks vía ACL]&lt;/div&gt;&lt;div&gt;17. Gestión de Trabajos → Pagos: orquesta cobro, retención y liberación de pagos [API REST vía ACL]&lt;/div&gt;&lt;div&gt;18. Suscripciones → Pagos: orquesta cobro recurrente [API REST vía ACL]&lt;/div&gt;&lt;div&gt;19. Pagos → Contabilidad: sincroniza movimientos financieros [Batch/API REST]&lt;/div&gt;&lt;div&gt;20. Scoring → Contabilidad: sincroniza cartera de créditos [Batch/API REST]&lt;/div&gt;" vertex="1">
+          <mxGeometry height="220" width="600" x="650" y="840" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

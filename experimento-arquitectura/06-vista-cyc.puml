@@ -1,0 +1,116 @@
+@startuml 06-vista-cyc
+
+' Hogar de los Alpes (HdA) - Vista de Componentes y Conectores (C&C, runtime)
+' Diseño táctico - Vista funcional / runtime
+'
+' A diferencia de la vista de Módulo (estructura estática), aquí se muestra el
+' sistema EN EJECUCIÓN: procesos/instancias, conectores (colas de eventos, llamadas
+' síncronas) y mecanismos de resiliencia. Foco: "Gestión de Trabajos", identificado
+' como punto de sensibilidad en la vista de Módulo (mayor fan-in/fan-out del sistema),
+' y cómo su runtime debe absorber los picos de hasta 4x en 48h (eventos climáticos
+' que disparan Siniestros) sin degradar el resto de canales.
+
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor<<proceso>> #DAE8FC
+  BorderColor<<proceso>> #6C8EBF
+  BackgroundColor<<sensible>> #FFE6CC
+  BorderColor<<sensible>> #D79B00
+  BackgroundColor<<externo>> #F5F5F5
+  BorderColor<<externo>> #666666
+  BackgroundColor<<conector>> #FFFFFF
+  BorderColor<<conector>> #999999
+}
+skinparam node {
+  BackgroundColor<<sensible>> #FFE6CC
+  BorderColor<<sensible>> #D79B00
+}
+skinparam queue {
+  BackgroundColor #EDEDED
+  BorderColor #666666
+}
+skinparam database {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+}
+
+title Hogar de los Alpes — Vista C&C (Runtime)\nFoco: proceso "Gestión de Trabajos" bajo picos de carga (hasta 4x / 48h)
+
+cloud "Procesos productores" {
+  component "Marketplace\n(réplicas)" as MKT <<proceso>>
+  component "Siniestros\n(réplicas)" as SIN <<proceso>>
+  component "Suscripciones\n(réplicas)" as SUS <<proceso>>
+}
+
+component "API Gateway /\nLoad Balancer" as LB <<proceso>>
+
+queue "Message Broker" {
+  component "trabajo.intencion" as T1
+  component "trabajo.siniestro" as T2
+  component "trabajo.suscripcion" as T3
+  component "trabajo.completado" as T4
+  component "DLQ trabajo.fallidos" as DLQ <<sensible>>
+}
+
+node "Gestión de Trabajos\n⚠ N réplicas + auto-scaling" as GT <<sensible>>
+database "BD Trabajos\n(por servicio)" as DB
+
+component "ACL Notificaciones\n(circuit breaker)" as ACL1 <<conector>>
+component "ACL Documental\n(circuit breaker)" as ACL2 <<conector>>
+component "ACL Agentes\n(circuit breaker)" as ACL3 <<conector>>
+component "ACL Pagos\n(circuit breaker)" as ACL4 <<conector>>
+
+component "Notificaciones" as NOT <<externo>>
+component "Gestor Documental" as DOC <<externo>>
+component "Gestión de Agentes" as AGT <<externo>>
+component "Pagos" as PAG <<externo>>
+
+cloud "Procesos consumidores (async)" {
+  component "Reputación\n(consumer group)" as REP <<proceso>>
+  component "Scoring\n(consumer group)" as SCR <<proceso>>
+}
+
+MKT ..> T1 : publica
+SIN ..> T2 : publica
+SUS ..> T3 : publica
+LB --> GT : REST (creación directa /\nconsultas de estado)
+
+T1 ..> GT : consume
+T2 ..> GT : consume
+T3 ..> GT : consume
+T2 ..> DLQ : reintentos\nagotados (pico 4x)
+
+GT --> DB : lee / escribe\nagregado Trabajo
+GT ..> T4 : publica evento
+T4 ..> REP : consume
+T4 ..> SCR : consume
+
+GT --> ACL1
+GT --> ACL2
+GT --> ACL3
+GT --> ACL4
+ACL1 --> NOT : API REST
+ACL2 --> DOC : API / S3
+ACL3 --> AGT : Webhook
+ACL4 --> PAG : API REST
+
+note right of GT
+  **Proceso de mayor sensibilidad en runtime**
+  Concentra 3 topics de entrada + 1 de salida
+  + 4 llamadas síncronas vía ACL.
+  Mitigaciones necesarias:
+  • auto-scaling horizontal (réplicas stateless)
+  • circuit breaker independiente por cada ACL
+  • DLQ para absorber picos sin bloquear el topic
+end note
+
+legend right
+  |= símbolo |= significado |
+  | <back:#FFE6CC>  </back> | proceso identificado como punto de sensibilidad |
+  | <back:#DAE8FC>  </back> | proceso propio (réplicas) |
+  | <back:#F5F5F5>  </back> | sistema externo (SaaS/ERP) |
+  | ..> | conector asíncrono (evento vía Message Broker) |
+  | --> | conector síncrono (REST / lectura-escritura BD) |
+endlegend
+
+@enduml
