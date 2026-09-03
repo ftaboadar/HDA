@@ -8,11 +8,22 @@ adicional a la BD antes de poder actuar (Regla 4 de la rúbrica: distinguir el
 tipo de evento y su forma explícitamente)."""
 
 import aio_pika
+from tenacity import retry, stop_after_attempt, wait_exponential_jitter
 
 from app.common.config import settings
 
 
+@retry(
+    reraise=True,
+    stop=stop_after_attempt(8),
+    wait=wait_exponential_jitter(initial=0.5, max=10),
+)
 async def conectar() -> aio_pika.RobustConnection:
+    """Reintenta la conexión inicial con backoff: el healthcheck de RabbitMQ
+    en docker-compose garantiza el orden de arranque, pero no que el listener
+    AMQP esté aceptando conexiones en el milisegundo exacto en que este
+    servicio arranca (carrera observada en CI, donde el runner es más lento
+    y variable que en desarrollo local)."""
     return await aio_pika.connect_robust(settings.rabbitmq_url)
 
 
