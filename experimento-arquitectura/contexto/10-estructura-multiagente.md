@@ -40,7 +40,7 @@ TO-BE. Esta es una restricción de diseño tan dura como los umbrales numéricos
 calidad: cualquier patrón/táctica que se proponga (bus de eventos, auto-scaling, DLQ, circuit
 breaker) debe tener una traducción viable a un servicio real de GCP, no quedarse en un nombre
 genérico. `experto-gcp` es responsable de esa traducción y de dejar explícito cuándo el stack local
-de un experimento (p. ej. RabbitMQ en `09-experimento-DISP-03/plan.md`) difiere de su equivalente en
+de un experimento (p. ej. RabbitMQ en `implementacion/DISP-03/plan.md`) difiere de su equivalente en
 GCP (Pub/Sub) de una forma que podría afectar la validez de las conclusiones — ese hallazgo alimenta
 directamente el trabajo de `validador-hipotesis`.
 

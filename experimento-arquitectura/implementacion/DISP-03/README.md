@@ -1,6 +1,6 @@
 # Experimento DISP-03 — implementación
 
-PoC ejecutable del experimento planificado en `../09-experimento-DISP-03/plan.md`. Valida si
+PoC ejecutable del experimento planificado en `../implementacion/DISP-03/plan.md`. Valida si
 desacople + reintentos con backoff + DLQ + reproceso permite que la Verificación de Proveedores
 cumpla DISP-03 cuando una entidad certificadora externa falla, se degrada o cae.
 
@@ -88,7 +88,7 @@ generalizarse al despliegue real, no solo al entorno local:
 ## Servicio DDD (Regla 5 de la rúbrica) — todavía no implementado aquí
 
 Este PoC resuelve el experimento de **resiliencia** (DISP-03): integración entre servicios, colas,
-DLQ. La Regla 5 de `../REGLAS-DURAS-rubrica-entrega-3.md` exige además un servicio con DDD completo
+DLQ. La Regla 5 de `../../contexto/REGLAS-DURAS-rubrica-entrega-3.md` exige además un servicio con DDD completo
 (entidades, VOs, *seedwork*, agregados, hexagonal, CQS) — si Verificación es el servicio elegido para
 esa pieza, su estructura interna de dominio va **encima** de este código de integración, no lo
 reemplaza. Ver `.claude/agents/implementador-ddd.md`.

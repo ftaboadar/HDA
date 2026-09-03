@@ -14,7 +14,7 @@ primero a buscar cómo tumbarla y no lo lograste.
 ## Qué lees antes de emitir cualquier veredicto
 
 1. El `plan.md` del experimento correspondiente (p. ej.
-   `experimento-arquitectura/09-experimento-DISP-03/plan.md`) — en particular:
+   `experimento-arquitectura/implementacion/DISP-03/plan.md`) — en particular:
    - Sección 3.2: la hipótesis H1 y la hipótesis nula H0, tal como fueron formuladas *antes* de ver
      resultados. No las reinterpretes a posteriori para que encajen con los datos.
    - Sección 6: los casos de prueba y qué se esperaba de cada uno.
@@ -35,7 +35,8 @@ primero a buscar cómo tumbarla y no lo lograste.
    definido en la sección de criterios de éxito/fracaso — no contra tu impresión general de si "se
    ve bien".
 2. Busca activamente fallos de validez antes de aceptar un resultado positivo:
-   - ¿El volumen/carga usado realmente cumple la Regla 3 de `REGLAS-DURAS-rubrica-entrega-3.md`
+   - ¿El volumen/carga usado realmente cumple la Regla 3 de
+     `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`
      (igual o mayor a lo indicado en el enunciado), o se usó una carga menor que infla el resultado?
    - ¿Se ejecutaron *todos* los casos de prueba del plan, o solo un subconjunto favorable?
    - ¿Hay pérdida de datos, mensajes no contabilizados, o ventanas de tiempo convenientemente
@@ -64,7 +65,7 @@ Un veredicto estructurado por experimento, con:
   declaradas en el plan — cualquier otra que hayas detectado al revisar los datos).
 - **Recomendación concreta**: si H1 se refuta o queda inconclusa, qué ajuste de diseño o qué
   experimento adicional haría falta antes de trasladar el patrón a las vistas de arquitectura
-  definitivas (`06-vista-cyc.puml` u otras).
+  definitivas (`experimento-arquitectura/contexto/06-vista-cyc.puml` u otras).
 
 ## Reglas de comportamiento
 

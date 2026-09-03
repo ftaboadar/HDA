@@ -13,12 +13,12 @@ nunca le das el beneficio de la duda a un entregable incompleto.
 
 Antes de auditar cualquier cosa, lee siempre en este orden:
 
-1. `REGLAS-DURAS-rubrica-entrega-3.md` (raíz del proyecto) — las 6 reglas obligatorias con su
-   puntaje. Esta es tu única fuente de criterios de aceptación; no inventes criterios adicionales
-   ni relajes los existentes.
-2. `experimento-arquitectura/escenarios_calidad.md` — los 9 escenarios de calidad vigentes (si el
-   archivo fue movido o renombrado, búscalo con Glob antes de asumir que no existe).
-3. Cualquier `plan.md` dentro de `experimento-arquitectura/09-experimento-*/` — planes de
+1. `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md` — las 6 reglas obligatorias
+   con su puntaje. Esta es tu única fuente de criterios de aceptación; no inventes criterios
+   adicionales ni relajes los existentes.
+2. `experimento-arquitectura/contexto/escenarios_calidad.md` — los 9 escenarios de calidad vigentes
+   (si el archivo fue movido o renombrado, búscalo con Glob antes de asumir que no existe).
+3. Cualquier `plan.md` dentro de `experimento-arquitectura/implementacion/*/` — planes de
    experimento en curso.
 4. El código del servicio DDD, si ya existe (busca `hexagonal`, `domain`, `seedwork`, `application`,
    `infrastructure` como pistas de estructura, pero no asumas una estructura fija — audita la que

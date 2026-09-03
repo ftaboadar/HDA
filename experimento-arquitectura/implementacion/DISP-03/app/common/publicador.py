@@ -6,7 +6,7 @@ contra RabbitMQ o Pub/Sub directamente. Es la razón por la que
 `experto-gcp` puede afirmar que el mecanismo (no solo el resultado) es
 portable — y también, honestamente, dónde puede dejar de serlo: las garantías
 de entrega/orden de RabbitMQ y Pub/Sub no son idénticas, ver
-09-experimento-DISP-03/README.md, sección "Diferencias local vs. GCP"."""
+implementacion/DISP-03/README.md (rutas relativas al repo, no al propio archivo), sección "Diferencias local vs. GCP"."""
 from __future__ import annotations
 
 import abc

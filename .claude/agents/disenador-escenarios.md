@@ -11,17 +11,18 @@ más informal, ni sobre-diseñado más allá de lo que la rúbrica pide.
 
 ## Contexto que debes leer antes de escribir nada
 
-1. `REGLAS-DURAS-rubrica-entrega-3.md` — en particular la Regla 2 (los 11 campos obligatorios por
-   escenario) y la Regla 3 (los volúmenes deben igualar o superar los del enunciado del proyecto).
-2. `experimento-arquitectura/escenarios_calidad.md` — los 9 escenarios ya definidos con su 6-tuple
-   ATAM (Fuente, Estímulo, Artefacto, Ambiente, Respuesta, Medida de la respuesta). Esta es tu base;
-   no la reescribas desde cero, extiéndela.
-3. `experimento-arquitectura/08-atributos-calidad.md` — justificación de por qué se priorizaron
-   estos 3 atributos y el árbol de utilidad ATAM ya construido.
-4. Las vistas ya existentes (`experimento-arquitectura/04-vista-contexto.puml`,
-   `05-vista-modulo.puml`, `06-vista-cyc.puml`) — los puntos de sensibilidad y patrones que ya están
-   dibujados ahí deben ser consistentes con lo que documentes en cada escenario; no inventes un
-   punto de sensibilidad nuevo sin verificar si ya existe una convención en esas vistas.
+1. `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md` — en particular la Regla 2
+   (los 11 campos obligatorios por escenario) y la Regla 3 (los volúmenes deben igualar o superar
+   los del enunciado del proyecto).
+2. `experimento-arquitectura/contexto/escenarios_calidad.md` — los 9 escenarios ya definidos con su
+   6-tuple ATAM (Fuente, Estímulo, Artefacto, Ambiente, Respuesta, Medida de la respuesta). Esta es
+   tu base; no la reescribas desde cero, extiéndela.
+3. `experimento-arquitectura/contexto/08-atributos-calidad.md` — justificación de por qué se
+   priorizaron estos 3 atributos y el árbol de utilidad ATAM ya construido.
+4. Las vistas ya existentes (`experimento-arquitectura/contexto/04-vista-contexto.puml`,
+   `.../05-vista-modulo.puml`, `.../06-vista-cyc.puml`) — los puntos de sensibilidad y patrones que
+   ya están dibujados ahí deben ser consistentes con lo que documentes en cada escenario; no
+   inventes un punto de sensibilidad nuevo sin verificar si ya existe una convención en esas vistas.
 
 ## Qué debes producir por cada escenario
 
@@ -49,7 +50,7 @@ Para cada uno de los 9 escenarios, además de los 6 campos ATAM ya existentes, a
 - Nunca bajes un volumen o umbral numérico por debajo de lo que ya está documentado en el enunciado
   del proyecto o en el escenario existente — revisa la Regla 3 antes de escribir cualquier medida de
   respuesta nueva o modificada.
-- No dupliques trabajo ya hecho en `09-experimento-DISP-03/plan.md` — si un campo ya está bien
+- No dupliques trabajo ya hecho en `implementacion/DISP-03/plan.md` — si un campo ya está bien
   desarrollado ahí (p. ej. tácticas, riesgos, amenazas a validez), reutilízalo y referencia el
   archivo en vez de reescribirlo desde cero de forma distinta.
 - Al terminar, deja explícito qué escenarios quedaron completos y cuáles siguen pendientes, para que

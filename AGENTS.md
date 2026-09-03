@@ -12,13 +12,37 @@ Proyecto de curso **Hogar de los Alpes (HdA)**, MISO 2026-14 (Maestría en Ingen
 Entregas 1 y 2 (dominio estratégico DDD, diseño táctico y atributos de calidad) ya están completas.
 Trabajo en curso: **Entrega 3 — Diseño de Experimentación**.
 
+## Estructura del repo — dos carpetas, dos propósitos distintos
+
+`experimento-arquitectura/` se divide en exactamente dos cosas, para que nunca se mezcle "para
+entender el proyecto" con "para correrlo":
+
+```
+experimento-arquitectura/
+├── contexto/          Todo lo que hay que LEER: dominio (DDD estratégico), atributos de calidad,
+│                       escenarios, reglas de la rúbrica, vistas de arquitectura (C4/C&C/módulo),
+│                       event storming, la estructura de equipo multiagéntica, y los PDFs/pptx
+│                       fuente del curso (en contexto/utils/). Nada de código ejecutable vive aquí.
+│
+└── implementacion/    Todo lo que hay que CORRER: un subdirectorio por experimento (ej. DISP-03/),
+    └── DISP-03/        cada uno con su propio plan.md/README.md (el contexto específico de ESE
+                         experimento — no del proyecto general) junto al código real: app/, tests/,
+                         infra/ (Terraform), cli/ (herramientas de aprovisionamiento GCP).
+```
+
+Regla al agregar algo nuevo: si es explicación, decisión, diagrama o rúbrica → `contexto/`. Si es
+código que se ejecuta (API, tests, IaC, scripts) → `implementacion/<experimento>/`. El `plan.md` y el
+`README.md` de un experimento se quedan junto a su propio código (no en `contexto/`) porque son la
+documentación operativa de ESE experimento, no contexto general del proyecto.
+
 ## Leer en este orden antes de tocar nada
 
-1. `experimento-arquitectura/REGLAS-DURAS-rubrica-entrega-3.md` — lo que la rúbrica del curso exige,
-   con puntaje. Es la fuente de verdad de qué se está calificando; no relajar ni reinterpretar.
-2. `experimento-arquitectura/10-estructura-multiagente.md` — los 6 roles de equipo (ver abajo) y por
-   qué el flujo de trabajo está separado como está.
-3. `experimento-arquitectura/09-experimento-DISP-03/plan.md` y `.../README.md` — el experimento en
+1. `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md` — lo que la rúbrica del
+   curso exige, con puntaje. Es la fuente de verdad de qué se está calificando; no relajar ni
+   reinterpretar.
+2. `experimento-arquitectura/contexto/10-estructura-multiagente.md` — los 6 roles de equipo (ver
+   abajo) y por qué el flujo de trabajo está separado como está.
+3. `experimento-arquitectura/implementacion/DISP-03/plan.md` y `.../README.md` — el experimento en
    curso: qué se planeó, qué se implementó, qué se validó de verdad (7/7 pruebas pasando contra el
    stack real) y qué falta.
 
@@ -58,7 +82,7 @@ la hipótesis se valida — ver `experimento-runner.md` y `validador-hipotesis.m
 
 Si el usuario comparte un archivo desde `~/Downloads` u otra carpeta fuera del repo, cópialo dentro
 antes de trabajar con él y de citarlo en cualquier documento — los roles de arriba referencian rutas
-relativas al repo (ej. `experimento-arquitectura/escenarios_calidad.md`); un archivo que solo vive
+relativas al repo (ej. `experimento-arquitectura/contexto/escenarios_calidad.md`); un archivo que solo vive
 fuera del repo rompe esa referencia para cualquier sesión o herramienta futura que no tenga el
 contexto de la conversación original en la que se compartió.
 

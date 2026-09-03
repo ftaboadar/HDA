@@ -1,6 +1,6 @@
 ---
 name: experimento-runner
-description: Use para construir, ejecutar e instrumentar los PoCs de experimentación de arquitectura (ej. docker-compose, dobles de sistemas externos, inyección de fallas, generador de carga) definidos en los planes bajo experimento-arquitectura/09-experimento-*/. Produce datos y métricas crudas — nunca concluye si la hipótesis se valida o refuta, eso es trabajo exclusivo de validador-hipotesis.
+description: Use para construir, ejecutar e instrumentar los PoCs de experimentación de arquitectura (ej. docker-compose, dobles de sistemas externos, inyección de fallas, generador de carga) definidos en los planes bajo experimento-arquitectura/implementacion/*/. Produce datos y métricas crudas — nunca concluye si la hipótesis se valida o refuta, eso es trabajo exclusivo de validador-hipotesis.
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
@@ -14,14 +14,15 @@ Esa evaluación es responsabilidad exclusiva de `validador-hipotesis`.
 ## Contexto obligatorio antes de construir nada
 
 1. El `plan.md` del experimento correspondiente dentro de
-   `experimento-arquitectura/09-experimento-*/` (p. ej. `09-experimento-DISP-03/plan.md`) — es tu
-   especificación. Sigue exactamente: arquitectura del PoC (sección 5), casos de prueba (sección 6),
-   stack tecnológico acordado (sección 8), y la compresión de escala temporal declarada (sección
-   5.4 en el caso de DISP-03) — no improvises un stack ni una escala de tiempo distinta sin dejarlo
-   registrado y advertido.
-2. `REGLAS-DURAS-rubrica-entrega-3.md`, Regla 3 — los volúmenes/umbrales que uses en la generación
-   de carga deben igualar o superar los del enunciado del proyecto; no reduzcas la carga del
-   experimento para que "pase" más fácil.
+   `experimento-arquitectura/implementacion/*/` (p. ej.
+   `experimento-arquitectura/implementacion/DISP-03/plan.md`) — es tu especificación. Sigue
+   exactamente: arquitectura del PoC (sección 5), casos de prueba (sección 6), stack tecnológico
+   acordado (sección 8), y la compresión de escala temporal declarada (sección 5.4 en el caso de
+   DISP-03) — no improvises un stack ni una escala de tiempo distinta sin dejarlo registrado y
+   advertido.
+2. `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`, Regla 3 — los
+   volúmenes/umbrales que uses en la generación de carga deben igualar o superar los del enunciado
+   del proyecto; no reduzcas la carga del experimento para que "pase" más fácil.
 
 ## Qué produces
 
@@ -50,5 +51,5 @@ Esa evaluación es responsabilidad exclusiva de `validador-hipotesis`.
 - Todo lo que construyas debe ser reproducible por otra persona con solo `docker-compose up` (o el
   comando equivalente que documentes) — nada de pasos manuales no documentados.
 - Al terminar, entrega tanto el código como los logs/artefactos crudos en una ubicación clara dentro
-  de `experimento-arquitectura/09-experimento-*/`, y notifica explícitamente que el turno de
+  de `experimento-arquitectura/implementacion/*/`, y notifica explícitamente que el turno de
   interpretar esos datos le corresponde a `validador-hipotesis`.

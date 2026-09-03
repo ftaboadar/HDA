@@ -8,9 +8,9 @@ ante fallas de entidades certificadoras externas
 | **Escenario de calidad** | DISP-03 (Disponibilidad, prioridad H) |
 | **Estado** | Implementado y validado localmente (7/7 casos de prueba pasan contra el stack real); Terraform validado sintácticamente, no aplicado contra un proyecto GCP real |
 | **Stack objetivo** | Python |
-| **Fuente del escenario** | `escenarios_calidad.md` (adjuntado por el usuario), sección Disponibilidad |
-| **Artefactos relacionados** | `06-vista-cyc.puml`, `08-atributos-calidad.md`, `05-vista-modulo.puml` |
-| **Rúbrica aplicable** | `../REGLAS-DURAS-rubrica-entrega-3.md` — ver Regla 2 (campos faltantes por escenario) y Regla 5 (si este servicio es el elegido para la implementación DDD obligatoria) |
+| **Fuente del escenario** | `../../contexto/escenarios_calidad.md` (adjuntado por el usuario), sección Disponibilidad |
+| **Artefactos relacionados** | `../../contexto/06-vista-cyc.puml`, `../../contexto/08-atributos-calidad.md`, `../../contexto/05-vista-modulo.puml` |
+| **Rúbrica aplicable** | `../../contexto/REGLAS-DURAS-rubrica-entrega-3.md` — ver Regla 2 (campos faltantes por escenario) y Regla 5 (si este servicio es el elegido para la implementación DDD obligatoria) |
 
 ---
 
@@ -27,9 +27,9 @@ sean reprocesables en menos de 24h**.
 
 Este es el escenario **DISP-03** del árbol de utilidad de Disponibilidad. Se elige como primer
 experimento porque, a diferencia de DISP-01 y DISP-02 (que ya tienen soporte explícito en la Vista C&C
-alrededor de Gestión de Trabajos — ver `06-vista-cyc.puml`), **DISP-03 hoy es el único escenario de
+alrededor de Gestión de Trabajos — ver `../../contexto/06-vista-cyc.puml`), **DISP-03 hoy es el único escenario de
 disponibilidad de prioridad H que todavía no está respaldado por ningún diagrama** (ver nota de
-pendientes #5 en `escenarios_calidad.md`). El experimento sirve, por tanto, doble propósito:
+pendientes #5 en `../../contexto/escenarios_calidad.md`). El experimento sirve, por tanto, doble propósito:
 
 1. Validar empíricamente que el patrón (cola asíncrona + reintentos + DLQ) que ya funcionó en
    Gestión de Trabajos (DISP-01/02) es igualmente aplicable al contexto de Proveedores/Verificación.
@@ -40,7 +40,7 @@ pendientes #5 en `escenarios_calidad.md`). El experimento sirve, por tanto, dobl
 
 ## 2. Escenario de calidad bajo prueba
 
-Tabla ATAM completa, tal como está documentada en `escenarios_calidad.md` (Disponibilidad · DISP-03):
+Tabla ATAM completa, tal como está documentada en `../../contexto/escenarios_calidad.md` (Disponibilidad · DISP-03):
 
 | Campo | Contenido |
 |---|---|
@@ -63,15 +63,15 @@ de onboarding de proveedores, bloqueando marketplace y claims por igual.
 
 ### 2.2 Relación con otros artefactos del proyecto
 
-- **`08-atributos-calidad.md`**: Disponibilidad/Elasticidad es uno de los 3 atributos priorizados;
+- **`../../contexto/08-atributos-calidad.md`**: Disponibilidad/Elasticidad es uno de los 3 atributos priorizados;
   el patrón que la resuelve según ese documento es "arquitectura orientada a eventos... DLQ para
   picos". DISP-03 es la instancia concreta de ese patrón aplicada a Verificación en vez de a
   Gestión de Trabajos.
-- **`06-vista-cyc.puml`**: ya modela el patrón DLQ + ACL/circuit breaker para el proceso de
+- **`../../contexto/06-vista-cyc.puml`**: ya modela el patrón DLQ + ACL/circuit breaker para el proceso de
   Gestión de Trabajos (nodo `GT`, cola `DLQ trabajo.fallidos`). Este experimento reutiliza la misma
   táctica arquitectónica pero la aplica y la mide sobre un componente distinto (Verificación), que
   hoy no aparece en ese diagrama.
-- **Nota de pendientes #5** (`escenarios_calidad.md`): señala que la Vista C&C actual "no respalda"
+- **Nota de pendientes #5** (`../../contexto/escenarios_calidad.md`): señala que la Vista C&C actual "no respalda"
   DISP-03 y que falta (a) el sistema externo de verificación como caja de Contexto Externo, y
   (b) el DLQ conectado al contexto de Proveedores/Verificación, no solo al de Gestión de Trabajos.
   **Este experimento es el insumo para cerrar ese pendiente**: el diagrama del PoC (sección 5.1)
@@ -284,7 +284,7 @@ quedarían cubiertas por este PoC).
 | **4. Ejecución de casos de falla (CP-3, CP-4, CP-5)** | Inyección de fallas controladas vía API de control de los dobles | Reporte de disponibilidad y trazabilidad bajo falla |
 | **5. Ejecución de recuperación y carga (CP-6, CP-7)** | Validar reproceso y comportamiento bajo concurrencia | Reporte de recuperación |
 | **6. Consolidación de resultados** | Comparar métricas obtenidas vs. umbrales de DISP-03; conclusión H1/H0 | Informe final del experimento |
-| **7. Retroalimentación al diseño** | Actualizar Vista C&C (`06-vista-cyc.puml` o nueva vista) con el patrón validado para Verificación, cerrando el pendiente #5 | Diagrama actualizado + changelog |
+| **7. Retroalimentación al diseño** | Actualizar Vista C&C (`../../contexto/06-vista-cyc.puml` o nueva vista) con el patrón validado para Verificación, cerrando el pendiente #5 | Diagrama actualizado + changelog |
 
 ---
 
@@ -342,7 +342,7 @@ ajuste de diseño se necesita antes de trasladar el patrón a la Vista C&C defin
 | **Amenaza a validez (compresión temporal)** | El factor de compresión 1min≈1h no captura fenómenos que solo aparecen en fallas de larga duración real (ej. vencimiento de credenciales, fugas de recursos) | Declarado explícitamente en 5.4; se documenta como límite conocido del PoC, no oculto en el reporte final |
 | **Amenaza a validez (entorno de un solo nodo)** | El PoC corre en `docker-compose` local, sin la topología distribuida real (múltiples instancias, red entre países) | El experimento valida el patrón/mecanismo, no el comportamiento a escala productiva — se declara así en las conclusiones |
 | **Riesgo** | El equipo de ingeniería podría requerir circuit breaker explícito si el mock revela reintentos que saturan al externo incluso con backoff | Se deja como extensión evaluable (sección 8 de tácticas) si CP-4/CP-7 muestran ese comportamiento |
-| **Riesgo** | RabbitMQ vs. Kafka: la elección de RabbitMQ para este PoC no predetermina la elección final del Bus de Eventos para toda la plataforma (ver `05-vista-modulo.puml`, SP5) | Se documenta explícitamente que este experimento evalúa la **táctica**, no fija la tecnología de bus definitiva para HdA |
+| **Riesgo** | RabbitMQ vs. Kafka: la elección de RabbitMQ para este PoC no predetermina la elección final del Bus de Eventos para toda la plataforma (ver `../../contexto/05-vista-modulo.puml`, SP5) | Se documenta explícitamente que este experimento evalúa la **táctica**, no fija la tecnología de bus definitiva para HdA |
 
 ---
 
@@ -350,12 +350,12 @@ ajuste de diseño se necesita antes de trasladar el patrón a la Vista C&C defin
 
 1. Este documento de planificación (`plan.md`).
 2. Código fuente del PoC (API, worker, dobles de externos, CLI de reproceso, scripts de escenarios) —
-   en `09-experimento-DISP-03/src/` (a implementar).
+   en `implementacion/DISP-03/src/` (a implementar).
 3. `docker-compose.yml` reproducible.
 4. Suite de pruebas automatizadas (`pytest`) que ejecuta los 7 casos de prueba de la sección 6.
 5. Informe de resultados con métricas obtenidas vs. umbrales de DISP-03, y veredicto H1/H0.
-6. Propuesta de actualización a la Vista C&C (`06-vista-cyc.puml`) que incorpore el patrón validado
-   para Verificación/Proveedores, cerrando el pendiente #5 documentado en `escenarios_calidad.md`.
+6. Propuesta de actualización a la Vista C&C (`../../contexto/06-vista-cyc.puml`) que incorpore el patrón validado
+   para Verificación/Proveedores, cerrando el pendiente #5 documentado en `../../contexto/escenarios_calidad.md`.
 7. Presentación breve (5–10 min) para el equipo de ingeniería, según lo exige el enunciado del
    proyecto.
 

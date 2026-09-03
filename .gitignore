@@ -12,7 +12,7 @@ __pycache__/
 *.tfplan
 
 # Resultados de ejecución de experimentos (datos crudos, no versionados)
-experimento-arquitectura/09-experimento-DISP-03/tests/results/*.jsonl
+experimento-arquitectura/implementacion/*/tests/results/*.jsonl
 
 # SO
 .DS_Store
