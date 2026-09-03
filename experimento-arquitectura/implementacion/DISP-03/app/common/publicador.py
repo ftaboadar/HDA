@@ -22,6 +22,17 @@ class Publicador(abc.ABC):
     @abc.abstractmethod
     async def publicar_fallida(self, mensaje: dict) -> None: ...
 
+    @abc.abstractmethod
+    async def publicar_evento(self, routing_key: str, mensaje: dict) -> None:
+        """Publica un evento de integración genérico (ej. `proveedor.habilitado`,
+        ver app/application/dispatcher_eventos_dominio.py) — a diferencia de
+        `publicar_solicitud`/`publicar_fallida`, que tienen forma y destino
+        fijos, este método existe para eventos de integración nuevos que no
+        necesitan su propia cola/topic dedicado dentro del alcance de este
+        PoC (los bounded contexts que consumirían `proveedor.habilitado`
+        — Marketplace, Siniestros, Suscripciones — están fuera de este
+        experimento)."""
+
 
 class PublicadorRabbitMQ(Publicador):
     """Adaptador local: publica sobre los exchanges declarados en mq.py."""
@@ -44,6 +55,20 @@ class PublicadorRabbitMQ(Publicador):
         await self._exchange_dlx.publish(
             aio_pika.Message(body=json.dumps(mensaje).encode(), delivery_mode=2),
             routing_key="",
+        )
+
+    async def publicar_evento(self, routing_key: str, mensaje: dict) -> None:
+        import aio_pika
+
+        # Se publica sobre el mismo exchange de solicitudes con un routing
+        # key propio (ej. "proveedor.habilitado") — no hay cola ligada a él
+        # todavía en mq.py (los consumidores de este evento son otros
+        # bounded contexts, fuera de alcance de DISP-03), así que el
+        # mensaje queda sin enrutar por diseño: demuestra el mecanismo sin
+        # requerir construir el consumidor.
+        await self._exchange_sol.publish(
+            aio_pika.Message(body=json.dumps(mensaje).encode(), delivery_mode=2),
+            routing_key=routing_key,
         )
 
 
@@ -78,3 +103,13 @@ class PublicadorPubSub(Publicador):
 
     async def publicar_fallida(self, mensaje: dict) -> None:
         await self._publicar(self._ruta_dlq, mensaje)
+
+    async def publicar_evento(self, routing_key: str, mensaje: dict) -> None:
+        # Pub/Sub no tiene routing keys tipo AMQP — se reutiliza el topic de
+        # solicitudes y el routing_key viaja como campo del mensaje. Un
+        # topic dedicado por tipo de evento de integración es la evolución
+        # natural si un bounded context real llega a consumir esto, pero
+        # está fuera del alcance de este PoC (ver docstring de la interfaz).
+        if not self._ruta_sol:
+            raise RuntimeError("PUBSUB_TOPIC_SOLICITUDES no configurado")
+        await self._publicar(self._ruta_sol, {**mensaje, "routing_key": routing_key})

@@ -4,7 +4,8 @@ Equivalente funcional de worker/main.py pero disparado por HTTP (push
 subscription, ver infra/pubsub.tf) en vez de un loop de consumo pull. La
 lógica de reintentos/backoff es la misma (worker/core.py) — solo cambia el
 transporte, que es justo el punto que experto-gcp debe dejar documentado
-como diferencia local↔GCP.
+como diferencia local↔GCP. Igual que worker/main.py, cada intento se
+registra vía el comando `RegistrarIntento` — no se escribe el ORM directo.
 
 Nota: siempre respondemos 200, incluso cuando la verificación termina en DLQ,
 porque procesar_verificacion() ya agotó sus propios reintentos internamente.
@@ -18,11 +19,15 @@ import os
 
 from fastapi import FastAPI, Request
 
+from app.application.commands.registrar_intento import RegistrarIntento
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.publicador import PublicadorPubSub
+from app.domain.verificacion.value_objects import ResultadoIntento
+from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
+    VerificacionRepositorySQLAlchemy,
+)
 from app.worker.core import procesar_verificacion
-from app.worker.main import actualizar_db
 
 logger = configurar_logging("worker.push_handler")
 app = FastAPI(title="Verificación — Worker (Cloud Run / Pub/Sub push)")
@@ -48,30 +53,30 @@ async def salud():
 
 @app.post("/pubsub/push")
 async def recibir_push(request: Request):
+    assert _publicador is not None
     envoltura = await request.json()
     datos_b64 = envoltura["message"]["data"]
     payload = json.loads(base64.b64decode(datos_b64))
+    verificacion_id = payload["verificacion_id"]
 
     resultado = await procesar_verificacion(
-        payload["verificacion_id"], payload["proveedor_id"], payload["tipo_verificador"]
+        verificacion_id, payload["proveedor_id"], payload["tipo_verificador"]
     )
-    actualizar_db(
-        payload["verificacion_id"], resultado.exito, resultado.intentos, resultado.motivo_falla
-    )
-    if not resultado.exito:
-        assert _publicador is not None
-        await _publicador.publicar_fallida(
-            {
-                **payload,
-                "motivo_falla": resultado.motivo_falla,
-                "intentos": resultado.intentos,
-            }
+
+    repo = VerificacionRepositorySQLAlchemy()
+    comando = RegistrarIntento(repo, _publicador)
+    for intento in resultado.detalle_intentos:
+        await comando.ejecutar(
+            verificacion_id=verificacion_id,
+            resultado=ResultadoIntento.EXITOSO if intento.exito else ResultadoIntento.FALLIDO,
+            duracion_ms=intento.duracion_ms,
+            error=intento.error,
         )
 
     log_evento(
         logger,
         "verificacion_procesada_push",
-        verificacion_id=payload["verificacion_id"],
+        verificacion_id=verificacion_id,
         exito=resultado.exito,
     )
     return {"estado": "procesado"}
