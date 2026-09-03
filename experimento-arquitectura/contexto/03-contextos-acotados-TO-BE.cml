@@ -82,13 +82,13 @@ ContextMap HogarDeLosAlpesTOBE {
   ContextoSiniestros [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
   ContextoSuscripciones [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
 
-  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de dominio" }
-  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSiniestros { implementationTechnology = "Eventos de dominio" }
-  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSuscripciones { implementationTechnology = "Eventos de dominio" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de integración" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSiniestros { implementationTechnology = "Eventos de integración" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSuscripciones { implementationTechnology = "Eventos de integración" }
 
-  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoReputacion { implementationTechnology = "Eventos de dominio" }
-  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoScoring { implementationTechnology = "Eventos de dominio" }
-  ContextoReputacion [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de dominio" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoReputacion { implementationTechnology = "Eventos de integración" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoScoring { implementationTechnology = "Eventos de integración" }
+  ContextoReputacion [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de integración" }
 
   /* Relaciones con Sistemas Genéricos Externos (Normalmente APIs / REST / ACL) */
   

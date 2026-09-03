@@ -1,14 +1,18 @@
-"""Lógica de procesamiento de una verificación — agnóstica de transporte.
+"""Lógica de procesamiento de una verificación — agnóstica de transporte Y
+(desde la capa DDD) agnóstica del sistema externo concreto: llama al puerto
+`IVerificacionExternaPort`, resuelto por `infrastructure.config`, en vez de
+`httpx` directo — cierra el segundo hueco de hexagonal (Regla 5, criterio 2).
 
-Tácticas implementadas aquí (ver plan.md, sección 4): timeout por llamada,
-reintentos con backoff exponencial + jitter, número de intentos acotado.
+Tácticas implementadas aquí (ver plan.md, sección 4): timeout por llamada
+(dentro de cada adaptador concreto), reintentos con backoff exponencial +
+jitter, número de intentos acotado — **sin cambios** respecto a la versión
+anterior, solo cambió qué se llama (`puerto.verificar()` en vez de
+`_llamar_externo()`), no cómo se reintenta.
+
 La usan tanto el consumidor pull de RabbitMQ (worker/main.py, local) como el
-handler push de Pub/Sub (worker/push_handler.py, GCP) — es la evidencia de que
-la táctica de resiliencia en sí es portable, aunque el transporte que la
-invoca no sea idéntico entre ambos entornos."""
+handler push de Pub/Sub (worker/push_handler.py, GCP)."""
 
-import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 from tenacity import (
@@ -18,14 +22,23 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
+from app.application.ports.verificacion_externa import FallaVerificacionExterna
 from app.common.config import settings
 from app.common.logging_utils import configurar_logging, log_evento
+from app.infrastructure.config import resolver_adaptador_externo
 
 logger = configurar_logging("worker.core")
 
 
-class FallaExterna(Exception):
-    pass
+@dataclass
+class IntentoResultado:
+    """Un intento individual — es lo que alimenta, uno a uno,
+    `RegistrarIntento` (application/commands) para que el agregado de
+    dominio registre su propia historia y dispare sus invariantes."""
+
+    exito: bool
+    duracion_ms: int
+    error: str | None = None
 
 
 @dataclass
@@ -33,23 +46,7 @@ class ResultadoProceso:
     exito: bool
     intentos: int
     motivo_falla: str | None = None
-
-
-def _url_externa(tipo_verificador: str) -> str:
-    return {
-        "policia": settings.mock_policia_url,
-        "rues": settings.mock_rues_url,
-        "certificadora": settings.mock_certificadora_url,
-    }[tipo_verificador]
-
-
-async def _llamar_externo(tipo_verificador: str, proveedor_id: str) -> None:
-    url = f"{_url_externa(tipo_verificador)}/verificar"
-    async with httpx.AsyncClient(timeout=settings.timeout_externo_s) as cliente:
-        resp = await cliente.post(url, json={"proveedor_id": proveedor_id})
-    if resp.status_code >= 500:
-        raise FallaExterna(f"HTTP {resp.status_code} de {tipo_verificador}")
-    resp.raise_for_status()
+    detalle_intentos: list[IntentoResultado] = field(default_factory=list)
 
 
 async def procesar_verificacion(
@@ -57,29 +54,36 @@ async def procesar_verificacion(
 ) -> ResultadoProceso:
     intentos = 0
     ultimo_error: str | None = None
+    detalle_intentos: list[IntentoResultado] = []
+    puerto = resolver_adaptador_externo(tipo_verificador)
 
     @retry(
         reraise=True,
         stop=stop_after_attempt(settings.max_reintentos),
         wait=wait_exponential_jitter(initial=settings.backoff_base_s, max=settings.backoff_max_s),
-        retry=retry_if_exception_type((FallaExterna, httpx.TransportError, httpx.TimeoutException)),
+        retry=retry_if_exception_type(
+            (FallaVerificacionExterna, httpx.TransportError, httpx.TimeoutException)
+        ),
     )
     async def _intentar():
         nonlocal intentos, ultimo_error
         intentos += 1
-        inicio = time.time()
         try:
-            await _llamar_externo(tipo_verificador, proveedor_id)
+            resultado = await puerto.verificar(proveedor_id)
+            detalle_intentos.append(IntentoResultado(exito=True, duracion_ms=resultado.duracion_ms))
             log_evento(
                 logger,
                 "verificacion_intento_exitoso",
                 verificacion_id=verificacion_id,
                 tipo_verificador=tipo_verificador,
                 intento=intentos,
-                duracion_ms=int((time.time() - inicio) * 1000),
+                duracion_ms=resultado.duracion_ms,
             )
         except Exception as exc:
             ultimo_error = str(exc)
+            detalle_intentos.append(
+                IntentoResultado(exito=False, duracion_ms=0, error=ultimo_error)
+            )
             log_evento(
                 logger,
                 "verificacion_intento_fallido",
@@ -87,13 +91,12 @@ async def procesar_verificacion(
                 tipo_verificador=tipo_verificador,
                 intento=intentos,
                 error=ultimo_error,
-                duracion_ms=int((time.time() - inicio) * 1000),
             )
             raise
 
     try:
         await _intentar()
-        return ResultadoProceso(exito=True, intentos=intentos)
+        return ResultadoProceso(exito=True, intentos=intentos, detalle_intentos=detalle_intentos)
     except Exception:  # noqa: BLE001 — reintentos agotados, se captura para enrutar a DLQ
         log_evento(
             logger,
@@ -103,4 +106,9 @@ async def procesar_verificacion(
             intentos=intentos,
             motivo_falla=ultimo_error,
         )
-        return ResultadoProceso(exito=False, intentos=intentos, motivo_falla=ultimo_error)
+        return ResultadoProceso(
+            exito=False,
+            intentos=intentos,
+            motivo_falla=ultimo_error,
+            detalle_intentos=detalle_intentos,
+        )

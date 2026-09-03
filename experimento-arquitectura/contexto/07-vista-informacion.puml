@@ -8,6 +8,16 @@
 ' Se marca explícitamente la Entidad Raíz de cada agregado (Aggregate Root).
 ' Las referencias entre agregados de distintos módulos son solo por id (sin
 ' composición), como corresponde entre Bounded Contexts independientes.
+'
+' CHANGELOG: paquete "Proveedores" actualizado para alinearse con el modelo de
+' Verificación de Proveedores usado en escenarios_calidad.md (DISP-03) y en el
+' PPTX de la Entrega 2 — reemplaza la versión anterior (Empleado/Certificado)
+' que había quedado desincronizada del resto de la documentación.
+' Verificacion cuelga tanto de Proveedor (verificación empresarial/persona
+' natural) como de Tecnico (verificación individual por empleado) — el
+' enunciado exige explícitamente que "cada empleado que visite el predio... 
+' haya sido verificado individualmente" y que "un técnico nuevo... no puede
+' atender trabajos hasta ser verificado".
 
 hide circle
 hide empty members
@@ -67,13 +77,25 @@ package "Suscripciones" {
 
 package "Proveedores" {
   class Proveedor <<AggregateRoot>>
-  class Empleado <<Entity>>
-  class Certificado <<ValueObject>>
-  class Cobertura <<ValueObject>>
+  class ProveedorPersonaNatural <<Entity>>
+  class ProveedorEmpresa <<Entity>>
+  class Tecnico <<Entity>>
+  class Verificacion <<Entity>>
+  class Servicio <<Entity>>
+  class DocumentoIdentidad <<ValueObject>>
+  class NivelVerificacion <<ValueObject>>
+  class ZonaCobertura <<ValueObject>>
 
-  Proveedor "1" *-- "0..*" Empleado
-  Proveedor "1" *-- "0..*" Certificado
-  Proveedor *-- Cobertura
+  Proveedor <|-- ProveedorPersonaNatural
+  Proveedor <|-- ProveedorEmpresa
+  ProveedorEmpresa "1" *-- "0..*" Tecnico
+  Proveedor "1" *-- "0..*" Verificacion
+  Tecnico "1" *-- "0..*" Verificacion
+  Proveedor "1" *-- "0..*" Servicio
+  Proveedor *-- ZonaCobertura
+  ProveedorPersonaNatural *-- DocumentoIdentidad
+  Tecnico *-- DocumentoIdentidad
+  Verificacion *-- NivelVerificacion
 }
 
 package "Reputación y Calidad" {
@@ -111,6 +133,7 @@ legend right
   | <back:#DAE8FC>  </back> | Entidad (parte del agregado) |
   | <back:#E1D5E7>  </back> | Objeto Valor (Value Object) |
   | *-- | composición (pertenece al agregado) |
+  | <\|-- | herencia / especialización |
   | ..> | referencia entre agregados de otro módulo (solo por id) |
 endlegend
 
