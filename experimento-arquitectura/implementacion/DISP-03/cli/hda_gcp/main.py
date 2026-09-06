@@ -163,11 +163,20 @@ def infra_reset_db(
 
     No conecta directo a Postgres (evita depender de un driver como
     psycopg2, que no siempre compila en la máquina del desarrollador):
-    borra y recrea la base lógica 'verificacion' vía gcloud (instancia y
+    reinicia la instancia (mata de forma limpia las conexiones que
+    api/worker mantienen abiertas en su pool de SQLAlchemy — 'sql databases
+    delete' falla con 'being accessed by other users' si no se hace esto
+    primero), borra y recrea la base lógica 'verificacion' (instancia y
     usuario quedan intactos), y fuerza una revisión nueva de api/worker con
     `terraform apply -replace` para que Base.metadata.create_all() reconstruya
     el esquema en el arranque — las instancias calientes (min_instance_count=1)
-    no vuelven a correr su startup solas."""
+    no vuelven a correr su startup solas.
+
+    También reaplica los IAM member de api/worker: al recrear el servicio
+    de Cloud Run (-replace), su política de IAM vuelve a estar vacía (es un
+    recurso nuevo internamente), y Terraform no lo detecta como drift
+    porque el nombre del servicio no cambió — sin este -replace adicional
+    la API queda inalcanzable (403) y Pub/Sub no puede invocar al worker."""
     instancia = f"{entorno}-verificacion"
     if not yes:
         typer.confirm(
@@ -175,6 +184,7 @@ def infra_reset_db(
             f"(proyecto '{project}') y redesplegar api/worker en frío. ¿Continuar?",
             abort=True,
         )
+    _ejecutar(["gcloud", "sql", "instances", "restart", instancia, "--project", project])
     _ejecutar(
         [
             "gcloud",
@@ -199,6 +209,8 @@ def infra_reset_db(
             "-auto-approve",
             "-replace=google_cloud_run_v2_service.api",
             "-replace=google_cloud_run_v2_service.worker",
+            "-replace=google_cloud_run_v2_service_iam_member.publico_api",
+            "-replace=google_cloud_run_v2_service_iam_member.pubsub_invoca_worker",
             f"-var=project_id={project}",
             f"-var=region={region}",
         ],
