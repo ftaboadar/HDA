@@ -244,39 +244,107 @@ async def test_cp6_recuperacion_y_reproceso_desde_dlq(api):
     assert duracion_reproceso_s < umbral_ventana_s
 
 
+def _mediana(valores: list[float]) -> float:
+    ordenados = sorted(valores)
+    n = len(ordenados)
+    medio = n // 2
+    if n % 2 == 1:
+        return ordenados[medio]
+    return (ordenados[medio - 1] + ordenados[medio]) / 2
+
+
 @pytest.mark.asyncio
 async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     """CP-7: bajo carga concurrente, la certificadora cae a mitad de la
     ejecución -> la latencia de ACEPTACIÓN de la API (no la de procesamiento)
-    debe mantenerse estable, evidencia de que el desacople funciona."""
-    latencias_aceptacion_ms: list[float] = []
+    NO debe degradarse significativamente frente a su propio baseline
+    (plan.md, sección 6, CP-7: "< 5% de variación vs. baseline").
 
-    async def _crear_y_medir(proveedor_id: str, tipo: str):
+    Esto es explícitamente una comparación RELATIVA (durante-falla vs.
+    baseline medido en el mismo entorno/corrida), no un umbral absoluto en
+    ms: un número absoluto fijo no puede calibrarse de antemano contra el
+    piso de latencia real de Cloud Run + Cloud SQL + Pub/Sub con TLS sobre
+    red pública, que ya varía por entorno.
+
+    Estadístico elegido: MEDIANA, no p95. Con n=15 por grupo, el p95 cae en
+    la posición ~14 de 15 (prácticamente el máximo de la muestra), así que
+    un solo outlier de red domina la métrica y no representa el
+    comportamiento típico de aceptación. La mediana es robusta a ese
+    outlier único y es más representativa para decidir "degradación
+    significativa" a este tamaño de muestra.
+    """
+    latencias_baseline_ms: list[float] = []
+    latencias_durante_falla_ms: list[float] = []
+
+    async def _crear_y_medir(proveedor_id: str, tipo: str, destino: list[float]):
         t0 = time.time()
         resultado = await crear_verificacion(api, proveedor_id, tipo)
-        latencias_aceptacion_ms.append((time.time() - t0) * 1000)
+        destino.append((time.time() - t0) * 1000)
         return resultado
 
+    # Baseline: certificadora sana.
     primera_mitad = await asyncio.gather(
-        *[_crear_y_medir(f"prov-cp7-a-{i}", "certificadora") for i in range(15)]
+        *[
+            _crear_y_medir(f"prov-cp7-a-{i}", "certificadora", latencias_baseline_ms)
+            for i in range(15)
+        ]
     )
 
     await configurar_mock("certificadora", modo="caido")
 
+    # Durante la falla: certificadora caída.
     segunda_mitad = await asyncio.gather(
-        *[_crear_y_medir(f"prov-cp7-b-{i}", "certificadora") for i in range(15)]
+        *[
+            _crear_y_medir(f"prov-cp7-b-{i}", "certificadora", latencias_durante_falla_ms)
+            for i in range(15)
+        ]
     )
 
-    p95_ms = sorted(latencias_aceptacion_ms)[int(len(latencias_aceptacion_ms) * 0.95) - 1]
-    umbral_p95_ms = 500
+    mediana_baseline_ms = _mediana(latencias_baseline_ms)
+    mediana_durante_falla_ms = _mediana(latencias_durante_falla_ms)
+    variacion_pct = (mediana_durante_falla_ms - mediana_baseline_ms) / mediana_baseline_ms
+    umbral_variacion_pct = 0.05  # plan.md, CP-7: < 5% de variación vs. baseline
+
+    # Métrica informativa adicional (no decide pass/fail): p95 agregado en
+    # ms absolutos, útil para diagnóstico pero no calibrado como criterio
+    # de éxito porque no existe un umbral absoluto en plan.md.
+    todas_latencias_ms = latencias_baseline_ms + latencias_durante_falla_ms
+    p95_informativo_ms = sorted(todas_latencias_ms)[int(len(todas_latencias_ms) * 0.95) - 1]
 
     registrar(
         "CP-7",
-        "p95_latencia_aceptacion_ms",
-        p95_ms,
-        umbral_p95_ms,
-        p95_ms < umbral_p95_ms,
-        detalle="la aceptación debe seguir siendo rápida aunque el externo esté caído",
+        "mediana_latencia_aceptacion_baseline_ms",
+        mediana_baseline_ms,
+        None,
+        True,
+        detalle="latencia de aceptación con certificadora sana (baseline)",
+    )
+    registrar(
+        "CP-7",
+        "mediana_latencia_aceptacion_durante_falla_ms",
+        mediana_durante_falla_ms,
+        None,
+        True,
+        detalle="latencia de aceptación con certificadora caída",
+    )
+    registrar(
+        "CP-7",
+        "variacion_relativa_latencia_aceptacion",
+        variacion_pct,
+        umbral_variacion_pct,
+        variacion_pct < umbral_variacion_pct,
+        detalle=(
+            "criterio de plan.md: variación relativa de la mediana "
+            "durante-falla vs. baseline debe ser < 5%"
+        ),
+    )
+    registrar(
+        "CP-7",
+        "p95_latencia_aceptacion_agregado_ms_informativo",
+        p95_informativo_ms,
+        None,
+        True,
+        detalle="métrica informativa, no es criterio de pass/fail (ver docstring)",
     )
 
     # Limpieza: dejamos que todo llegue a estado terminal antes de terminar el test
@@ -285,4 +353,8 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
         *[esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30) for c in todas]
     )
 
-    assert p95_ms < umbral_p95_ms, "la API no debe bloquearse por la caída del externo"
+    assert variacion_pct < umbral_variacion_pct, (
+        f"la latencia de aceptación se degradó {variacion_pct:.1%} vs. baseline "
+        f"({mediana_baseline_ms:.1f}ms -> {mediana_durante_falla_ms:.1f}ms), "
+        "plan.md exige < 5%"
+    )
