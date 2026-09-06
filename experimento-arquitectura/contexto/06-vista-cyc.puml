@@ -9,6 +9,11 @@
 ' como punto de sensibilidad en la vista de Módulo (mayor fan-in/fan-out del sistema),
 ' y cómo su runtime debe absorber los picos de hasta 4x en 48h (eventos climáticos
 ' que disparan Siniestros) sin degradar el resto de canales.
+'
+' Cierra pendiente #5 (ver contexto/escenarios_calidad.md): añade el runtime de
+' Verificación (submódulo de Proveedores, DISP-03) con su propia cola, DLQ y el
+' Contexto Externo de verificación (Policía/RUES/Certificadora), validado
+' empíricamente en implementacion/DISP-03/ (commits ca76f60..ef391c5 contra GCP real).
 
 skinparam componentStyle rectangle
 skinparam component {
@@ -34,7 +39,7 @@ skinparam database {
   BorderColor #6C8EBF
 }
 
-title Hogar de los Alpes — Vista C&C (Runtime)\nFoco: proceso "Gestión de Trabajos" bajo picos de carga (hasta 4x / 48h)
+title Hogar de los Alpes — Vista C&C (Runtime)\nFoco: "Gestión de Trabajos" bajo picos de carga (hasta 4x / 48h, ESC/DISP-01/02) y\n"Verificación" (submódulo de Proveedores) ante externos con SLA de 24-48h (DISP-03)
 
 cloud "Procesos productores" {
   component "Marketplace\n(réplicas)" as MKT <<proceso>>
@@ -69,6 +74,40 @@ cloud "Procesos consumidores (async)" {
   component "Reputación\n(consumer group)" as REP <<proceso>>
   component "Scoring\n(consumer group)" as SCR <<proceso>>
 }
+
+' --- Runtime de Proveedores / Verificación — DISP-03 ---
+' Validado empíricamente en implementacion/DISP-03/ (RabbitMQ local / Pub-Sub en GCP)
+component "Proveedores\n(API, réplicas)" as PRV <<proceso>>
+node "Verificación\n(submódulo de Proveedores)\n⚠ N réplicas + worker" as VERIF <<sensible>>
+database "BD Verificación\n(por servicio)" as DBV
+
+queue "Message Broker (Verificación)" {
+  component "verificacion.solicitudes" as VQ
+  component "DLQ verificacion.fallidas" as VDLQ <<sensible>>
+}
+
+component "CLI / endpoint admin\nreprocesar-dlq" as VCLI <<conector>>
+
+component "Contexto Externo\nVerificación\n(Policía / RUES / Certificadora)" as VEXT <<externo>>
+
+PRV ..> VQ : publica solicitud\nde verificación (acepta,\nno espera al externo)
+VQ ..> VERIF : consume
+VERIF --> VEXT : invoca con timeout\n(Policía / RUES / Certificadora,\nSLA real 24-48h)
+VERIF ..> VDLQ : reintentos agotados\n(backoff exponencial + jitter)
+VDLQ ..> VCLI : inspección /\nreproceso manual
+VCLI ..> VQ : reencola (< 24h)
+VERIF --> DBV : lee / escribe\nagregado Verificacion
+
+note right of VERIF
+  **Runtime de DISP-03** (ver contexto/escenarios_calidad.md,
+  tabla Disponibilidad, columna DISP-03)
+  Táctica: cola async + timeout + reintento con
+  backoff/jitter + DLQ + reproceso manual.
+  Certificadora = SLA real de 24-48h (no es solo
+  falla, es latencia normal esperada del externo).
+  Validado contra GCP real en
+  implementacion/DISP-03/ (commits ca76f60..ef391c5).
+end note
 
 MKT ..> T1 : publica
 SIN ..> T2 : publica
