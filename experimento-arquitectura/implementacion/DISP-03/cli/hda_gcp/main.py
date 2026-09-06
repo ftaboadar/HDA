@@ -38,12 +38,19 @@ RAIZ = pathlib.Path(__file__).resolve().parents[2]
 DIR_INFRA = RAIZ / "infra"
 
 
+# En Windows, gcloud se instala como gcloud.cmd (no un .exe nativo); CreateProcess
+# no puede lanzar un .cmd directamente con shell=False, así que ahí delegamos a
+# cmd.exe con shell=True (subprocess arma el command-line igual de seguro con una
+# lista de args). En POSIX shell=False sigue siendo lo correcto.
+_EN_WINDOWS = os.name == "nt"
+
+
 def _ejecutar(cmd: list[str], cwd: pathlib.Path | None = None, env: dict | None = None) -> None:
     typer.secho(f"$ {' '.join(cmd)}", fg=typer.colors.CYAN)
     entorno = os.environ.copy()
     if env:
         entorno.update(env)
-    resultado = subprocess.run(cmd, cwd=cwd, env=entorno, check=False)
+    resultado = subprocess.run(cmd, cwd=cwd, env=entorno, check=False, shell=_EN_WINDOWS)
     if resultado.returncode != 0:
         typer.secho(f"Comando falló con código {resultado.returncode}", fg=typer.colors.RED)
         raise typer.Exit(resultado.returncode)
@@ -63,7 +70,7 @@ def check():
         )
 
     if "gcloud" not in faltantes:
-        subprocess.run(["gcloud", "config", "list"], check=False)
+        subprocess.run(["gcloud", "config", "list"], check=False, shell=_EN_WINDOWS)
 
     if faltantes:
         typer.secho(
@@ -204,7 +211,7 @@ def run_experiment(
         typer.secho("--target debe ser 'local' o 'gcp'", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    cmd = ["pytest", "tests/", "-v"]
+    cmd = [sys.executable, "-m", "pytest", "tests/", "-v"]
     if solo:
         cmd += ["-k", solo]
     resultado_env = os.environ.copy()

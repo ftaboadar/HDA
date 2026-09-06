@@ -33,5 +33,12 @@ def configurar_logging(nombre: str) -> logging.Logger:
     return logger
 
 
-def log_evento(logger: logging.Logger, evento: str, **campos) -> None:
-    logger.info(evento, extra={"campos": {"evento": evento, **campos}})
+def log_evento(logger: logging.Logger, evento: str, nivel: str = "info", **campos) -> None:
+    """`nivel` es opcional (default "info") para no romper las ~30 llamadas
+    existentes que no lo pasan. Se usa "error" en
+    application/dispatcher_eventos_dominio.py cuando falla la publicación de
+    un evento de integración secundario — ver docstring de ese módulo y de
+    worker/push_handler.py: el fallo se registra pero no se propaga, porque
+    el handler push debe responder 200 aun si esta publicación falla."""
+    metodo = getattr(logger, nivel, logger.info)
+    metodo(evento, extra={"campos": {"evento": evento, **campos}})

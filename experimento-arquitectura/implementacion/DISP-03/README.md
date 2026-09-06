@@ -87,6 +87,30 @@ es "definitivamente fallido" y lo envía a la DLQ por su cuenta. Por diseño, el
 fallo), precisamente para que la capa de Pub/Sub no dispare sus propios reintentos sobre algo que la
 aplicación ya resolvió — evita que ambas capas reintenten el mismo mensaje sin coordinarse.
 
+**Bug de producción encontrado y corregido (2026-09-06, contra GCP real, `hda-projectt`):** el
+worker de Cloud Run (`google_cloud_run_v2_service.worker` en `infra/cloudrun.tf`) no tenía la
+variable `PUBSUB_TOPIC_SOLICITUDES`, solo el servicio `api` la tenía. `RegistrarIntento` (que corre
+en el worker) despacha `VerificacionCompletada` → si el proveedor queda habilitado, publica el
+evento de integración `proveedor.habilitado` sobre el topic de solicitudes
+(`dispatcher_eventos_dominio.py`). Sin esa variable, `PublicadorPubSub._ruta_sol` queda en `None` y
+`publicar_evento` lanzaba `RuntimeError` sin capturar, que se propagaba hasta
+`push_handler.py:recibir_push` y devolvía 500 — violando la garantía de "siempre 200" documentada
+arriba, y provocando que Pub/Sub reintregara un mensaje cuya verificación ya estaba en un estado
+terminal en la base de datos (chocando contra los invariantes del agregado en el reintento). Dos
+correcciones, complementarias:
+1. `infra/cloudrun.tf` ahora pasa `PUBSUB_TOPIC_SOLICITUDES` al worker (igual que ya lo hacía la
+   API) — la causa raíz.
+2. `application/dispatcher_eventos_dominio.py` ahora envuelve las llamadas a
+   `publicador.publicar_evento`/`publicar_fallida` en try/except: si fallan (por esta causa u otra
+   transitoria), se registra en nivel "error" y NO se re-lanza, porque cuando se llega a `despachar()`
+   el estado del agregado ya se persistió con éxito — la publicación es notificación de un hecho ya
+   verdadero, no una escritura que deba ser atómica con él. Esto es defensa en profundidad, no un
+   reemplazo del fix #1. Pendiente de re-correr contra GCP real para confirmar: la suite completa
+   (`run-experiment --target gcp`), idealmente dos veces seguidas como en la corrida que expuso el
+   bug (nota aparte: la segunda corrida también compitió por Cloud SQL porque `run-experiment
+   --target gcp` no resetea la base entre corridas — eso es un problema de tooling distinto, sin
+   corregir aquí).
+
 ## Diferencias local (RabbitMQ) vs. GCP (Pub/Sub) — amenazas a la validez
 
 Documentadas aquí para que `validador-hipotesis` las cite explícitamente si el veredicto pretende

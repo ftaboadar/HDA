@@ -11,7 +11,29 @@ Nota: siempre respondemos 200, incluso cuando la verificación termina en DLQ,
 porque procesar_verificacion() ya agotó sus propios reintentos internamente.
 Devolver un error HTTP aquí haría que Pub/Sub reintregue el mensaje y
 duplique reintentos a dos niveles distintos (el nuestro y el de la
-suscripción), lo cual no es lo que DISP-03 pide."""
+suscripción), lo cual no es lo que DISP-03 pide.
+
+Nota sobre concurrencia (investigación CP-2 contra GCP real, ver
+experimento-arquitectura/): a diferencia de worker/main.py, este handler NO
+usa un asyncio.Semaphore explícito. Es una decisión deliberada, no un
+descuido: cada POST /pubsub/push que llega lo despacha uvicorn/FastAPI como
+su propia task de asyncio, y procesar_verificacion() llama al puerto externo
+con httpx.AsyncClient (no bloqueante) — así que varias verificaciones ya se
+procesan de forma concurrente dentro de una misma instancia caliente, sin
+necesidad de un semáforo de aplicación equivalente al de worker/main.py (ese
+semáforo allá cumple otro propósito: acotar cuántos mensajes de RabbitMQ se
+sacan a la vez para no agotar memoria/prefetch, no evitar bloqueo mutuo).
+Cuando CP-2 midió 4.21s contra un umbral de 1.5s en GCP, la causa más
+probable no era este handler sino cold start de Cloud Run
+(min_instance_count=0 dejaba al worker frío; ver infra/cloudrun.tf, donde se
+fijó min_instance_count=1 y max_instance_request_concurrency explícito para
+que una ráfaga de 6 mensajes no dispare varias instancias frías en paralelo).
+Si una futura corrida instrumentada muestra que el verdadero cuello de
+botella SÍ está aquí (ej. `repo.guardar()` es una llamada síncrona a
+SQLAlchemy que bloquea el event loop durante cada escritura — ver
+verificacion_repository_sqlalchemy.py — y eso pesa más de lo esperado bajo
+la latencia real de Cloud SQL), ahí sí correspondería revisar si conviene
+paralelizar esa escritura o acotar concurrencia por instancia."""
 
 import base64
 import json
