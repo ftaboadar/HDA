@@ -65,6 +65,7 @@ async def startup() -> None:
         project_id=os.environ["GCP_PROJECT"],
         topic_solicitudes=os.environ.get("PUBSUB_TOPIC_SOLICITUDES", ""),
         topic_fallidas=os.environ["PUBSUB_TOPIC_FALLIDAS"],
+        topic_eventos=os.environ.get("PUBSUB_TOPIC_EVENTOS", ""),
     )
 
 
@@ -79,6 +80,24 @@ async def recibir_push(request: Request):
     envoltura = await request.json()
     datos_b64 = envoltura["message"]["data"]
     payload = json.loads(base64.b64decode(datos_b64))
+
+    # Defensa en profundidad (no la corrección de raíz — esa es tener un
+    # topic físicamente separado para eventos de integración, ver
+    # infra/pubsub.tf y app/common/publicador.py): si por configuración
+    # futura o error humano un mensaje que no es una solicitud de
+    # verificación real llega igual a este endpoint, lo descartamos con un
+    # 200 (ack) en vez de tumbar el proceso con un KeyError sin capturar y
+    # dejar que Pub/Sub lo reintente indefinidamente contra un handler que
+    # de todos modos no puede procesarlo como verificación.
+    if "verificacion_id" not in payload:
+        log_evento(
+            logger,
+            "mensaje_push_ignorado_forma_inesperada",
+            nivel="error",
+            payload_evento=payload.get("evento"),
+        )
+        return {"estado": "ignorado"}
+
     verificacion_id = payload["verificacion_id"]
 
     resultado = await procesar_verificacion(

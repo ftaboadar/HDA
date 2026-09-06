@@ -105,11 +105,62 @@ correcciones, complementarias:
    transitoria), se registra en nivel "error" y NO se re-lanza, porque cuando se llega a `despachar()`
    el estado del agregado ya se persistió con éxito — la publicación es notificación de un hecho ya
    verdadero, no una escritura que deba ser atómica con él. Esto es defensa en profundidad, no un
-   reemplazo del fix #1. Pendiente de re-correr contra GCP real para confirmar: la suite completa
-   (`run-experiment --target gcp`), idealmente dos veces seguidas como en la corrida que expuso el
-   bug (nota aparte: la segunda corrida también compitió por Cloud SQL porque `run-experiment
-   --target gcp` no resetea la base entre corridas — eso es un problema de tooling distinto, sin
-   corregir aquí).
+   reemplazo del fix #1.
+
+**Segundo bug de producción, distinto y más profundo, encontrado con el fix anterior ya aplicado
+(2026-09-06, contra GCP real, `hda-projectt`, confirmado en logs de Cloud Run):**
+
+```
+KeyError: 'verificacion_id'
+  File "/srv/app/worker/push_handler.py", line 82, in recibir_push
+    verificacion_id = payload["verificacion_id"]
+```
+
+Causa raíz: `PublicadorPubSub.publicar_evento` (usada por `dispatcher_eventos_dominio.py` para
+publicar el evento de INTEGRACIÓN `proveedor.habilitado`, ver bug anterior) reutilizaba el mismo
+topic Pub/Sub que `publicar_solicitud` (`{entorno}-verificacion-solicitudes`). La suscripción push
+que el worker consume (`google_pubsub_subscription.solicitudes_push`, `infra/pubsub.tf`) está
+atada a ese único topic sin ningún `filter`, así que cada `proveedor.habilitado` le llegaba al
+worker por `/pubsub/push` con la misma forma que una solicitud real — pero sin `verificacion_id` —
+y `recibir_push` reventaba con `KeyError` sin capturar → 500 → Pub/Sub reintregaba el mismo mensaje
+envenenado hasta agotar `max_delivery_attempts = 5`, compitiendo por capacidad del worker con
+verificaciones reales en el proceso. Como casi cada verificación exitosa deja al proveedor
+habilitado (la elegibilidad exige "todas las verificaciones que el proveedor tenga", no
+necesariamente las 3 — ver `servicio_elegibilidad.py`), esto explica la degradación progresiva
+observada en corridas sucesivas de `run-experiment --target gcp`.
+
+Por qué esto no pasa en local: `cola_sol` (RabbitMQ, `app/common/mq.py`) solo se bindea a routing
+keys `verificacion.*`; `publicar_evento` publica con routing_key `proveedor.habilitado` sobre el
+mismo exchange, pero al no estar bindeado ese patrón, el mensaje queda sin enrutar por diseño y
+nunca llega al consumidor real (ver comentario ya existente en
+`PublicadorRabbitMQ.publicar_evento`). Pub/Sub no tiene ese filtrado por routing key a nivel de
+suscripción — de ahí que la asimetría solo se manifestara contra GCP real.
+
+Corrección de raíz + defensa en profundidad, tres cambios complementarios:
+1. `infra/pubsub.tf` — nuevo topic `google_pubsub_topic.eventos_integracion`
+   (`{entorno}-verificacion-eventos-integracion`), físicamente distinto del de solicitudes,
+   **sin ninguna suscripción push** (ningún bounded context de este PoC lo consume todavía —
+   Marketplace/Siniestros/Suscripciones están fuera de alcance, igual que ya documentaba el
+   equivalente de RabbitMQ).
+2. `app/common/publicador.py` — `PublicadorPubSub` recibe un nuevo parámetro `topic_eventos` y
+   `publicar_evento` publica exclusivamente a ese topic (antes reutilizaba `self._ruta_sol`). El
+   contrato de la interfaz `Publicador` no cambió de forma (`publicar_evento(routing_key, mensaje)`
+   sigue igual en ambos adaptadores) — solo el destino físico en el adaptador Pub/Sub.
+3. `app/worker/push_handler.py` — `recibir_push` ahora valida que el payload traiga
+   `verificacion_id` antes de asumir que es una solicitud real; si no, responde
+   `{"estado": "ignorado"}` con log en nivel "error" en vez de propagar `KeyError`. Es defensa en
+   profundidad, no la corrección completa por sí sola (Pub/Sub seguiría reintentando un mensaje que
+   el worker de todos modos no puede procesar como verificación si el topic no estuviera separado).
+4. `infra/cloudrun.tf` — nueva variable `PUBSUB_TOPIC_EVENTOS` en el servicio `worker` (y, por
+   simetría con `PUBSUB_TOPIC_FALLIDAS`, también en `api`, aunque ningún comando de la API la usa
+   hoy).
+
+Pendiente de re-aplicar/re-correr para confirmar (no se ejecutó desde este entorno de desarrollo —
+sin `gcloud` ni credenciales aquí): `terraform apply` (crea el topic nuevo y actualiza las env vars
+de Cloud Run) y luego `run-experiment --target gcp`, idealmente dos veces seguidas como en la
+corrida que expuso ambos bugs (nota aparte, sin corregir aquí: `run-experiment --target gcp` no
+resetea la base entre corridas, así que la segunda corrida también compite por Cloud SQL — problema
+de tooling distinto).
 
 ## Diferencias local (RabbitMQ) vs. GCP (Pub/Sub) — amenazas a la validez
 

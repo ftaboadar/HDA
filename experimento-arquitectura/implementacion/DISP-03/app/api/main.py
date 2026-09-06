@@ -73,6 +73,11 @@ async def startup() -> None:
             project_id=settings.gcp_project,
             topic_solicitudes=settings.pubsub_topic_solicitudes,
             topic_fallidas=settings.pubsub_topic_fallidas,
+            # No usado hoy por ningún comando de la API (solo
+            # RegistrarIntento, que corre en el worker, llama a
+            # publicar_evento) — se pasa igual por simetría con
+            # topic_fallidas, que tampoco usa la API todavía.
+            topic_eventos=settings.pubsub_topic_eventos,
         )
     else:
         _conexion = await conectar()

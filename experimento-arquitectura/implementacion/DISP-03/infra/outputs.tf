@@ -26,6 +26,10 @@ output "topic_fallidas_dlq" {
   value = google_pubsub_topic.fallidas.name
 }
 
+output "topic_eventos_integracion" {
+  value = google_pubsub_topic.eventos_integracion.name
+}
+
 output "sql_connection_name" {
   value = google_sql_database_instance.verificacion.connection_name
 }

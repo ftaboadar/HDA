@@ -74,6 +74,13 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "PUBSUB_TOPIC_FALLIDAS"
         value = google_pubsub_topic.fallidas.name
       }
+      env {
+        # No la usa ningún comando de la API hoy (ver
+        # app/api/main.py) — se pasa por simetría con
+        # PUBSUB_TOPIC_FALLIDAS, que tampoco usa la API todavía.
+        name  = "PUBSUB_TOPIC_EVENTOS"
+        value = google_pubsub_topic.eventos_integracion.name
+      }
 
       volume_mounts {
         name       = "cloudsql"
@@ -145,26 +152,35 @@ resource "google_cloud_run_v2_service" "worker" {
         value = var.project_id
       }
       env {
-        # El worker SÍ publica al topic de "solicitudes": no para consumir
-        # verificaciones (eso lo hace la suscripción push), sino porque
-        # RegistrarIntento -> despachar() reacciona a VerificacionCompletada
-        # publicando el evento de integración `proveedor.habilitado` sobre
-        # este mismo topic con un routing_key propio (ver
-        # PublicadorPubSub.publicar_evento en app/common/publicador.py y
-        # app/application/dispatcher_eventos_dominio.py). Sin esta variable,
-        # PublicadorPubSub queda con _ruta_sol=None y
-        # publicar_evento()/publicar_solicitud() lanzan RuntimeError — el
-        # despachador ya no deja que esa excepción tumbe la respuesta HTTP
-        # (ver dispatcher_eventos_dominio.py), pero el evento de integración
-        # simplemente no se publicaría, así que fijar el topic aquí sigue
-        # siendo la corrección real, no solo la resiliencia alrededor de
-        # ella.
+        # El worker necesita conocer el nombre del topic de "solicitudes"
+        # únicamente porque PublicadorPubSub lo usa para construir la ruta
+        # con la que valida publicar_solicitud() — el worker en sí NUNCA
+        # publica a este topic (solo lo consume, vía la suscripción push
+        # definida en infra/pubsub.tf). Sin esta variable, _ruta_sol queda
+        # en None y publicar_solicitud() lanzaría RuntimeError si alguna
+        # ruta del worker llegara a invocarla (hoy ninguna lo hace, pero
+        # mantenerla fijada evita sorpresas si eso cambia).
         name  = "PUBSUB_TOPIC_SOLICITUDES"
         value = google_pubsub_topic.solicitudes.name
       }
       env {
         name  = "PUBSUB_TOPIC_FALLIDAS"
         value = google_pubsub_topic.fallidas.name
+      }
+      env {
+        # Bug de producción corregido 2026-09-06 (ver infra/pubsub.tf,
+        # sección sobre `eventos_integracion`): RegistrarIntento ->
+        # despachar() reacciona a VerificacionCompletada publicando el
+        # evento de INTEGRACIÓN `proveedor.habilitado` (ver
+        # app/application/dispatcher_eventos_dominio.py). Antes se
+        # reutilizaba PUBSUB_TOPIC_SOLICITUDES para esto, lo cual hacía que
+        # ese evento le llegara al propio worker por /pubsub/push como si
+        # fuera una verificación real (misma suscripción, sin filtro) y
+        # reventara con KeyError('verificacion_id'). Ahora
+        # PublicadorPubSub.publicar_evento publica exclusivamente a este
+        # topic dedicado, que no tiene ninguna suscripción push activa.
+        name  = "PUBSUB_TOPIC_EVENTOS"
+        value = google_pubsub_topic.eventos_integracion.name
       }
       env {
         name  = "MAX_REINTENTOS"

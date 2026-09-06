@@ -13,6 +13,37 @@ resource "google_pubsub_topic" "fallidas" {
   depends_on = [google_project_service.apis]
 }
 
+# Bug de producción (2026-09-06, GCP real `hda-projectt`): antes de este
+# topic, `PublicadorPubSub.publicar_evento` (usado por
+# app/application/dispatcher_eventos_dominio.py para publicar el evento de
+# INTEGRACIÓN `proveedor.habilitado` cuando una verificación deja a un
+# proveedor elegible) reutilizaba el topic "solicitudes" de arriba,
+# distinguiendo el mensaje solo por un campo `routing_key` dentro del propio
+# JSON. Como `solicitudes_push` (abajo) está suscrita a ESE topic sin
+# ningún filtro, cada `proveedor.habilitado` le llegaba al worker por
+# /pubsub/push como si fuera una solicitud de verificación real, y
+# `push_handler.py` reventaba con `KeyError: 'verificacion_id'` — Pub/Sub
+# reintregaba el mismo mensaje envenenado hasta agotar
+# `max_delivery_attempts`, compitiendo por capacidad del worker con
+# verificaciones reales. RabbitMQ no sufre esto porque la cola local está
+# bindeada solo a routing keys `verificacion.*` (ver
+# app/common/mq.py/PublicadorRabbitMQ.publicar_evento): un mensaje con
+# routing_key "proveedor.habilitado" queda sin enrutar por diseño, nunca
+# llega al consumidor. Pub/Sub no tiene ese enrutamiento por routing key a
+# nivel de suscripción, así que la corrección es un topic dedicado.
+#
+# Deliberadamente SIN suscripción todavía: ningún bounded context de este
+# PoC consume `proveedor.habilitado` (los consumidores reales — Marketplace,
+# Siniestros, Suscripciones — están fuera del alcance de DISP-03, ver
+# docstring de Publicador.publicar_evento). Publicar a un topic sin
+# suscripción es válido en Pub/Sub (el mensaje simplemente no se retiene
+# para nadie) y es el equivalente exacto del "mensaje sin enrutar por
+# diseño" que ya describe PublicadorRabbitMQ.publicar_evento.
+resource "google_pubsub_topic" "eventos_integracion" {
+  name       = "${var.entorno}-verificacion-eventos-integracion"
+  depends_on = [google_project_service.apis]
+}
+
 resource "google_pubsub_subscription" "solicitudes_push" {
   name  = "${var.entorno}-verificacion-solicitudes-push"
   topic = google_pubsub_topic.solicitudes.name

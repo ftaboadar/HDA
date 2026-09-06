@@ -6,6 +6,7 @@ Ejemplos:
     python -m cli.hda_gcp.main infra init
     python -m cli.hda_gcp.main infra plan   --project mi-proyecto
     python -m cli.hda_gcp.main infra apply  --project mi-proyecto
+    python -m cli.hda_gcp.main infra reset-db --project mi-proyecto
     python -m cli.hda_gcp.main images build-push --project mi-proyecto --repo disp03-poc-hda
     python -m cli.hda_gcp.main run-experiment --target local
     python -m cli.hda_gcp.main run-experiment --target gcp
@@ -146,6 +147,64 @@ def infra_destroy(
         ],
         cwd=DIR_INFRA,
     )
+
+
+@infra_app.command("reset-db")
+def infra_reset_db(
+    project: str = typer.Option(..., "--project", "-p"),
+    region: str = typer.Option("southamerica-east1"),
+    entorno: str = typer.Option("disp03-poc", "--entorno"),
+    yes: bool = typer.Option(False, "--yes", help="Omite la confirmación interactiva"),
+):
+    """Resetea los datos del experimento en Cloud SQL entre corridas de
+    `run-experiment --target gcp` — a diferencia de local (que arranca de
+    'down -v' en cada corrida), Cloud SQL persiste entre corridas y eso hace
+    que los resultados no sean reproducibles ni comparables entre sí.
+
+    No conecta directo a Postgres (evita depender de un driver como
+    psycopg2, que no siempre compila en la máquina del desarrollador):
+    borra y recrea la base lógica 'verificacion' vía gcloud (instancia y
+    usuario quedan intactos), y fuerza una revisión nueva de api/worker con
+    `terraform apply -replace` para que Base.metadata.create_all() reconstruya
+    el esquema en el arranque — las instancias calientes (min_instance_count=1)
+    no vuelven a correr su startup solas."""
+    instancia = f"{entorno}-verificacion"
+    if not yes:
+        typer.confirm(
+            f"Esto va a BORRAR TODOS LOS DATOS del experimento en '{instancia}' "
+            f"(proyecto '{project}') y redesplegar api/worker en frío. ¿Continuar?",
+            abort=True,
+        )
+    _ejecutar(
+        [
+            "gcloud",
+            "sql",
+            "databases",
+            "delete",
+            "verificacion",
+            "--instance",
+            instancia,
+            "--project",
+            project,
+            "--quiet",
+        ]
+    )
+    _ejecutar(
+        ["gcloud", "sql", "databases", "create", "verificacion", "--instance", instancia, "--project", project]
+    )
+    _ejecutar(
+        [
+            "terraform",
+            "apply",
+            "-auto-approve",
+            "-replace=google_cloud_run_v2_service.api",
+            "-replace=google_cloud_run_v2_service.worker",
+            f"-var=project_id={project}",
+            f"-var=region={region}",
+        ],
+        cwd=DIR_INFRA,
+    )
+    typer.secho("Base de datos reseteada y api/worker redesplegados en frío.", fg=typer.colors.GREEN)
 
 
 @infra_app.command("output")
