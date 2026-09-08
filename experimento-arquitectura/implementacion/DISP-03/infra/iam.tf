@@ -15,6 +15,17 @@ resource "google_cloud_run_v2_service_iam_member" "pubsub_invoca_worker" {
   member   = "serviceAccount:${google_service_account.invocador_pubsub.email}"
 }
 
+# Sin esto, el push de Pub/Sub falla con "request was not authenticated":
+# el agente de servicio de Pub/Sub necesita permiso explícito para FIRMAR
+# tokens OIDC como la SA invocador_pubsub (no basta con que la suscripción
+# declare oidc_token.service_account_email) — descubierto corriendo el
+# experimento contra GCP real, no evidente solo leyendo la documentación.
+resource "google_service_account_iam_member" "pubsub_agente_firma_como_invocador" {
+  service_account_id = google_service_account.invocador_pubsub.name
+  role                = "roles/iam.serviceAccountTokenCreator"
+  member              = "serviceAccount:service-${data.google_project.actual.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+}
+
 resource "google_project_iam_member" "runtime_sql" {
   project = var.project_id
   role    = "roles/cloudsql.client"
