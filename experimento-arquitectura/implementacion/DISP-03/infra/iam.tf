@@ -22,8 +22,8 @@ resource "google_cloud_run_v2_service_iam_member" "pubsub_invoca_worker" {
 # experimento contra GCP real, no evidente solo leyendo la documentación.
 resource "google_service_account_iam_member" "pubsub_agente_firma_como_invocador" {
   service_account_id = google_service_account.invocador_pubsub.name
-  role                = "roles/iam.serviceAccountTokenCreator"
-  member              = "serviceAccount:service-${data.google_project.actual.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.actual.number}@gcp-sa-pubsub.iam.gserviceaccount.com"
 }
 
 resource "google_project_iam_member" "runtime_sql" {
