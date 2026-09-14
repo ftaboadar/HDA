@@ -13,6 +13,8 @@ puerto `IVerificacionRepository`, implementado por
 import uuid
 from datetime import datetime, timezone
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 
 from app.application.commands.iniciar_verificacion import IniciarVerificacion
@@ -35,7 +37,6 @@ from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
 )
 
 logger = configurar_logging("api.main")
-app = FastAPI(title="Verificación de Proveedores — API (DISP-03 PoC)")
 
 _conexion = None
 _publicador: Publicador | None = None
@@ -63,8 +64,8 @@ def _a_schema(v: Verificacion) -> VerificacionOut:
     )
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global _conexion, _publicador
     Base.metadata.create_all(bind=engine)
 
@@ -96,14 +97,14 @@ async def startup() -> None:
         _publicador = PublicadorRabbitMQ(exchange_sol, exchange_dlx)
 
     log_evento(logger, "api_iniciada", transporte=settings.transporte)
-
-
-@app.on_event("shutdown")
-async def shutdown() -> None:
+    yield
     if _conexion:
         await _conexion.close()
     if isinstance(_publicador, PublicadorPulsar):
         _publicador.cerrar()
+
+
+app = FastAPI(title="Verificación de Proveedores — API (DISP-03 PoC)", lifespan=lifespan)
 
 
 @app.get("/salud")
