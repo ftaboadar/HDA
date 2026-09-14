@@ -1,0 +1,89 @@
+/*
+ * Hogar de los Alpes (HdA)
+ * Entrega 1 - Dominios y Sub-dominios
+ *
+ * Corrección de arquitectura:
+ * Se dividió el modelo monolítico original en múltiples Dominios de acuerdo con 
+ * la estrategia de expansión (B2B2C, Fintech, Suscripciones) y se incluyeron 
+ * los sub-dominios genéricos solicitados.
+ */
+
+Domain MarketplaceDeServicios {
+  domainVisionStatement = "Conectar de forma segura a los dueños de hogar que necesitan resolver un problema puntual con profesionales verificados, gestionando el ciclo de vida central de los trabajos."
+
+  Subdomain GestionDeTrabajos {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Ser el motor de orquestación central de trabajos de HdA, adaptando el flujo (orden, paralelos, bloqueos) según el origen, categoría y novedades."
+  }
+
+  Subdomain ProveedoresDeServicio {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Registrar, verificar y habilitar a personas naturales y empresas que prestarán trabajos. Es el proceso de confianza que diferencia a HdA."
+  }
+
+  Subdomain Marketplace {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Conectar la demanda B2C con la oferta de proveedores acreditados a través de publicación, cotización, y diagnóstico mediante asistente conversacional."
+  }
+
+  Subdomain ReputacionYCalidad {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Registrar calificaciones, cumplimiento y garantías de cada proveedor a partir de los trabajos ejecutados."
+  }
+}
+
+Domain SiniestrosYAlianzasB2B2C {
+  domainVisionStatement = "Soportar la operación B2B2C que representa el 70% del volumen, integrándose con aseguradoras (como Seguros de los Alpes), bancos y comercios."
+
+  Subdomain SiniestrosYPartners {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Traducir las reglas y compliance de cada partner (red permitida, SLAs, montos máximos) en parámetros para inyectar al motor de Gestión de Trabajos."
+  }
+}
+
+Domain ServiciosRecurrentes {
+  domainVisionStatement = "Nueva línea de negocio para servicios recurrentes del hogar bajo modelo de suscripción, con dinámicas de continuidad distintas a trabajos puntuales."
+
+  Subdomain GestionDeSuscripciones {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Gestionar ciclos de facturación recurrente, continuidad o rotación del proveedor asignado para servicios como aseo o jardinería."
+  }
+}
+
+Domain FintechYPagos {
+  domainVisionStatement = "Ofrecer servicios financieros a proveedores y gestionar el flujo de dinero, apalancando la historia de trabajos como activo."
+
+  Subdomain ScoringYCredito {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Usar el historial de trabajos como fuente de scoring crediticio para ofrecer micro-préstamos a proveedores no bancarizados."
+  }
+
+  Subdomain Pagos {
+    type = GENERIC_SUBDOMAIN
+    domainVisionStatement = "Gestionar el flujo de dinero (cobro, retención, liberación, facturación B2B2C). Subdominio genérico delegable a un proveedor de pagos para marketplace (ej. Stripe)."
+  }
+}
+
+Domain CapacidadesTransversales {
+  domainVisionStatement = "Capacidades operativas y tecnológicas genéricas que dan soporte a todos los dominios core de la organización."
+
+  Subdomain OperacionDeAgentes {
+    type = GENERIC_SUBDOMAIN
+    domainVisionStatement = "Plataforma genérica (ej. CRM / Mesa de ayuda como Zendesk) para coordinar a los agentes humanos que atienden novedades, disputas y verificación asistida."
+  }
+
+  Subdomain Notificaciones {
+    type = GENERIC_SUBDOMAIN
+    domainVisionStatement = "Capacidad de enviar SMS, Emails o Push notifications a clientes y proveedores a lo largo del ciclo de vida de los servicios."
+  }
+
+  Subdomain GestorDocumental {
+    type = GENERIC_SUBDOMAIN
+    domainVisionStatement = "Almacenamiento y gestión de evidencias, fotos de siniestros, certificados de proveedores y documentos legales (ej. AWS S3 o un CMS documental)."
+  }
+
+  Subdomain Contabilidad {
+    type = GENERIC_SUBDOMAIN
+    domainVisionStatement = "Gestión de la cartera, cuentas por cobrar/pagar, libros contables y conciliación financiera corporativa (ej. ERP como SAP o Dynamics)."
+  }
+}
