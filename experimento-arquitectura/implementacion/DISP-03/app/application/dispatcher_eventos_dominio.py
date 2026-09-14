@@ -33,6 +33,8 @@ intento chocaría entonces contra el invariante de
 tests/unit/dominio/test_verificacion_aggregate.py), una segunda falla
 distinta y evitable."""
 
+import asyncio
+
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.publicador import Publicador
 from app.domain.seedwork.domain_event import DomainEvent
@@ -71,7 +73,8 @@ async def despachar(
                 verificacion_id=str(evento.verificacion_id),
             )
             servicio = ServicioDeElegibilidad(repo)
-            if servicio.proveedor_esta_habilitado(evento.proveedor_id):
+            habilitado = await asyncio.to_thread(servicio.proveedor_esta_habilitado, evento.proveedor_id)
+            if habilitado:
                 try:
                     await publicador.publicar_evento(
                         ROUTING_KEY_PROVEEDOR_HABILITADO,

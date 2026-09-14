@@ -10,6 +10,8 @@ FALLIDA_DLQ sin haber agotado los reintentos — precisamente el invariante 2
 que el agregado protege. La transición ocurre *dentro* de este comando,
 como efecto de `registrar_intento`, nunca como comando independiente."""
 
+import asyncio
+
 from app.application.dispatcher_eventos_dominio import despachar
 from app.common.publicador import Publicador
 from app.domain.verificacion.repository import IVerificacionRepository
@@ -34,12 +36,12 @@ class RegistrarIntento:
         error: str | None = None,
     ) -> Verificacion:
         vid = VerificacionId.desde_str(verificacion_id)
-        verificacion = self._repo.obtener_por_id(vid)
+        verificacion = await asyncio.to_thread(self._repo.obtener_por_id, vid)
         if verificacion is None:
             raise VerificacionNoEncontrada(verificacion_id)
 
         verificacion.registrar_intento(resultado=resultado, duracion_ms=duracion_ms, error=error)
-        self._repo.guardar(verificacion)
+        await asyncio.to_thread(self._repo.guardar, verificacion)
 
         eventos = verificacion.recoger_eventos()
         await despachar(eventos, self._repo, self._publicador)

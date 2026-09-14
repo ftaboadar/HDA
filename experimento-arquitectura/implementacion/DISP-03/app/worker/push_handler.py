@@ -44,6 +44,7 @@ verificacion_repository_sqlalchemy.py — y eso pesa más de lo esperado bajo
 la latencia real de Cloud SQL), ahí sí correspondería revisar si conviene
 paralelizar esa escritura o acotar concurrencia por instancia."""
 
+import asyncio
 import base64
 import json
 import os
@@ -119,7 +120,7 @@ async def recibir_push(request: Request):
 
     verificacion_id = payload["verificacion_id"]
 
-    existente = ConsultarVerificacion(repo).ejecutar(verificacion_id)
+    existente = await asyncio.to_thread(ConsultarVerificacion(repo).ejecutar, verificacion_id)
     if existente is not None and existente.estado in (
         EstadoVerificacion.COMPLETADA,
         EstadoVerificacion.FALLIDA_DLQ,

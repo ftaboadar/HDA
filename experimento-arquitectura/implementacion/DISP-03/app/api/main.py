@@ -130,7 +130,7 @@ async def crear_verificacion(payload: VerificacionCreate):
 
 
 @app.get("/verificaciones/{verificacion_id}", response_model=VerificacionOut)
-async def obtener_verificacion(verificacion_id: uuid.UUID):
+def obtener_verificacion(verificacion_id: uuid.UUID):
     query = ConsultarVerificacion(_repo)
     verificacion = query.ejecutar(str(verificacion_id))
     if verificacion is None:
@@ -139,13 +139,13 @@ async def obtener_verificacion(verificacion_id: uuid.UUID):
 
 
 @app.get("/verificaciones", response_model=list[VerificacionOut])
-async def listar_verificaciones(estado: str | None = None, proveedor_id: str | None = None):
+def listar_verificaciones(estado: str | None = None, proveedor_id: str | None = None):
     query = ListarVerificaciones(_repo)
     return [_a_schema(v) for v in query.ejecutar(estado=estado, proveedor_id=proveedor_id)]
 
 
 @app.get("/dlq", response_model=list[VerificacionOut])
-async def listar_dlq():
+def listar_dlq():
     query = ListarDLQ(_repo)
     return [_a_schema(v) for v in query.ejecutar()]
 

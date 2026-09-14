@@ -11,6 +11,7 @@ técnico nuevo, que el documento de propuesta describe como los otros dos
 disparadores, no se implementa aquí (es integración con un scheduler
 externo, no parte de los 5 criterios de la Regla 5)."""
 
+import asyncio
 from datetime import datetime, timezone
 
 from app.common.publicador import Publicador
@@ -35,7 +36,7 @@ class RevalidarProveedor:
             proveedor_id=ProveedorId(proveedor_id),
             tipo_verificador=TipoVerificador(tipo_verificador),
         )
-        self._repo.guardar(verificacion)
+        await asyncio.to_thread(self._repo.guardar, verificacion)
 
         await self._publicador.publicar_solicitud(
             {
