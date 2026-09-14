@@ -18,7 +18,9 @@ class Settings(BaseSettings):
     # que el cluster de pulsar-infra (ver docker-compose.yml de este
     # directorio); si se corre suelto, sobreescribir con localhost:6650.
     pulsar_service_url: str = "pulsar://broker:6650"
-    pulsar_topic_trabajos_finalizado: str = "persistent://hda/gestion-trabajos/trabajos.finalizado"
+    pulsar_topic_trabajos_finalizado: str = (
+        "persistent://hda/gestion-trabajos/trabajos.finalizado"
+    )
     pulsar_subscription: str = "reputacion-trabajos-finalizado"
 
 

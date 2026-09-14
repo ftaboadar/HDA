@@ -52,7 +52,9 @@ def _serializar(evento: DomainEvent) -> str:
 def _deserializar(tipo_evento: str, payload_json: str) -> DomainEvent:
     clase = _EVENTOS.get(tipo_evento)
     if clase is None:
-        raise NotImplementedError(f"No hay deserializador registrado para el tipo '{tipo_evento}'")
+        raise NotImplementedError(
+            f"No hay deserializador registrado para el tipo '{tipo_evento}'"
+        )
 
     payload = json.loads(payload_json)
 
@@ -70,7 +72,9 @@ def _deserializar(tipo_evento: str, payload_json: str) -> DomainEvent:
                 else None
             ),
         )
-    raise NotImplementedError(f"No hay deserializador registrado para el tipo '{tipo_evento}'")
+    raise NotImplementedError(
+        f"No hay deserializador registrado para el tipo '{tipo_evento}'"
+    )
 
 
 class EventStoreSQLAlchemy(IEventStore):
@@ -106,7 +110,9 @@ class EventStoreSQLAlchemy(IEventStore):
                 .where(EventoReputacionORM.agregado_id == agregado_id)
                 .order_by(EventoReputacionORM.version.asc())
             ).all()
-            return [_deserializar(fila.tipo_evento, fila.payload_json) for fila in filas]
+            return [
+                _deserializar(fila.tipo_evento, fila.payload_json) for fila in filas
+            ]
 
     @staticmethod
     def _version_actual(sesion: Session, agregado_id: str) -> int:

@@ -10,9 +10,14 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app.application.commands.calificar_proveedor import CalificarProveedor
-from app.application.queries.consultar_perfil_reputacion import ConsultarPerfilReputacion
+from app.application.queries.consultar_perfil_reputacion import (
+    ConsultarPerfilReputacion,
+)
 from app.common.db import Base, engine
-from app.domain.reputacion.perfil_reputacion import PerfilReputacion, PuntajeFueraDeRango
+from app.domain.reputacion.perfil_reputacion import (
+    PerfilReputacion,
+    PuntajeFueraDeRango,
+)
 from app.infrastructure.persistence.event_store_sqlalchemy import EventStoreSQLAlchemy
 
 app = FastAPI(title="Reputación — API (Entrega 4 PoC, Event Sourcing)")
@@ -93,5 +98,7 @@ async def obtener_reputacion(proveedor_id: str):
     query = ConsultarPerfilReputacion(_event_store)
     perfil = query.ejecutar(proveedor_id)
     if perfil is None:
-        raise HTTPException(status_code=404, detail="proveedor sin calificaciones registradas")
+        raise HTTPException(
+            status_code=404, detail="proveedor sin calificaciones registradas"
+        )
     return _a_schema(perfil)

@@ -8,7 +8,10 @@
 import pytest
 
 from app.domain.reputacion.eventos import ProveedorCalificado
-from app.domain.reputacion.perfil_reputacion import PerfilReputacion, PuntajeFueraDeRango
+from app.domain.reputacion.perfil_reputacion import (
+    PerfilReputacion,
+    PuntajeFueraDeRango,
+)
 from app.domain.reputacion.value_objects import Garantia, ProveedorId, TrabajoId
 
 
@@ -24,7 +27,9 @@ def test_crear_perfil_nuevo_no_tiene_calificaciones_ni_eventos_pendientes():
 def test_calificar_aplica_el_evento_y_lo_deja_pendiente_de_persistir():
     perfil = PerfilReputacion.crear(ProveedorId("prov-1"))
 
-    perfil.calificar(trabajo_id=TrabajoId("trabajo-1"), puntaje=5, comentario="Excelente")
+    perfil.calificar(
+        trabajo_id=TrabajoId("trabajo-1"), puntaje=5, comentario="Excelente"
+    )
 
     assert len(perfil.calificaciones) == 1
     assert perfil.calificaciones[0].puntaje == 5
