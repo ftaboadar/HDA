@@ -17,6 +17,7 @@ mensaje sin `verificacion_id`, el handler debe responder 200 con
 
 import base64
 import json
+import uuid
 
 import pytest
 
@@ -64,13 +65,32 @@ async def test_recibir_push_procesa_solicitud_real_sin_ser_bloqueada_por_la_vali
     """La validación no debe descartar mensajes legítimos: si trae
     `verificacion_id`, el handler debe seguir el camino normal (aquí
     verificado solo hasta el punto en que llamaría a `procesar_verificacion`,
-    sin BD real)."""
+    sin BD real).
+
+    Desde la fusión con el chequeo de idempotencia ante redelivery de Pub/Sub
+    (`ConsultarVerificacion` antes de procesar, ver push_handler.py), este
+    camino ya no es 100% "sin BD real" salvo que también se mockee esa
+    consulta — se hace aquí devolviendo `None` (equivalente a "no existe
+    todavía"), que es el caso real para una solicitud nueva. También se usa
+    un UUID válido: `VerificacionId.desde_str()` (llamado dentro de la
+    consulta) exige formato UUID real, cosa que el código anterior a la
+    fusión nunca ejercitaba en este camino."""
     monkeypatch.setattr(push_handler, "_publicador", object())
+
+    class _ConsultaFalsa:
+        def __init__(self, _repo) -> None:
+            pass
+
+        def ejecutar(self, _verificacion_id) -> None:
+            return None
+
+    monkeypatch.setattr(push_handler, "ConsultarVerificacion", _ConsultaFalsa)
 
     class _DetenerAqui(Exception):
         """Se lanza deliberadamente para no seguir ejecutando el resto del
         handler (que sí necesitaría BD real) una vez confirmado que la
-        validación de forma dejó pasar el mensaje legítimo."""
+        validación de forma y de idempotencia dejaron pasar el mensaje
+        legítimo."""
 
     llamado = {}
 
@@ -80,8 +100,9 @@ async def test_recibir_push_procesa_solicitud_real_sin_ser_bloqueada_por_la_vali
 
     monkeypatch.setattr(push_handler, "procesar_verificacion", _procesar_verificacion_falso)
 
+    verificacion_id = str(uuid.uuid4())
     payload_solicitud_real = {
-        "verificacion_id": "verif-1",
+        "verificacion_id": verificacion_id,
         "proveedor_id": "prov-1",
         "tipo_verificador": "POLICIA",
     }
@@ -90,4 +111,4 @@ async def test_recibir_push_procesa_solicitud_real_sin_ser_bloqueada_por_la_vali
     with pytest.raises(_DetenerAqui):
         await push_handler.recibir_push(request)
 
-    assert llamado["args"] == ("verif-1", "prov-1", "POLICIA")
+    assert llamado["args"] == (verificacion_id, "prov-1", "POLICIA")
