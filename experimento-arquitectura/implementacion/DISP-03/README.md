@@ -14,23 +14,33 @@ app/
   domain/seedwork/          Entity, AggregateRoot, ValueObject, DomainEvent, IRepository genérico
   application/
     commands/                IniciarVerificacion, RegistrarIntento, ReprocesarDesdeDLQ,
-                              RevalidarProveedor (mutan estado — CQS)
+                              RevalidarProveedor, RegistrarEventoTrabajoFinalizado (mutan estado — CQS)
     queries/                  ConsultarVerificacion, ListarVerificaciones, ListarDLQ (solo leen)
     ports/verificacion_externa.py   IVerificacionExternaPort (2do puerto hexagonal)
+    ports/eventos_recibidos.py      IEventosRecibidosRepository (registro liviano de eventos
+                                     RECIBIDOS de otros microservicios, ej. trabajos.finalizado)
     dispatcher_eventos_dominio.py    despachador en memoria de eventos de dominio
   infrastructure/
     persistence/               VerificacionRepositorySQLAlchemy — implementa IVerificacionRepository
+                                EventosRecibidosRepositorySQLAlchemy — tabla eventos_recibidos
     external/                   AdaptadorPolicia / AdaptadorRUES / AdaptadorCertificadora
     config.py                   resuelve qué adaptador externo usar según tipo_verificador
-  common/        config, DB (Postgres/Cloud SQL), logging estructurado, topología de mensajería,
-                 y publicador.py — el puerto Publicador con sus dos adaptadores (RabbitMQ / Pub/Sub)
-                 + publicar_evento genérico (eventos de integración nuevos, ej. ProveedorHabilitado)
+  common/        config, DB (Postgres/Cloud SQL), logging estructurado, topología de mensajería
+                 (mq.py para RabbitMQ, pulsar_topology.py para Pulsar), y publicador.py — el puerto
+                 Publicador con sus tres adaptadores (RabbitMQ / Pub/Sub / Pulsar) + publicar_evento
+                 genérico (eventos de integración nuevos, ej. ProveedorHabilitado)
   api/           API de Verificación (FastAPI) — llama a application/commands y application/queries,
                  nunca a SQLAlchemy directo
   worker/
     core.py      reintentos/backoff, agnóstico de transporte Y de sistema externo (llama al puerto)
     main.py      consumidor pull de RabbitMQ (local) — registra cada intento vía RegistrarIntento
     push_handler.py  handler push de Pub/Sub (GCP / Cloud Run), mismo patrón
+    pulsar_consumer.py   consumidor pull de Apache Pulsar, mismo patrón que main.py, con
+                         DeadLetterPolicy nativa de la suscripción (sección 2.2 del plan Entrega 4)
+    consumidor_trabajos_finalizado.py   consumidor LIVIANO de trabajos.finalizado (Gestión de
+                         Trabajos -> Proveedores) — solo recibe y registra, no completa la cadena
+    job_reproceso_dlq.py   job batch que monitorea el backlog de la DLQ vía la API de
+                         estadísticas de Pulsar y dispara ReprocesarDesdeDLQ automáticamente
   mocks/         doble de sistema externo (Policía/RUES/Certificadora), un solo artefacto
                  parametrizado por MOCK_NAME, controlable en caliente vía /_control/config
 tests/
@@ -162,22 +172,29 @@ corrida que expuso ambos bugs (nota aparte, sin corregir aquí: `run-experiment 
 resetea la base entre corridas, así que la segunda corrida también compite por Cloud SQL — problema
 de tooling distinto).
 
-## Diferencias local (RabbitMQ) vs. GCP (Pub/Sub) — amenazas a la validez
+## Diferencias local (RabbitMQ) vs. GCP (Pub/Sub) vs. Apache Pulsar — amenazas a la validez
 
 Documentadas aquí para que `validador-hipotesis` las cite explícitamente si el veredicto pretende
-generalizarse al despliegue real, no solo al entorno local:
+generalizarse al despliegue real, no solo al entorno local. La columna Pulsar corresponde a la
+migración del publicador descrita en la sección 2.2 de
+`../../contexto/12-plan-entrega-4.md` — **el veredicto H1 con RabbitMQ/Pub-Sub NO se traslada
+automáticamente a Pulsar por analogía**: al menos CP-4 (falla dura + DLQ) y CP-7 (carga
+concurrente) deben re-ejecutarse contra un cluster de Pulsar real antes de reclamarlo (ver
+`../../contexto/12-plan-entrega-4.md`, sección 2, "Riesgo nuevo, explícito, por la migración a
+Pulsar").
 
-- **Orden de mensajes**: RabbitMQ con una sola cola preserva orden FIFO razonablemente bien bajo
-  esta topología; Pub/Sub sin `ordering key` no garantiza orden. Ninguno de los 7 casos de prueba
-  depende de orden estricto, pero si un caso futuro lo necesitara, habría que fijar `ordering_key` en
-  el publicador de Pub/Sub.
-- **Semántica de entrega**: ambos son *at-least-once* — el código ya asume mensajes duplicados
-  posibles (idempotencia parcial vía `verificacion_id`), pero no hay una prueba de prueba específica
-  de duplicados en esta primera versión.
-- **Transporte del worker**: pull continuo (RabbitMQ) vs. push por HTTP (Pub/Sub → Cloud Run). La
-  lógica de reintentos (`worker/core.py`) es idéntica; el *trigger* no lo es.
-- **DLQ**: local es una cola RabbitMQ poblada por la propia aplicación; en GCP hay dos mecanismos
-  (aplicación + `dead_letter_policy` nativa de Pub/Sub) — ver sección anterior.
+| Aspecto | RabbitMQ (local) | Pub/Sub (GCP) | Apache Pulsar |
+|---|---|---|---|
+| Orden de mensajes | FIFO razonable con una sola cola | Sin garantía sin `ordering key` | Orden garantizado **por partición** (no orden global), similar a Kafka — si un tópico tiene una sola partición, se comporta como FIFO |
+| Semántica de entrega | *at-least-once* | *at-least-once* | *at-least-once* por defecto; *effectively-once* es posible activando deduplicación de productor (fuera de alcance de este PoC) |
+| Transporte del worker | Pull continuo (`worker/main.py`) | Push por HTTP (`worker/push_handler.py` → Cloud Run) | Pull nativo (`worker/pulsar_consumer.py`) — Pulsar sí soporta pull, a diferencia de Pub/Sub, así que el diseño es más parecido al de RabbitMQ que al de Pub/Sub |
+| DLQ | Cola RabbitMQ poblada por la propia aplicación (`publicar_fallida`) | Dos mecanismos: aplicación + `dead_letter_policy` nativa de la suscripción push | Dos mecanismos también, pero distintos entre sí: tópico de aplicación (`publicar_fallida`, `verificacion.fallida-dlq`) + `DeadLetterPolicy` **nativa de la suscripción** del consumidor pull (`pulsar_topology.construir_dead_letter_policy`, tópico técnico separado `verificacion.solicitudes-dlq-nativo`) — ver docstring de `app/worker/job_reproceso_dlq.py` para la distinción explícita entre ambas |
+| Reproceso de DLQ | Manual (`POST /dlq/{id}/reprocesar`) | Manual | Manual + **job automático** (`app/worker/job_reproceso_dlq.py`) que monitorea el backlog vía la API de estadísticas de Pulsar (`GET /admin/v2/persistent/{topic}/stats`) y dispara `ReprocesarDesdeDLQ` cuando supera un umbral |
+
+- Ninguno de los 7 casos de prueba (CP-1..CP-7) depende de orden estricto entre mensajes, en
+  ninguno de los tres transportes.
+- No hay una prueba específica de duplicados (idempotencia solo parcial vía `verificacion_id`) en
+  ninguno de los tres transportes.
 
 ## Servicio DDD (Regla 5 de la rúbrica) — implementado
 

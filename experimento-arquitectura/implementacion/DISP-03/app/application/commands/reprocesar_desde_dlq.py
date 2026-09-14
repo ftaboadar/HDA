@@ -1,5 +1,6 @@
 """Comando — reemplaza el cuerpo de `POST /dlq/{id}/reprocesar`."""
 
+import asyncio
 from datetime import datetime, timezone
 
 from app.common.publicador import Publicador
@@ -19,12 +20,12 @@ class ReprocesarDesdeDLQ:
 
     async def ejecutar(self, verificacion_id: str) -> Verificacion:
         vid = VerificacionId.desde_str(verificacion_id)
-        verificacion = self._repo.obtener_por_id(vid)
+        verificacion = await asyncio.to_thread(self._repo.obtener_por_id, vid)
         if verificacion is None:
             raise VerificacionNoEncontrada(verificacion_id)
 
         verificacion.reprocesar()  # valida el invariante: solo desde FALLIDA_DLQ
-        self._repo.guardar(verificacion)
+        await asyncio.to_thread(self._repo.guardar, verificacion)
 
         await self._publicador.publicar_solicitud(
             {

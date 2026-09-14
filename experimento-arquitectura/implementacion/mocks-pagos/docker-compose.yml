@@ -1,0 +1,12 @@
+services:
+  mock-stripe:
+    build: .
+    command: uvicorn app.stripe_mock:app --host 0.0.0.0 --port 8000
+    ports:
+      - "9100:8000"
+
+  mock-mercadopago:
+    build: .
+    command: uvicorn app.mercadopago_mock:app --host 0.0.0.0 --port 8000
+    ports:
+      - "9101:8000"

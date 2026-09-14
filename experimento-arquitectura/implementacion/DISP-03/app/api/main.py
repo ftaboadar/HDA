@@ -13,6 +13,8 @@ puerto `IVerificacionRepository`, implementado por
 import uuid
 from datetime import datetime, timezone
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 
 from app.application.commands.iniciar_verificacion import IniciarVerificacion
@@ -26,7 +28,7 @@ from app.common.config import settings
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.mq import conectar, declarar_topologia
-from app.common.publicador import Publicador, PublicadorPubSub, PublicadorRabbitMQ
+from app.common.publicador import Publicador, PublicadorPubSub, PublicadorPulsar, PublicadorRabbitMQ
 from app.common.schemas import VerificacionCreate, VerificacionOut
 from app.domain.verificacion.value_objects import MotivoRevalidacion
 from app.domain.verificacion.verificacion import Verificacion
@@ -35,7 +37,6 @@ from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
 )
 
 logger = configurar_logging("api.main")
-app = FastAPI(title="Verificación de Proveedores — API (DISP-03 PoC)")
 
 _conexion = None
 _publicador: Publicador | None = None
@@ -63,8 +64,8 @@ def _a_schema(v: Verificacion) -> VerificacionOut:
     )
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global _conexion, _publicador
     Base.metadata.create_all(bind=engine)
 
@@ -79,6 +80,16 @@ async def startup() -> None:
             # topic_fallidas, que tampoco usa la API todavía.
             topic_eventos=settings.pubsub_topic_eventos,
         )
+    elif settings.transporte == "pulsar":
+        # Igual que en la rama pubsub: ningún comando de la API publica
+        # eventos de integración hoy (solo RegistrarIntento, en el worker),
+        # se pasa topic_eventos igual por simetría.
+        _publicador = PublicadorPulsar(
+            service_url=settings.pulsar_service_url,
+            topic_solicitudes=settings.pulsar_topic_solicitudes,
+            topic_fallidas=settings.pulsar_topic_fallidas,
+            topic_eventos=settings.pulsar_topic_eventos,
+        )
     else:
         _conexion = await conectar()
         canal = await _conexion.channel()
@@ -86,12 +97,14 @@ async def startup() -> None:
         _publicador = PublicadorRabbitMQ(exchange_sol, exchange_dlx)
 
     log_evento(logger, "api_iniciada", transporte=settings.transporte)
-
-
-@app.on_event("shutdown")
-async def shutdown() -> None:
+    yield
     if _conexion:
         await _conexion.close()
+    if isinstance(_publicador, PublicadorPulsar):
+        _publicador.cerrar()
+
+
+app = FastAPI(title="Verificación de Proveedores — API (DISP-03 PoC)", lifespan=lifespan)
 
 
 @app.get("/salud")
@@ -118,7 +131,7 @@ async def crear_verificacion(payload: VerificacionCreate):
 
 
 @app.get("/verificaciones/{verificacion_id}", response_model=VerificacionOut)
-async def obtener_verificacion(verificacion_id: uuid.UUID):
+def obtener_verificacion(verificacion_id: uuid.UUID):
     query = ConsultarVerificacion(_repo)
     verificacion = query.ejecutar(str(verificacion_id))
     if verificacion is None:
@@ -127,13 +140,13 @@ async def obtener_verificacion(verificacion_id: uuid.UUID):
 
 
 @app.get("/verificaciones", response_model=list[VerificacionOut])
-async def listar_verificaciones(estado: str | None = None, proveedor_id: str | None = None):
+def listar_verificaciones(estado: str | None = None, proveedor_id: str | None = None):
     query = ListarVerificaciones(_repo)
     return [_a_schema(v) for v in query.ejecutar(estado=estado, proveedor_id=proveedor_id)]
 
 
 @app.get("/dlq", response_model=list[VerificacionOut])
-async def listar_dlq():
+def listar_dlq():
     query = ListarDLQ(_repo)
     return [_a_schema(v) for v in query.ejecutar()]
 

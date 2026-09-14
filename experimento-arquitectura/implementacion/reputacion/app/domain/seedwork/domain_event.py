@@ -24,7 +24,9 @@ class DomainEvent:
     # violar el orden de dataclasses (campos con default no pueden preceder
     # a campos sin default en la lista posicional).
     event_id: uuid.UUID = field(default_factory=uuid.uuid4, kw_only=True)
-    ocurrido_en: datetime = field(default_factory=lambda: datetime.now(timezone.utc), kw_only=True)
+    ocurrido_en: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc), kw_only=True
+    )
 
     @property
     def tipo(self) -> str:

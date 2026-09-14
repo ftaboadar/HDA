@@ -13,7 +13,9 @@ from app.infrastructure.persistence.models_db import TrabajoVistoORM
 
 
 class RegistroAuditoriaSQLAlchemy(IRegistroAuditoria):
-    def registrar_trabajo_finalizado(self, trabajo_id: str, proveedor_id: str, payload: dict) -> None:
+    def registrar_trabajo_finalizado(
+        self, trabajo_id: str, proveedor_id: str, payload: dict
+    ) -> None:
         with SessionLocal() as sesion:
             sesion.add(
                 TrabajoVistoORM(

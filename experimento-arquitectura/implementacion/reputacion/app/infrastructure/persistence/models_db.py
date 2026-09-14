@@ -38,8 +38,12 @@ class TrabajoVistoORM(Base):
 
     __tablename__ = "trabajos_vistos"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     trabajo_id: Mapped[str] = mapped_column(String, nullable=False)
     proveedor_id: Mapped[str] = mapped_column(String, nullable=False)
     payload_json: Mapped[str] = mapped_column(Text, nullable=False)
-    recibido_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    recibido_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )

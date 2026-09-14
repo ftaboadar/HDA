@@ -1,6 +1,7 @@
 """Comando — reemplaza el cuerpo de `POST /verificaciones` que antes tocaba
 `SessionLocal`/`VerificacionORM` directo desde la ruta HTTP."""
 
+import asyncio
 from datetime import datetime, timezone
 
 from app.common.publicador import Publicador
@@ -20,7 +21,7 @@ class IniciarVerificacion:
             proveedor_id=ProveedorId(proveedor_id),
             tipo_verificador=TipoVerificador(tipo_verificador),
         )
-        self._repo.guardar(verificacion)
+        await asyncio.to_thread(self._repo.guardar, verificacion)
 
         # Evento de INTEGRACIÓN (no de dominio): cruza del adaptador de
         # entrada al worker vía el broker — transporte sin cambios respecto

@@ -12,5 +12,6 @@ import abc
 
 class IRegistroAuditoria(abc.ABC):
     @abc.abstractmethod
-    def registrar_trabajo_finalizado(self, trabajo_id: str, proveedor_id: str, payload: dict) -> None:
-        ...
+    def registrar_trabajo_finalizado(
+        self, trabajo_id: str, proveedor_id: str, payload: dict
+    ) -> None: ...

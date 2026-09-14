@@ -68,3 +68,19 @@ class IntentoVerificacionORM(Base):
     ocurrido_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
 
     verificacion = relationship("VerificacionORM", back_populates="intentos_registrados")
+
+
+class EventoRecibidoORM(Base):
+    """Registro liviano de eventos de integración RECIBIDOS de otros
+    microservicios (ej. `trabajos.finalizado` de Gestión de Trabajos, ver
+    `app/worker/consumidor_trabajos_finalizado.py`) — NO es un agregado de
+    dominio ni tiene invariantes: es solo trazabilidad de que Proveedores
+    "oyó" el evento (sección 1.1 del plan de Entrega 4 — completar la cadena
+    de verificación automáticamente es Entrega 5, fuera de alcance)."""
+
+    __tablename__ = "eventos_recibidos"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tipo_evento = Column(String, nullable=False, index=True)
+    payload = Column(Text, nullable=False)  # JSON serializado del evento recibido
+    recibido_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)

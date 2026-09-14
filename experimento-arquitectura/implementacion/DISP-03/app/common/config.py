@@ -7,11 +7,15 @@ variable se sobreescribe vía las env vars que Terraform inyecta en Cloud Run
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.common import pulsar_topology
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Transporte de mensajería: "rabbitmq" (local) o "pubsub" (GCP)
+    # Transporte de mensajería: "rabbitmq" (local), "pubsub" (GCP) o "pulsar"
+    # (cluster de Apache Pulsar, ver implementacion/pulsar-infra/ y sección
+    # 2.2 del plan de Entrega 4)
     transporte: str = "rabbitmq"
 
     database_url: str = "postgresql+psycopg2://hda:hda@postgres:5432/verificacion"
@@ -31,6 +35,35 @@ class Settings(BaseSettings):
     # reutilizar pubsub_topic_solicitudes para esto: la suscripción push del
     # worker está atada a ese topic y no filtra por tipo de mensaje.
     pubsub_topic_eventos: str = ""
+
+    # --- Pulsar (transporte "pulsar", ver app/common/pulsar_topology.py y
+    # sección 2.2 del plan de Entrega 4) — mismo patrón 1:1 de nombres que
+    # el bloque pubsub_* de arriba, para no romper la simetría que hace
+    # legible el resto del código.
+    pulsar_service_url: str = "pulsar://pulsar:6650"
+    pulsar_admin_url: str = "http://pulsar:8080"
+    pulsar_topic_solicitudes: str = pulsar_topology.TOPIC_SOLICITUDES
+    pulsar_topic_fallidas: str = pulsar_topology.TOPIC_FALLIDAS
+    # Topic dedicado a eventos de INTEGRACIÓN (ej. proveedor.habilitado) —
+    # mismo cuidado que pubsub_topic_eventos: NUNCA reutilizar
+    # pulsar_topic_solicitudes para esto (bug de producción 2026-09-06, ver
+    # app/common/publicador.py y app/common/pulsar_topology.py).
+    pulsar_topic_eventos: str = pulsar_topology.TOPIC_EVENTOS
+    pulsar_suscripcion_solicitudes: str = "verificacion-solicitudes-worker"
+
+    # Consumidor liviano de `trabajos.finalizado` (Gestión de Trabajos ->
+    # Proveedores, sección 2 punto 2 y sección 1.1 del plan de Entrega 4) —
+    # namespace ajeno, propiedad de Gestión de Trabajos; Proveedores solo lo
+    # consume, nunca administra esa topología.
+    pulsar_topic_trabajos_finalizado: str = pulsar_topology.TOPIC_TRABAJOS_FINALIZADO
+    pulsar_suscripcion_trabajos_finalizado: str = "proveedores-trabajos-finalizado"
+
+    # Job de reproceso automático de la DLQ vía la API de estadísticas de
+    # Pulsar (sección 2, punto 3 del plan de Entrega 4) — dispara
+    # ReprocesarDesdeDLQ cuando el backlog de pulsar_topic_fallidas supera
+    # este umbral, en vez de un cron ciego por tiempo fijo.
+    pulsar_dlq_backlog_umbral: int = 50
+    pulsar_dlq_check_interval_s: float = 30.0
 
     mock_policia_url: str = "http://mock-policia:8000"
     mock_rues_url: str = "http://mock-rues:8000"

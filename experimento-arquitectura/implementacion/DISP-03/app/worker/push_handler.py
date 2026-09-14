@@ -44,9 +44,12 @@ verificacion_repository_sqlalchemy.py — y eso pesa más de lo esperado bajo
 la latencia real de Cloud SQL), ahí sí correspondería revisar si conviene
 paralelizar esa escritura o acotar concurrencia por instancia."""
 
+import asyncio
 import base64
 import json
 import os
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 
@@ -62,13 +65,12 @@ from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
 from app.worker.core import procesar_verificacion
 
 logger = configurar_logging("worker.push_handler")
-app = FastAPI(title="Verificación — Worker (Cloud Run / Pub/Sub push)")
 
 _publicador: PublicadorPubSub | None = None
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global _publicador
     Base.metadata.create_all(bind=engine)
     _publicador = PublicadorPubSub(
@@ -77,6 +79,10 @@ async def startup() -> None:
         topic_fallidas=os.environ["PUBSUB_TOPIC_FALLIDAS"],
         topic_eventos=os.environ.get("PUBSUB_TOPIC_EVENTOS", ""),
     )
+    yield
+
+
+app = FastAPI(title="Verificación — Worker (Cloud Run / Pub/Sub push)", lifespan=lifespan)
 
 
 @app.get("/salud")
@@ -119,7 +125,7 @@ async def recibir_push(request: Request):
 
     verificacion_id = payload["verificacion_id"]
 
-    existente = ConsultarVerificacion(repo).ejecutar(verificacion_id)
+    existente = await asyncio.to_thread(ConsultarVerificacion(repo).ejecutar, verificacion_id)
     if existente is not None and existente.estado in (
         EstadoVerificacion.COMPLETADA,
         EstadoVerificacion.FALLIDA_DLQ,
