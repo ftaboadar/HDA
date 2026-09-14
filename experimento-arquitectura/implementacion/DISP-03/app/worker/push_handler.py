@@ -49,6 +49,8 @@ import base64
 import json
 import os
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 
 from app.application.commands.registrar_intento import RegistrarIntento
@@ -63,13 +65,12 @@ from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
 from app.worker.core import procesar_verificacion
 
 logger = configurar_logging("worker.push_handler")
-app = FastAPI(title="Verificación — Worker (Cloud Run / Pub/Sub push)")
 
 _publicador: PublicadorPubSub | None = None
 
 
-@app.on_event("startup")
-async def startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global _publicador
     Base.metadata.create_all(bind=engine)
     _publicador = PublicadorPubSub(
@@ -78,6 +79,10 @@ async def startup() -> None:
         topic_fallidas=os.environ["PUBSUB_TOPIC_FALLIDAS"],
         topic_eventos=os.environ.get("PUBSUB_TOPIC_EVENTOS", ""),
     )
+    yield
+
+
+app = FastAPI(title="Verificación — Worker (Cloud Run / Pub/Sub push)", lifespan=lifespan)
 
 
 @app.get("/salud")
