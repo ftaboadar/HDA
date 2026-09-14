@@ -200,7 +200,17 @@ def infra_reset_db(
         ]
     )
     _ejecutar(
-        ["gcloud", "sql", "databases", "create", "verificacion", "--instance", instancia, "--project", project]
+        [
+            "gcloud",
+            "sql",
+            "databases",
+            "create",
+            "verificacion",
+            "--instance",
+            instancia,
+            "--project",
+            project,
+        ]
     )
     _ejecutar(
         [
@@ -216,7 +226,9 @@ def infra_reset_db(
         ],
         cwd=DIR_INFRA,
     )
-    typer.secho("Base de datos reseteada y api/worker redesplegados en frío.", fg=typer.colors.GREEN)
+    typer.secho(
+        "Base de datos reseteada y api/worker redesplegados en frío.", fg=typer.colors.GREEN
+    )
 
 
 @infra_app.command("output")
