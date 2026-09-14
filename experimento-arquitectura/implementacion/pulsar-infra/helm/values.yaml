@@ -1,0 +1,102 @@
+# values.yaml para el Helm chart OFICIAL de Apache Pulsar
+# (repo: https://github.com/apache/pulsar-helm-chart, chart: pulsar/pulsar)
+#
+# NO reescribe el chart — solo los overrides razonables para un PoC de
+# Entrega 4 en GKE (ver experimento-arquitectura/contexto/12-plan-entrega-4.md,
+# sección 3): no existe un servicio gestionado nativo de Pulsar en GCP, así
+# que el cluster se autogestiona dentro de GKE con este chart.
+#
+# Filosofía de estos overrides: réplicas mínimas (1 de cada componente,
+# igual que el docker-compose local, pero ahora corriendo como pods de
+# Kubernetes reales -- sigue contando como cluster real, no monolítico),
+# persistencia habilitada (PVCs reales, no emptyDir), recursos moderados
+# (un PoC no necesita los defaults de producción del chart, que asumen
+# nodos grandes) y desactivación explícita de componentes que esta entrega
+# no usa (Pulsar Functions, WebSocket, Pulsar SQL) -- para no gastar cuota
+# de GKE en piezas que ningún escenario de calidad de esta entrega ejercita.
+
+# --- Namespace / cluster ---
+initialize: true
+clusterName: cluster-hda
+
+# --- Componentes core: 1 réplica cada uno (mínimo real de un PoC) ---
+zookeeper:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 0.25
+  volumes:
+    persistence: true
+    data:
+      size: 5Gi
+
+bookkeeper:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 0.5
+  volumes:
+    persistence: true
+    journal:
+      size: 10Gi
+    ledgers:
+      size: 20Gi
+
+broker:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 0.5
+  configData:
+    # Ensemble/quorum en 1 -- coherente con bookkeeper.replicaCount=1, igual
+    # razonamiento que managedLedgerDefault* en docker-compose.yml local.
+    managedLedgerDefaultEnsembleSize: "1"
+    managedLedgerDefaultWriteQuorum: "1"
+    managedLedgerDefaultAckQuorum: "1"
+
+# autorecovery sí se mantiene activo (1 réplica) -- es liviano y da
+# recuperación automática de bookies caídos, relevante para DISP-03/02
+# cuando se degrade el cluster a propósito.
+autorecovery:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 0.1
+
+# --- Proxy: expone el cluster hacia afuera de GKE (equivalente a los
+# puertos 6650/8080 publicados al host en el docker-compose local) ---
+proxy:
+  replicaCount: 1
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 0.25
+  service:
+    type: LoadBalancer
+
+# --- Toolset: pod con pulsar-admin/pulsar-client ya instalado, útil para
+# correr los mismos comandos del README local (healthcheck, crear tópicos)
+# directo dentro del cluster de GKE ---
+toolset:
+  replicaCount: 1
+
+# --- Componentes que esta entrega NO usa -- desactivados explícitamente
+# para no consumir cuota de GKE en piezas sin escenario de calidad que las
+# ejercite (ver plan, sección 1.1: alcance reducido de esta entrega) ---
+functions:
+  enabled: false
+pulsar_manager:
+  enabled: false
+
+# --- Monitoreo: se deja desactivado en este PoC (Prometheus/Grafana del
+# propio chart) -- las métricas de los 3 escenarios de calidad se leen
+# directo de la API de estadísticas de Pulsar (GET /admin/v2/.../stats,
+# ver plan sección 9), no de un stack de monitoreo aparte. Si el equipo
+# necesita dashboards, esto se activa cambiando estos dos valores a true.
+monitoring:
+  prometheus: false
+  grafana: false
