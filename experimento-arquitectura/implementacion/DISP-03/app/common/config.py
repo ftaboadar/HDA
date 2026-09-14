@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     gcp_project: str = ""
     pubsub_topic_solicitudes: str = ""
     pubsub_topic_fallidas: str = ""
+    # Topic dedicado a eventos de INTEGRACIÓN (ej. proveedor.habilitado) —
+    # separado del topic de solicitudes desde el bug de producción del
+    # 2026-09-06 (ver infra/pubsub.tf y app/common/publicador.py). Nunca
+    # reutilizar pubsub_topic_solicitudes para esto: la suscripción push del
+    # worker está atada a ese topic y no filtra por tipo de mensaje.
+    pubsub_topic_eventos: str = ""
 
     mock_policia_url: str = "http://mock-policia:8000"
     mock_rues_url: str = "http://mock-rues:8000"

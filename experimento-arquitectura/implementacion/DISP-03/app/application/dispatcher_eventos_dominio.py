@@ -14,7 +14,24 @@ Reacciones:
   dentro de worker/main.py.
 - `VerificacionAgotoReintentos`: publica el evento de INTEGRACIÓN de DLQ ya
   existente (`publicar_fallida`, sin cambios en ese transporte).
-"""
+
+Manejo de errores de publicación (deliberado, no un descuido): cuando este
+módulo se invoca, `verificacion.registrar_intento()` y `repo.guardar()` ya
+corrieron con éxito — el estado del agregado ya quedó persistido de forma
+correcta. Todo lo que pasa aquí abajo es notificación de un hecho que ya es
+verdad, no una escritura que deba ser atómica con ella. Por eso cada llamada
+al puerto `Publicador` se envuelve en try/except: si falla (ej. el adaptador
+GCP levanta `RuntimeError` porque `PUBSUB_TOPIC_SOLICITUDES` no está
+configurado — ver app/common/publicador.py), se registra en nivel "error" y
+NO se re-lanza. Re-lanzar rompería la garantía explícita de
+worker/push_handler.py ("siempre respondemos 200 ... porque
+procesar_verificacion() ya agotó sus propios reintentos internamente") y
+provocaría que Pub/Sub reintregue un mensaje cuya verificación ya está en un
+estado terminal (COMPLETADA o FALLIDA_DLQ) en la base de datos — el segundo
+intento chocaría entonces contra el invariante de
+`Verificacion.registrar_intento` (ver
+tests/unit/dominio/test_verificacion_aggregate.py), una segunda falla
+distinta y evitable."""
 
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.publicador import Publicador
@@ -55,18 +72,27 @@ async def despachar(
             )
             servicio = ServicioDeElegibilidad(repo)
             if servicio.proveedor_esta_habilitado(evento.proveedor_id):
-                await publicador.publicar_evento(
-                    ROUTING_KEY_PROVEEDOR_HABILITADO,
-                    {
-                        "proveedor_id": str(evento.proveedor_id),
-                        "evento": "ProveedorHabilitado",
-                    },
-                )
-                log_evento(
-                    logger,
-                    "evento_integracion_proveedor_habilitado_publicado",
-                    proveedor_id=str(evento.proveedor_id),
-                )
+                try:
+                    await publicador.publicar_evento(
+                        ROUTING_KEY_PROVEEDOR_HABILITADO,
+                        {
+                            "proveedor_id": str(evento.proveedor_id),
+                            "evento": "ProveedorHabilitado",
+                        },
+                    )
+                    log_evento(
+                        logger,
+                        "evento_integracion_proveedor_habilitado_publicado",
+                        proveedor_id=str(evento.proveedor_id),
+                    )
+                except Exception as exc:  # noqa: BLE001 — ver docstring del módulo
+                    log_evento(
+                        logger,
+                        "evento_integracion_proveedor_habilitado_fallo_publicacion",
+                        nivel="error",
+                        proveedor_id=str(evento.proveedor_id),
+                        error=str(exc),
+                    )
 
         elif isinstance(evento, VerificacionAgotoReintentos):
             log_evento(
@@ -75,10 +101,19 @@ async def despachar(
                 verificacion_id=str(evento.verificacion_id),
                 motivo_falla=evento.motivo_falla,
             )
-            await publicador.publicar_fallida(
-                {
-                    "verificacion_id": str(evento.verificacion_id),
-                    "proveedor_id": str(evento.proveedor_id),
-                    "motivo_falla": evento.motivo_falla,
-                }
-            )
+            try:
+                await publicador.publicar_fallida(
+                    {
+                        "verificacion_id": str(evento.verificacion_id),
+                        "proveedor_id": str(evento.proveedor_id),
+                        "motivo_falla": evento.motivo_falla,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001 — ver docstring del módulo
+                log_evento(
+                    logger,
+                    "evento_integracion_dlq_fallo_publicacion",
+                    nivel="error",
+                    verificacion_id=str(evento.verificacion_id),
+                    error=str(exc),
+                )

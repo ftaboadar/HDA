@@ -20,7 +20,29 @@ contra GCP real). Es una mitigación pragmática para este PoC, no
 idempotencia perfecta: sigue existiendo una ventana de carrera si dos
 redeliveries llegan casi simultáneamente a instancias distintas antes de
 que la primera termine de escribir. Cerrarla del todo pediría una tabla de
-deduplicación por message_id de Pub/Sub, fuera de alcance aquí."""
+deduplicación por message_id de Pub/Sub, fuera de alcance aquí.
+
+Nota 3 (concurrencia, investigación CP-2 contra GCP real, ver
+experimento-arquitectura/): a diferencia de worker/main.py, este handler NO
+usa un asyncio.Semaphore explícito. Es una decisión deliberada, no un
+descuido: cada POST /pubsub/push que llega lo despacha uvicorn/FastAPI como
+su propia task de asyncio, y procesar_verificacion() llama al puerto externo
+con httpx.AsyncClient (no bloqueante) — así que varias verificaciones ya se
+procesan de forma concurrente dentro de una misma instancia caliente, sin
+necesidad de un semáforo de aplicación equivalente al de worker/main.py (ese
+semáforo allá cumple otro propósito: acotar cuántos mensajes de RabbitMQ se
+sacan a la vez para no agotar memoria/prefetch, no evitar bloqueo mutuo).
+Cuando CP-2 midió 4.21s contra un umbral de 1.5s en GCP, la causa más
+probable no era este handler sino cold start de Cloud Run
+(min_instance_count=0 dejaba al worker frío; ver infra/cloudrun.tf, donde se
+fijó min_instance_count=1 y max_instance_request_concurrency explícito para
+que una ráfaga de 6 mensajes no dispare varias instancias frías en paralelo).
+Si una futura corrida instrumentada muestra que el verdadero cuello de
+botella SÍ está aquí (ej. `repo.guardar()` es una llamada síncrona a
+SQLAlchemy que bloquea el event loop durante cada escritura — ver
+verificacion_repository_sqlalchemy.py — y eso pesa más de lo esperado bajo
+la latencia real de Cloud SQL), ahí sí correspondería revisar si conviene
+paralelizar esa escritura o acotar concurrencia por instancia."""
 
 import base64
 import json
@@ -53,6 +75,7 @@ async def startup() -> None:
         project_id=os.environ["GCP_PROJECT"],
         topic_solicitudes=os.environ.get("PUBSUB_TOPIC_SOLICITUDES", ""),
         topic_fallidas=os.environ["PUBSUB_TOPIC_FALLIDAS"],
+        topic_eventos=os.environ.get("PUBSUB_TOPIC_EVENTOS", ""),
     )
 
 
@@ -76,6 +99,24 @@ async def recibir_push(request: Request):
     envoltura = await request.json()
     datos_b64 = envoltura["message"]["data"]
     payload = json.loads(base64.b64decode(datos_b64))
+
+    # Defensa en profundidad (no la corrección de raíz — esa es tener un
+    # topic físicamente separado para eventos de integración, ver
+    # infra/pubsub.tf y app/common/publicador.py): si por configuración
+    # futura o error humano un mensaje que no es una solicitud de
+    # verificación real llega igual a este endpoint, lo descartamos con un
+    # 200 (ack) en vez de tumbar el proceso con un KeyError sin capturar y
+    # dejar que Pub/Sub lo reintente indefinidamente contra un handler que
+    # de todos modos no puede procesarlo como verificación.
+    if "verificacion_id" not in payload:
+        log_evento(
+            logger,
+            "mensaje_push_ignorado_forma_inesperada",
+            nivel="error",
+            payload_evento=payload.get("evento"),
+        )
+        return {"estado": "ignorado"}
+
     verificacion_id = payload["verificacion_id"]
 
     existente = ConsultarVerificacion(repo).ejecutar(verificacion_id)

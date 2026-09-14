@@ -6,6 +6,7 @@ Ejemplos:
     python -m cli.hda_gcp.main infra init
     python -m cli.hda_gcp.main infra plan   --project mi-proyecto
     python -m cli.hda_gcp.main infra apply  --project mi-proyecto
+    python -m cli.hda_gcp.main infra reset-db --project mi-proyecto
     python -m cli.hda_gcp.main images build-push --project mi-proyecto --repo disp03-poc-hda
     python -m cli.hda_gcp.main run-experiment --target local
     python -m cli.hda_gcp.main run-experiment --target gcp
@@ -38,12 +39,19 @@ RAIZ = pathlib.Path(__file__).resolve().parents[2]
 DIR_INFRA = RAIZ / "infra"
 
 
+# En Windows, gcloud se instala como gcloud.cmd (no un .exe nativo); CreateProcess
+# no puede lanzar un .cmd directamente con shell=False, así que ahí delegamos a
+# cmd.exe con shell=True (subprocess arma el command-line igual de seguro con una
+# lista de args). En POSIX shell=False sigue siendo lo correcto.
+_EN_WINDOWS = os.name == "nt"
+
+
 def _ejecutar(cmd: list[str], cwd: pathlib.Path | None = None, env: dict | None = None) -> None:
     typer.secho(f"$ {' '.join(cmd)}", fg=typer.colors.CYAN)
     entorno = os.environ.copy()
     if env:
         entorno.update(env)
-    resultado = subprocess.run(cmd, cwd=cwd, env=entorno, check=False)
+    resultado = subprocess.run(cmd, cwd=cwd, env=entorno, check=False, shell=_EN_WINDOWS)
     if resultado.returncode != 0:
         typer.secho(f"Comando falló con código {resultado.returncode}", fg=typer.colors.RED)
         raise typer.Exit(resultado.returncode)
@@ -63,7 +71,7 @@ def check():
         )
 
     if "gcloud" not in faltantes:
-        subprocess.run(["gcloud", "config", "list"], check=False)
+        subprocess.run(["gcloud", "config", "list"], check=False, shell=_EN_WINDOWS)
 
     if faltantes:
         typer.secho(
@@ -141,6 +149,88 @@ def infra_destroy(
     )
 
 
+@infra_app.command("reset-db")
+def infra_reset_db(
+    project: str = typer.Option(..., "--project", "-p"),
+    region: str = typer.Option("southamerica-east1"),
+    entorno: str = typer.Option("disp03-poc", "--entorno"),
+    yes: bool = typer.Option(False, "--yes", help="Omite la confirmación interactiva"),
+):
+    """Resetea los datos del experimento en Cloud SQL entre corridas de
+    `run-experiment --target gcp` — a diferencia de local (que arranca de
+    'down -v' en cada corrida), Cloud SQL persiste entre corridas y eso hace
+    que los resultados no sean reproducibles ni comparables entre sí.
+
+    No conecta directo a Postgres (evita depender de un driver como
+    psycopg2, que no siempre compila en la máquina del desarrollador):
+    reinicia la instancia (mata de forma limpia las conexiones que
+    api/worker mantienen abiertas en su pool de SQLAlchemy — 'sql databases
+    delete' falla con 'being accessed by other users' si no se hace esto
+    primero), borra y recrea la base lógica 'verificacion' (instancia y
+    usuario quedan intactos), y fuerza una revisión nueva de api/worker con
+    `terraform apply -replace` para que Base.metadata.create_all() reconstruya
+    el esquema en el arranque — las instancias calientes (min_instance_count=1)
+    no vuelven a correr su startup solas.
+
+    También reaplica los IAM member de api/worker: al recrear el servicio
+    de Cloud Run (-replace), su política de IAM vuelve a estar vacía (es un
+    recurso nuevo internamente), y Terraform no lo detecta como drift
+    porque el nombre del servicio no cambió — sin este -replace adicional
+    la API queda inalcanzable (403) y Pub/Sub no puede invocar al worker."""
+    instancia = f"{entorno}-verificacion"
+    if not yes:
+        typer.confirm(
+            f"Esto va a BORRAR TODOS LOS DATOS del experimento en '{instancia}' "
+            f"(proyecto '{project}') y redesplegar api/worker en frío. ¿Continuar?",
+            abort=True,
+        )
+    _ejecutar(["gcloud", "sql", "instances", "restart", instancia, "--project", project])
+    _ejecutar(
+        [
+            "gcloud",
+            "sql",
+            "databases",
+            "delete",
+            "verificacion",
+            "--instance",
+            instancia,
+            "--project",
+            project,
+            "--quiet",
+        ]
+    )
+    _ejecutar(
+        [
+            "gcloud",
+            "sql",
+            "databases",
+            "create",
+            "verificacion",
+            "--instance",
+            instancia,
+            "--project",
+            project,
+        ]
+    )
+    _ejecutar(
+        [
+            "terraform",
+            "apply",
+            "-auto-approve",
+            "-replace=google_cloud_run_v2_service.api",
+            "-replace=google_cloud_run_v2_service.worker",
+            "-replace=google_cloud_run_v2_service_iam_member.publico_api",
+            "-replace=google_cloud_run_v2_service_iam_member.pubsub_invoca_worker",
+            f"-var=project_id={project}",
+            f"-var=region={region}",
+        ],
+        cwd=DIR_INFRA,
+    )
+    typer.secho(
+        "Base de datos reseteada y api/worker redesplegados en frío.", fg=typer.colors.GREEN
+    )
+
+
 @infra_app.command("output")
 def infra_output():
     """Muestra los outputs de Terraform (URLs de Cloud Run, nombres de topics, etc.)."""
@@ -204,7 +294,7 @@ def run_experiment(
         typer.secho("--target debe ser 'local' o 'gcp'", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    cmd = ["pytest", "tests/", "-v"]
+    cmd = [sys.executable, "-m", "pytest", "tests/", "-v"]
     if solo:
         cmd += ["-k", solo]
     resultado_env = os.environ.copy()

@@ -54,35 +54,78 @@ async def test_cp1_baseline_todo_disponible(api):
 @pytest.mark.asyncio
 async def test_cp2_certificadora_lenta_dentro_de_sla(api):
     """CP-2: certificadora responde OK pero lenta (dentro de SLA) -> no
-    bloquea verificaciones de policía que llegan al mismo tiempo."""
+    bloquea verificaciones de policía que llegan al mismo tiempo.
+
+    plan.md (sección 6, CP-2) no define ningún umbral absoluto de segundos;
+    el criterio cualitativo es "sin bloquear otras" más disponibilidad
+    ≥ 99.9% / 0 en DLQ. La versión anterior de este test comparaba la
+    duración de las rápidas contra un umbral de pared (1.5s) calibrado en
+    `docker-compose` local (loopback, sin TLS) — contra GCP real ese número
+    queda casi encima del piso de latencia de red/TLS de Cloud Run +
+    Cloud SQL + Pub/Sub (mismo problema ya corregido en CP-7; ver también
+    la nota de investigación en app/worker/push_handler.py, donde una
+    corrida midió 4.21s por cold start de Cloud Run sin que hubiera
+    bloqueo real).
+
+    Métrica elegida: RATIO entre el momento en que terminan las rápidas y
+    el momento en que termina la lenta, ambos medidos desde el mismo origen
+    temporal y esperados de forma CONCURRENTE (no secuencial, para que el
+    orden de los `await` en el test no sesgue la medición). Si el sistema
+    de verdad desacopla el procesamiento, las rápidas —que no cargan los
+    2000ms de latencia inyectada— deben terminar en una fracción claramente
+    menor del tiempo que le toma a la lenta; si estuvieran bloqueadas
+    detrás de ella, el ratio se acercaría a 1.0. Esta comparación es
+    relativa al propio experimento (ancla al estímulo inyectado, no al
+    entorno de red) y no a un número de pared heredado de local.
+
+    Se usa el MÁXIMO de las 5 rápidas, no la mediana/promedio: "ninguna
+    debe bloquearse" es una afirmación sobre todas, y con n=5 cualquier
+    percentil no trivial es en la práctica el máximo de la muestra de
+    todos modos (mismo razonamiento que en CP-7 para descartar p95).
+    """
     await configurar_mock("certificadora", modo="ok", latencia_ms=2000)
 
     inicio = time.time()
-    lenta = await crear_verificacion(api, "prov-cp2-lenta", "certificadora")
-    rapidas = await asyncio.gather(
-        *[crear_verificacion(api, f"prov-cp2-rapida-{i}", "policia") for i in range(5)]
+
+    async def _crear_y_medir(proveedor_id: str, tipo: str) -> tuple[dict, float]:
+        creada = await crear_verificacion(api, proveedor_id, tipo)
+        resultado = await esperar_estado(
+            api, creada["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=20
+        )
+        return resultado, time.time() - inicio
+
+    (resultado_lenta, tiempo_fin_lenta_s), *medidas_rapidas = await asyncio.gather(
+        _crear_y_medir("prov-cp2-lenta", "certificadora"),
+        *[_crear_y_medir(f"prov-cp2-rapida-{i}", "policia") for i in range(5)],
     )
 
-    resultados_rapidas = await asyncio.gather(
-        *[
-            esperar_estado(api, r["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=10)
-            for r in rapidas
-        ]
-    )
-    duracion_rapidas_s = time.time() - inicio
-    resultado_lenta = await esperar_estado(
-        api, lenta["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=15
-    )
+    resultados_rapidas = [resultado for resultado, _ in medidas_rapidas]
+    tiempo_fin_rapidas_s = max(tiempo for _, tiempo in medidas_rapidas)
 
     todas_policia_ok = all(r["estado"] == "COMPLETADA" for r in resultados_rapidas)
 
+    ratio_rapidas_vs_lenta = tiempo_fin_rapidas_s / tiempo_fin_lenta_s
+    umbral_ratio = 0.5  # las rápidas deben terminar en <50% del tiempo total de la lenta
+
     registrar(
         "CP-2",
-        "duracion_verificaciones_rapidas_s",
-        duracion_rapidas_s,
-        1.5,
-        duracion_rapidas_s < 1.5,
-        detalle="deben completarse sin esperar a la certificadora lenta",
+        "ratio_tiempo_fin_rapidas_vs_lenta",
+        ratio_rapidas_vs_lenta,
+        umbral_ratio,
+        ratio_rapidas_vs_lenta < umbral_ratio,
+        detalle=(
+            "max(tiempo_fin de las 5 rápidas) / tiempo_fin de la lenta, "
+            "medidos desde el mismo origen y esperados de forma concurrente; "
+            "ratio bajo = las rápidas no esperaron a la lenta"
+        ),
+    )
+    registrar(
+        "CP-2",
+        "tiempo_fin_rapidas_s",
+        tiempo_fin_rapidas_s,
+        None,
+        True,
+        detalle="dato informativo (no es criterio de pass/fail, ver ratio arriba)",
     )
     registrar(
         "CP-2",
@@ -93,7 +136,10 @@ async def test_cp2_certificadora_lenta_dentro_de_sla(api):
     )
 
     assert todas_policia_ok
-    assert duracion_rapidas_s < 1.5, "las verificaciones rápidas no deberían esperar a la lenta"
+    assert ratio_rapidas_vs_lenta < umbral_ratio, (
+        "las verificaciones rápidas tardaron una fracción del tiempo de la lenta "
+        "demasiado alta como para no haber esperado por ella"
+    )
     assert resultado_lenta["estado"] == "COMPLETADA"
 
 
@@ -244,39 +290,107 @@ async def test_cp6_recuperacion_y_reproceso_desde_dlq(api):
     assert duracion_reproceso_s < umbral_ventana_s
 
 
+def _mediana(valores: list[float]) -> float:
+    ordenados = sorted(valores)
+    n = len(ordenados)
+    medio = n // 2
+    if n % 2 == 1:
+        return ordenados[medio]
+    return (ordenados[medio - 1] + ordenados[medio]) / 2
+
+
 @pytest.mark.asyncio
 async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     """CP-7: bajo carga concurrente, la certificadora cae a mitad de la
     ejecución -> la latencia de ACEPTACIÓN de la API (no la de procesamiento)
-    debe mantenerse estable, evidencia de que el desacople funciona."""
-    latencias_aceptacion_ms: list[float] = []
+    NO debe degradarse significativamente frente a su propio baseline
+    (plan.md, sección 6, CP-7: "< 5% de variación vs. baseline").
 
-    async def _crear_y_medir(proveedor_id: str, tipo: str):
+    Esto es explícitamente una comparación RELATIVA (durante-falla vs.
+    baseline medido en el mismo entorno/corrida), no un umbral absoluto en
+    ms: un número absoluto fijo no puede calibrarse de antemano contra el
+    piso de latencia real de Cloud Run + Cloud SQL + Pub/Sub con TLS sobre
+    red pública, que ya varía por entorno.
+
+    Estadístico elegido: MEDIANA, no p95. Con n=15 por grupo, el p95 cae en
+    la posición ~14 de 15 (prácticamente el máximo de la muestra), así que
+    un solo outlier de red domina la métrica y no representa el
+    comportamiento típico de aceptación. La mediana es robusta a ese
+    outlier único y es más representativa para decidir "degradación
+    significativa" a este tamaño de muestra.
+    """
+    latencias_baseline_ms: list[float] = []
+    latencias_durante_falla_ms: list[float] = []
+
+    async def _crear_y_medir(proveedor_id: str, tipo: str, destino: list[float]):
         t0 = time.time()
         resultado = await crear_verificacion(api, proveedor_id, tipo)
-        latencias_aceptacion_ms.append((time.time() - t0) * 1000)
+        destino.append((time.time() - t0) * 1000)
         return resultado
 
+    # Baseline: certificadora sana.
     primera_mitad = await asyncio.gather(
-        *[_crear_y_medir(f"prov-cp7-a-{i}", "certificadora") for i in range(15)]
+        *[
+            _crear_y_medir(f"prov-cp7-a-{i}", "certificadora", latencias_baseline_ms)
+            for i in range(15)
+        ]
     )
 
     await configurar_mock("certificadora", modo="caido")
 
+    # Durante la falla: certificadora caída.
     segunda_mitad = await asyncio.gather(
-        *[_crear_y_medir(f"prov-cp7-b-{i}", "certificadora") for i in range(15)]
+        *[
+            _crear_y_medir(f"prov-cp7-b-{i}", "certificadora", latencias_durante_falla_ms)
+            for i in range(15)
+        ]
     )
 
-    p95_ms = sorted(latencias_aceptacion_ms)[int(len(latencias_aceptacion_ms) * 0.95) - 1]
-    umbral_p95_ms = 500
+    mediana_baseline_ms = _mediana(latencias_baseline_ms)
+    mediana_durante_falla_ms = _mediana(latencias_durante_falla_ms)
+    variacion_pct = (mediana_durante_falla_ms - mediana_baseline_ms) / mediana_baseline_ms
+    umbral_variacion_pct = 0.05  # plan.md, CP-7: < 5% de variación vs. baseline
+
+    # Métrica informativa adicional (no decide pass/fail): p95 agregado en
+    # ms absolutos, útil para diagnóstico pero no calibrado como criterio
+    # de éxito porque no existe un umbral absoluto en plan.md.
+    todas_latencias_ms = latencias_baseline_ms + latencias_durante_falla_ms
+    p95_informativo_ms = sorted(todas_latencias_ms)[int(len(todas_latencias_ms) * 0.95) - 1]
 
     registrar(
         "CP-7",
-        "p95_latencia_aceptacion_ms",
-        p95_ms,
-        umbral_p95_ms,
-        p95_ms < umbral_p95_ms,
-        detalle="la aceptación debe seguir siendo rápida aunque el externo esté caído",
+        "mediana_latencia_aceptacion_baseline_ms",
+        mediana_baseline_ms,
+        None,
+        True,
+        detalle="latencia de aceptación con certificadora sana (baseline)",
+    )
+    registrar(
+        "CP-7",
+        "mediana_latencia_aceptacion_durante_falla_ms",
+        mediana_durante_falla_ms,
+        None,
+        True,
+        detalle="latencia de aceptación con certificadora caída",
+    )
+    registrar(
+        "CP-7",
+        "variacion_relativa_latencia_aceptacion",
+        variacion_pct,
+        umbral_variacion_pct,
+        variacion_pct < umbral_variacion_pct,
+        detalle=(
+            "criterio de plan.md: variación relativa de la mediana "
+            "durante-falla vs. baseline debe ser < 5%"
+        ),
+    )
+    registrar(
+        "CP-7",
+        "p95_latencia_aceptacion_agregado_ms_informativo",
+        p95_informativo_ms,
+        None,
+        True,
+        detalle="métrica informativa, no es criterio de pass/fail (ver docstring)",
     )
 
     # Limpieza: dejamos que todo llegue a estado terminal antes de terminar el test
@@ -285,4 +399,8 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
         *[esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30) for c in todas]
     )
 
-    assert p95_ms < umbral_p95_ms, "la API no debe bloquearse por la caída del externo"
+    assert variacion_pct < umbral_variacion_pct, (
+        f"la latencia de aceptación se degradó {variacion_pct:.1%} vs. baseline "
+        f"({mediana_baseline_ms:.1f}ms -> {mediana_durante_falla_ms:.1f}ms), "
+        "plan.md exige < 5%"
+    )

@@ -1,4 +1,4 @@
-.PHONY: up down test report local-run gcp-check gcp-plan gcp-apply gcp-destroy
+.PHONY: up down test report local-run gcp-check gcp-plan gcp-apply gcp-destroy gcp-reset-db
 
 up:
 	docker compose up -d --build
@@ -33,3 +33,6 @@ gcp-apply:
 
 gcp-destroy:
 	python -m cli.hda_gcp.main infra destroy --project $(PROJECT)
+
+gcp-reset-db:
+	python -m cli.hda_gcp.main infra reset-db --project $(PROJECT)
