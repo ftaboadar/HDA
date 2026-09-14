@@ -1,12 +1,18 @@
-"""Puerto de publicación de eventos + dos adaptadores (RabbitMQ local / Pub/Sub GCP).
+"""Puerto de publicación de eventos + tres adaptadores (RabbitMQ local /
+Pub/Sub GCP / Apache Pulsar).
 
 Esta es la pieza concreta que le da portabilidad al experimento: el resto del
 código (API, worker/core.py) programa contra la interfaz `Publicador`, nunca
-contra RabbitMQ o Pub/Sub directamente. Es la razón por la que
+contra RabbitMQ, Pub/Sub o Pulsar directamente. Es la razón por la que
 `experto-gcp` puede afirmar que el mecanismo (no solo el resultado) es
 portable — y también, honestamente, dónde puede dejar de serlo: las garantías
-de entrega/orden de RabbitMQ y Pub/Sub no son idénticas, ver
-implementacion/DISP-03/README.md (rutas relativas al repo, no al propio archivo), sección "Diferencias local vs. GCP"."""
+de entrega/orden de RabbitMQ, Pub/Sub y Pulsar no son idénticas, ver
+implementacion/DISP-03/README.md (rutas relativas al repo, no al propio archivo), sección "Diferencias local vs. GCP".
+
+`PublicadorPulsar` (sección 2.2, punto 1 del plan de Entrega 4,
+`experimento-arquitectura/contexto/12-plan-entrega-4.md`) migra el transporte
+de Proveedores de Pub/Sub a Pulsar — el contrato de la interfaz `Publicador`
+no cambia de forma, solo se agrega un tercer adaptador concreto."""
 
 from __future__ import annotations
 
@@ -155,3 +161,65 @@ class PublicadorPubSub(Publicador):
         if not self._ruta_eventos:
             raise RuntimeError("PUBSUB_TOPIC_EVENTOS no configurado")
         await self._publicar(self._ruta_eventos, {**mensaje, "routing_key": routing_key})
+
+
+class PublicadorPulsar(Publicador):
+    """Adaptador Apache Pulsar (sección 2.2, punto 1 del plan de Entrega 4):
+    un productor por destino físico, igual que `PublicadorPubSub` — nunca un
+    productor compartido entre solicitudes y eventos de integración (mismo
+    cuidado explícito del bug de producción del 2026-09-06, ver
+    `app/common/pulsar_topology.py`).
+
+    El cliente `pulsar-client` (Python) es síncrono/bloqueante en `send()`;
+    se despacha vía `run_in_executor`, mismo patrón que `PublicadorPubSub`
+    usa para el cliente síncrono de `google-cloud-pubsub`, para no bloquear
+    el loop de asyncio de FastAPI/el worker."""
+
+    def __init__(
+        self,
+        service_url: str,
+        topic_solicitudes: str,
+        topic_fallidas: str,
+        topic_eventos: str = "",
+    ):
+        import pulsar
+
+        self._cliente = pulsar.Client(service_url)
+        self._productor_sol = (
+            self._cliente.create_producer(topic_solicitudes) if topic_solicitudes else None
+        )
+        self._productor_dlq = self._cliente.create_producer(topic_fallidas)
+        # Tópico FÍSICAMENTE distinto del de solicitudes (bug de producción
+        # 2026-09-06, ver docstring de app/common/pulsar_topology.py): la
+        # suscripción pull del worker (worker/pulsar_consumer.py) está
+        # atada solo a topic_solicitudes.
+        self._productor_eventos = (
+            self._cliente.create_producer(topic_eventos) if topic_eventos else None
+        )
+
+    async def _enviar(self, productor, mensaje: dict) -> None:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: productor.send(json.dumps(mensaje).encode()))
+
+    async def publicar_solicitud(self, mensaje: dict) -> None:
+        if not self._productor_sol:
+            raise RuntimeError("PULSAR_TOPIC_SOLICITUDES no configurado")
+        await self._enviar(self._productor_sol, mensaje)
+
+    async def publicar_fallida(self, mensaje: dict) -> None:
+        await self._enviar(self._productor_dlq, mensaje)
+
+    async def publicar_evento(self, routing_key: str, mensaje: dict) -> None:
+        # Igual que en Pub/Sub, Pulsar no tiene routing keys tipo AMQP — el
+        # routing_key viaja como campo del mensaje, publicado exclusivamente
+        # al tópico de eventos de integración, nunca al de solicitudes.
+        if not self._productor_eventos:
+            raise RuntimeError("PULSAR_TOPIC_EVENTOS no configurado")
+        await self._enviar(self._productor_eventos, {**mensaje, "routing_key": routing_key})
+
+    def cerrar(self) -> None:
+        """Cierre explícito del cliente — no hay un hook de shutdown de
+        FastAPI equivalente a `app.on_event("shutdown")` para el worker pull
+        (ver worker/pulsar_consumer.py), así que cada punto de entrada es
+        responsable de llamarlo en su propio `finally`."""
+        self._cliente.close()

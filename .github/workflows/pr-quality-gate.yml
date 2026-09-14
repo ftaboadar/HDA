@@ -10,36 +10,91 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  # Matriz sobre los 3 microservicios propios de la Entrega 4 (sección 1 de
+  # `experimento-arquitectura/contexto/12-plan-entrega-4.md`): Proveedores
+  # (DISP-03, ya certificado — obligatorio, sección 8: propiedad de Johan),
+  # Gestión de Trabajos y Reputación (propiedad de Frans y Daniel
+  # respectivamente, en ramas hermanas — todavía NO existen en esta rama).
+  #
+  # Cada entrada se auto-detecta: si `requirements-dev.txt` no existe todavía
+  # en la carpeta del microservicio, el resto de los pasos se omite vía
+  # `if: steps.existe.outputs.ok == 'true'` (nunca falla por un `cd` a una
+  # carpeta inexistente, porque el paso completo ni se ejecuta) y el job
+  # termina en verde de forma trivial. Además, `gestion-de-trabajos` y
+  # `reputacion` llevan `opcional: true` -> `continue-on-error`, para que el
+  # día que ya existan pero su propio `tests/` todavía no esté 100% verde
+  # (ej. mientras se integra su PR), esta rama y las hermanas no queden
+  # bloqueadas por un servicio que no es el propio. DISP-03 se mantiene
+  # `opcional: false`: es el único de los tres cuya suite ya está probada y
+  # no debe degradarse silenciosamente.
   python-lint-y-pruebas:
-    name: Python — lint, formato y suite de pruebas (DISP-03)
+    name: Python — lint, formato y pruebas (${{ matrix.servicio }})
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: experimento-arquitectura/implementacion/DISP-03
+    continue-on-error: ${{ matrix.opcional }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - servicio: DISP-03
+            carpeta: experimento-arquitectura/implementacion/DISP-03
+            opcional: false
+          - servicio: gestion-de-trabajos
+            carpeta: experimento-arquitectura/implementacion/gestion-de-trabajos
+            opcional: true
+          - servicio: reputacion
+            carpeta: experimento-arquitectura/implementacion/reputacion
+            opcional: true
     steps:
       - uses: actions/checkout@v4
 
+      # Corre siempre en la raíz del repo (sin working-directory), a
+      # propósito: si la carpeta del microservicio ni siquiera existe
+      # todavía en esta rama, este `test -f` no falla (a diferencia de un
+      # `cd` a una ruta inexistente, que sí tumbaría el step).
+      - name: Verificar si ${{ matrix.servicio }} ya existe en esta rama
+        id: existe
+        run: |
+          if [ -f "${{ matrix.carpeta }}/requirements-dev.txt" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ matrix.servicio }} todavía no tiene requirements-dev.txt en esta rama (opcional=${{ matrix.opcional }}) — se omite el resto de este job."
+          fi
+
       - uses: actions/setup-python@v5
+        if: steps.existe.outputs.ok == 'true'
         with:
           python-version: "3.12"
 
       - name: Instalar dependencias
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: pip install -r requirements-dev.txt
 
       - name: Lint (ruff check)
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: ruff check .
 
       - name: Formato (ruff format --check)
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: ruff format --check .
 
       - name: Compilación (sintaxis y nombres no definidos)
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: |
-          python -m py_compile $(find app tests cli -name "*.py")
+          python -m py_compile $(find app tests cli -name "*.py" 2>/dev/null)
 
       - name: Levantar el stack local (docker compose)
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: docker compose up -d --build
 
       - name: Esperar a que la API esté sana
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: |
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/salud > /dev/null && exit 0
@@ -49,19 +104,24 @@ jobs:
           docker compose logs
           exit 1
 
-      - name: Correr la suite de pruebas (CP-1..CP-7)
+      - name: Correr la suite de pruebas
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: pytest tests/ -v
 
       - name: Publicar reporte de métricas crudas
-        if: always()
+        if: always() && steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: python tests/reporte.py || true
 
       - name: Logs de los servicios (solo si algo falló)
-        if: failure()
+        if: failure() && steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: docker compose logs
 
       - name: Apagar el stack
-        if: always()
+        if: always() && steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
         run: docker compose down -v
 
   terraform:

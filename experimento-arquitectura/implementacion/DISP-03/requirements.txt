@@ -8,3 +8,4 @@ aio-pika==9.4.3
 tenacity==9.0.0
 httpx==0.27.2
 google-cloud-pubsub==2.23.0
+pulsar-client==3.5.0

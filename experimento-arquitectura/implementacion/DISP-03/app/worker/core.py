@@ -9,8 +9,11 @@ jitter, número de intentos acotado — **sin cambios** respecto a la versión
 anterior, solo cambió qué se llama (`puerto.verificar()` en vez de
 `_llamar_externo()`), no cómo se reintenta.
 
-La usan tanto el consumidor pull de RabbitMQ (worker/main.py, local) como el
-handler push de Pub/Sub (worker/push_handler.py, GCP)."""
+La usan el consumidor pull de RabbitMQ (worker/main.py, local), el handler
+push de Pub/Sub (worker/push_handler.py, GCP) y el consumidor pull de
+Apache Pulsar (worker/pulsar_consumer.py, sección 2.2 del plan de Entrega 4)
+— sin ningún cambio de lógica al agregar este tercer transporte, que es
+justo la prueba de que el diseño hexagonal ya pagó."""
 
 from dataclasses import dataclass, field
 

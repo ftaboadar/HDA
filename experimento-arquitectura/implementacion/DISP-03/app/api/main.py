@@ -26,7 +26,7 @@ from app.common.config import settings
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.mq import conectar, declarar_topologia
-from app.common.publicador import Publicador, PublicadorPubSub, PublicadorRabbitMQ
+from app.common.publicador import Publicador, PublicadorPubSub, PublicadorPulsar, PublicadorRabbitMQ
 from app.common.schemas import VerificacionCreate, VerificacionOut
 from app.domain.verificacion.value_objects import MotivoRevalidacion
 from app.domain.verificacion.verificacion import Verificacion
@@ -79,6 +79,16 @@ async def startup() -> None:
             # topic_fallidas, que tampoco usa la API todavía.
             topic_eventos=settings.pubsub_topic_eventos,
         )
+    elif settings.transporte == "pulsar":
+        # Igual que en la rama pubsub: ningún comando de la API publica
+        # eventos de integración hoy (solo RegistrarIntento, en el worker),
+        # se pasa topic_eventos igual por simetría.
+        _publicador = PublicadorPulsar(
+            service_url=settings.pulsar_service_url,
+            topic_solicitudes=settings.pulsar_topic_solicitudes,
+            topic_fallidas=settings.pulsar_topic_fallidas,
+            topic_eventos=settings.pulsar_topic_eventos,
+        )
     else:
         _conexion = await conectar()
         canal = await _conexion.channel()
@@ -92,6 +102,8 @@ async def startup() -> None:
 async def shutdown() -> None:
     if _conexion:
         await _conexion.close()
+    if isinstance(_publicador, PublicadorPulsar):
+        _publicador.cerrar()
 
 
 @app.get("/salud")
