@@ -1,0 +1,65 @@
+# Postgres real (Regla 5, criterio 3: persistencia real) + API de
+# Reputación. El consumidor de Pulsar (`consumidor`) se deja como perfil
+# aparte porque necesita el cluster de ../pulsar-infra corriendo -- no
+# tiene sentido que este compose intente levantar un segundo cluster de
+# Pulsar por su cuenta.
+#
+# Puerto de Postgres publicado en 5433 (no 5432) para poder correr este
+# servicio en paralelo con el Postgres de DISP-03 en la misma máquina de
+# desarrollo, sin choque de puertos.
+
+networks:
+  pulsar-infra_pulsar:
+    external: true
+    # Nombre real de la red creada por
+    # experimento-arquitectura/implementacion/pulsar-infra/docker-compose.yml
+    # (docker-compose prefija el nombre del directorio del proyecto).
+    # Si el equipo levantó ese compose con un nombre de proyecto distinto,
+    # ajustar aquí o correr `docker network ls` para confirmar el nombre real.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hda
+      POSTGRES_PASSWORD: hda
+      POSTGRES_DB: reputacion
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hda"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  api:
+    build: .
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    restart: on-failure:5
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/reputacion
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Perfil opcional -- requiere el cluster de pulsar-infra corriendo y
+  # conectado a la red externa declarada arriba. Levantar con:
+  #   docker-compose --profile consumidor up
+  consumidor:
+    build: .
+    command: python -m app.infrastructure.messaging.consumidor_pulsar
+    restart: on-failure:5
+    profiles: ["consumidor"]
+    networks:
+      - default
+      - pulsar-infra_pulsar
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/reputacion
+      PULSAR_SERVICE_URL: pulsar://hda-pulsar-broker:6650
+      PULSAR_TOPIC_TRABAJOS_FINALIZADO: persistent://hda/gestion-trabajos/trabajos.finalizado
+      PULSAR_SUBSCRIPTION: reputacion-trabajos-finalizado
+    depends_on:
+      postgres:
+        condition: service_healthy
