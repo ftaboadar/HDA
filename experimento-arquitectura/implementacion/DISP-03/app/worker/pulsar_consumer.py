@@ -28,12 +28,13 @@ import json
 import pulsar
 
 from app.application.commands.registrar_intento import RegistrarIntento
+from app.application.queries.consultar_verificacion import ConsultarVerificacion
 from app.common.config import settings
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.publicador import PublicadorPulsar
 from app.common.pulsar_topology import construir_dead_letter_policy
-from app.domain.verificacion.value_objects import ResultadoIntento
+from app.domain.verificacion.value_objects import EstadoVerificacion, ResultadoIntento
 from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
     VerificacionRepositorySQLAlchemy,
 )
@@ -53,9 +54,25 @@ async def _procesar_mensaje(mensaje, consumidor, publicador: PublicadorPulsar) -
             proveedor_id = payload["proveedor_id"]
             tipo_verificador = payload["tipo_verificador"]
 
-            resultado = await procesar_verificacion(verificacion_id, proveedor_id, tipo_verificador)
-
             repo = VerificacionRepositorySQLAlchemy()
+
+            existente = await asyncio.to_thread(
+                ConsultarVerificacion(repo).ejecutar, verificacion_id
+            )
+            if existente is not None and existente.estado in (
+                EstadoVerificacion.COMPLETADA,
+                EstadoVerificacion.FALLIDA_DLQ,
+            ):
+                log_evento(
+                    logger,
+                    "verificacion_redelivery_ignorada",
+                    verificacion_id=verificacion_id,
+                    estado=existente.estado.value,
+                )
+                await loop.run_in_executor(None, lambda: consumidor.acknowledge(mensaje))
+                return
+
+            resultado = await procesar_verificacion(verificacion_id, proveedor_id, tipo_verificador)
             comando = RegistrarIntento(repo, publicador)
             for intento in resultado.detalle_intentos:
                 await comando.ejecutar(

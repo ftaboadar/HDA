@@ -19,8 +19,6 @@ de este PoC."""
 
 import asyncio
 
-import httpx
-
 from app.application.commands.reprocesar_desde_dlq import ReprocesarDesdeDLQ
 from app.application.queries.listar_dlq import ListarDLQ
 from app.common.config import settings
@@ -33,18 +31,9 @@ from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
 logger = configurar_logging("worker.job_reproceso_dlq")
 
 
-def _ruta_stats_admin(topic_pulsar: str) -> str:
-    """Traduce `persistent://tenant/namespace/topic` a la ruta REST de
-    Pulsar Admin v2 (`/admin/v2/persistent/{tenant}/{namespace}/{topic}/stats`)."""
-    sin_esquema = topic_pulsar.removeprefix("persistent://")
-    tenant, namespace, topico = sin_esquema.split("/", 2)
-    return f"/admin/v2/persistent/{tenant}/{namespace}/{topico}/stats"
-
-
-async def obtener_backlog(cliente_admin: httpx.AsyncClient, topic_pulsar: str) -> int:
-    resp = await cliente_admin.get(_ruta_stats_admin(topic_pulsar))
-    resp.raise_for_status()
-    return resp.json().get("msgBacklog", 0)
+async def obtener_backlog(repo) -> int:
+    pendientes = await asyncio.to_thread(ListarDLQ(repo).ejecutar)
+    return len(pendientes)
 
 
 async def _reprocesar_pendientes(repo, publicador: PublicadorPulsar) -> int:
@@ -52,7 +41,7 @@ async def _reprocesar_pendientes(repo, publicador: PublicadorPulsar) -> int:
     `ListarDLQ`), reutilizando el comando `ReprocesarDesdeDLQ` sin cambios —
     ver sección 2.2 del plan: "revisa reprocesar_desde_dlq.py, ya existe,
     reutilízalo, no lo reescribas"."""
-    pendientes = ListarDLQ(repo).ejecutar()
+    pendientes = await asyncio.to_thread(ListarDLQ(repo).ejecutar)
     comando = ReprocesarDesdeDLQ(repo, publicador)
     reprocesadas = 0
     for verificacion in pendientes:
@@ -70,8 +59,8 @@ async def _reprocesar_pendientes(repo, publicador: PublicadorPulsar) -> int:
     return reprocesadas
 
 
-async def ciclo_monitoreo(cliente_admin: httpx.AsyncClient, repo, publicador) -> None:
-    backlog = await obtener_backlog(cliente_admin, settings.pulsar_topic_fallidas)
+async def ciclo_monitoreo(repo, publicador) -> None:
+    backlog = await obtener_backlog(repo)
     log_evento(
         logger,
         "dlq_backlog_medido",
@@ -97,19 +86,18 @@ async def main() -> None:
         topic_eventos=settings.pulsar_topic_eventos,
     )
     try:
-        async with httpx.AsyncClient(base_url=settings.pulsar_admin_url, timeout=10) as admin:
-            log_evento(
-                logger,
-                "job_reproceso_dlq_iniciado",
-                umbral=settings.pulsar_dlq_backlog_umbral,
-                intervalo_s=settings.pulsar_dlq_check_interval_s,
-            )
-            while True:
-                try:
-                    await ciclo_monitoreo(admin, repo, publicador)
-                except Exception as exc:  # noqa: BLE001 — un ciclo fallido no debe tumbar el job
-                    log_evento(logger, "dlq_ciclo_monitoreo_fallo", nivel="error", error=str(exc))
-                await asyncio.sleep(settings.pulsar_dlq_check_interval_s)
+        log_evento(
+            logger,
+            "job_reproceso_dlq_iniciado",
+            umbral=settings.pulsar_dlq_backlog_umbral,
+            intervalo_s=settings.pulsar_dlq_check_interval_s,
+        )
+        while True:
+            try:
+                await ciclo_monitoreo(repo, publicador)
+            except Exception as exc:  # noqa: BLE001 — un ciclo fallido no debe tumbar el job
+                log_evento(logger, "dlq_ciclo_monitoreo_fallo", nivel="error", error=str(exc))
+            await asyncio.sleep(settings.pulsar_dlq_check_interval_s)
     finally:
         publicador.cerrar()
 
