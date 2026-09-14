@@ -1,0 +1,89 @@
+/*
+ * Hogar de los Alpes (HdA)
+ * Entrega 1 - Contextos Acotados AS-IS
+ *
+ * Realidad actual: "toda la operación corre sobre un monolito construido desde 2016... equipos
+ * que se bloquean entre sí al compartir una misma fuente de código".
+ *
+ * En esta vista AS-IS, se modelan todas las capacidades (incluso las genéricas como 
+ * Notificaciones, Documental y Contabilidad) como MÓDULOS INTERNOS del Monolito, 
+ * evidenciando la deuda técnica de haber construido todo desde cero en la misma 
+ * base de código y base de datos, en lugar de haber comprado software de terceros.
+ */
+
+import "./01-dominios-subdominios.cml"
+
+BoundedContext ContextoGestionDeTrabajos implements GestionDeTrabajos {
+  domainVisionStatement = "Módulo central del monolito: el motor que construye y adapta el flujo de cada 'Trabajo'."
+}
+
+BoundedContext ContextoMarketplace implements Marketplace {
+  domainVisionStatement = "Módulo del monolito para el canal B2C."
+}
+
+BoundedContext ContextoSiniestros implements SiniestrosYPartners {
+  domainVisionStatement = "Módulo del monolito para el canal B2B2C: integraciones con partners."
+}
+
+BoundedContext ContextoProveedores implements ProveedoresDeServicio {
+  domainVisionStatement = "Módulo del monolito encargado del registro, verificación y habilitación."
+}
+
+BoundedContext ContextoFintech implements Pagos, ScoringYCredito {
+  domainVisionStatement = "Módulo del monolito para pagos, wallet y scoring."
+}
+
+/* --- Módulos Genéricos (Construidos internamente en el monolito) --- */
+
+BoundedContext ContextoGestionAgentes implements OperacionDeAgentes {
+  domainVisionStatement = "Módulo interno del monolito construido para que los agentes administren tickets y verifiquen proveedores."
+}
+
+BoundedContext ContextoContabilidad implements Contabilidad {
+  domainVisionStatement = "Módulo interno del monolito para asentar la cartera y facturación, altamente acoplado a Fintech."
+}
+
+BoundedContext ContextoGestorDocumental implements GestorDocumental {
+  domainVisionStatement = "Módulo interno que guarda las evidencias y certificados directamente en disco o en la DB compartida."
+}
+
+BoundedContext ContextoNotificaciones implements Notificaciones {
+  domainVisionStatement = "Módulo interno del monolito que ejecuta el envío de correos y mensajes."
+}
+
+ContextMap HogarDeLosAlpesASIS {
+  type = SYSTEM_LANDSCAPE
+  state = AS_IS
+
+  contains ContextoGestionDeTrabajos
+  contains ContextoMarketplace
+  contains ContextoSiniestros
+  contains ContextoProveedores
+  contains ContextoFintech
+  
+  contains ContextoGestionAgentes
+  contains ContextoContabilidad
+  contains ContextoGestorDocumental
+  contains ContextoNotificaciones
+
+  /* El gran anti-patrón del Monolito: TODO comparte la misma base de datos y código fuente (Shared Kernel) */
+  ContextoGestionDeTrabajos [SK]<->[SK] ContextoMarketplace
+  ContextoGestionDeTrabajos [SK]<->[SK] ContextoSiniestros
+  ContextoGestionDeTrabajos [SK]<->[SK] ContextoProveedores
+  ContextoGestionDeTrabajos [SK]<->[SK] ContextoFintech
+  
+  /* Incluso las capacidades genéricas fueron construidas in-house y acopladas a la BD central */
+  ContextoGestionDeTrabajos [SK]<->[SK] ContextoGestionAgentes
+  ContextoProveedores [SK]<->[SK] ContextoGestionAgentes
+  
+  ContextoGestionDeTrabajos [SK]<->[SK] ContextoNotificaciones
+  ContextoMarketplace [SK]<->[SK] ContextoNotificaciones
+  ContextoProveedores [SK]<->[SK] ContextoNotificaciones
+  ContextoFintech [SK]<->[SK] ContextoNotificaciones
+
+  ContextoGestionDeTrabajos [SK]<->[SK] ContextoGestorDocumental
+  ContextoProveedores [SK]<->[SK] ContextoGestorDocumental
+  ContextoSiniestros [SK]<->[SK] ContextoGestorDocumental
+  
+  ContextoFintech [SK]<->[SK] ContextoContabilidad
+}
