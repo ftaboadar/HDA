@@ -65,7 +65,9 @@ def _deserializar(tipo_evento: str, payload_json: str) -> DomainEvent:
             puntaje=payload["puntaje"],
             comentario=payload.get("comentario"),
             garantia=(
-                Garantia(payload["garantia_dias"]) if payload.get("garantia_dias") is not None else None
+                Garantia(payload["garantia_dias"])
+                if payload.get("garantia_dias") is not None
+                else None
             ),
         )
     raise NotImplementedError(f"No hay deserializador registrado para el tipo '{tipo_evento}'")

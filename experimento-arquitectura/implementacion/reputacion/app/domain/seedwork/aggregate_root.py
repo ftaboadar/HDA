@@ -39,7 +39,9 @@ class AggregateRootES:
         eventos ya persistidos. No agrega nada a la lista de "no
         confirmados" -- estos eventos ya existen en el Event Store."""
         if not eventos:
-            raise ValueError("No se puede reconstruir un agregado a partir de una lista vacía de eventos")
+            raise ValueError(
+                "No se puede reconstruir un agregado a partir de una lista vacía de eventos"
+            )
         instancia = cls()
         for evento in eventos:
             instancia._aplicar(evento, es_nuevo=False)
