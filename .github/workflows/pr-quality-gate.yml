@@ -96,8 +96,10 @@ jobs:
         if: steps.existe.outputs.ok == 'true'
         working-directory: ${{ matrix.carpeta }}
         run: |
+          PORT=$(docker compose port api 8000 | head -n 1 | awk -F: '{print $NF}')
+          echo "API_URL=http://localhost:$PORT" >> $GITHUB_ENV
           for i in $(seq 1 30); do
-            curl -sf http://localhost:8000/salud > /dev/null && exit 0
+            curl -sf http://localhost:$PORT/salud > /dev/null && exit 0
             sleep 2
           done
           echo "La API no quedó sana a tiempo"
