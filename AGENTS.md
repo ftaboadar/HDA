@@ -10,7 +10,9 @@ si algo cambia, se actualiza aquí y todas las herramientas quedan al día.
 
 Proyecto de curso **Hogar de los Alpes (HdA)**, MISO 2026-14 (Maestría en Ingeniería de Software).
 Entregas 1 y 2 (dominio estratégico DDD, diseño táctico y atributos de calidad) ya están completas.
-Trabajo en curso: **Entrega 3 — Diseño de Experimentación**.
+Entrega 3 (Diseño de Experimentación) está en cierre — ver estado detallado abajo. Trabajo en
+planificación: **Entrega 4 — transacción larga no monolítica** (`12-plan-entrega-4.md` y
+`13-guia-entrega-4-pasos.md`).
 
 ## Estructura del repo — dos carpetas, dos propósitos distintos
 
@@ -42,9 +44,14 @@ documentación operativa de ESE experimento, no contexto general del proyecto.
    reinterpretar.
 2. `experimento-arquitectura/contexto/10-estructura-multiagente.md` — los 6 roles de equipo (ver
    abajo) y por qué el flujo de trabajo está separado como está.
-3. `experimento-arquitectura/implementacion/DISP-03/plan.md` y `.../README.md` — el experimento en
-   curso: qué se planeó, qué se implementó, qué se validó de verdad (7/7 pruebas pasando contra el
-   stack real) y qué falta.
+3. `experimento-arquitectura/implementacion/DISP-03/plan.md` y `.../README.md` — el experimento de
+   Entrega 3: qué se planeó, qué se implementó, qué se validó de verdad (7/7 pruebas pasando contra
+   el stack real, incluida una corrida contra GCP real) y qué falta.
+4. `experimento-arquitectura/contexto/12-plan-entrega-4.md` y `13-guia-entrega-4-pasos.md` — plan y
+   runbook de la **próxima** entrega (transacción larga Gestión de Trabajos → Proveedores → Pagos +
+   Reputación, sobre un cluster de Apache Pulsar). Léelos antes de tocar algo que suene a "Pulsar",
+   "Gestión de Trabajos", "Pagos" o "Reputación" — ninguno de esos microservicios existe todavía en
+   `implementacion/`.
 
 ## Restricciones duras del proyecto (decisiones de equipo — no reabrir sin acuerdo del equipo)
 
@@ -63,7 +70,7 @@ subagentes invocables — el resto del archivo es la instrucción real, y esa pa
 |---|---|---|
 | Auditor de rúbrica | `.claude/agents/rubrica-auditor.md` | Verificar cumplimiento contra las reglas duras, en cualquier punto de control |
 | Diseñador de escenarios | `.claude/agents/disenador-escenarios.md` | Completar/extender los 9 escenarios de calidad |
-| Implementador DDD | `.claude/agents/implementador-ddd.md` | Construir el servicio con DDD + hexagonal + eventos + CQS (Regla 5, 45pt — el bloque más grande, aún sin empezar) |
+| Implementador DDD | `.claude/agents/implementador-ddd.md` | Construir el servicio con DDD + hexagonal + eventos + CQS (Regla 5, 45pt — ya implementada en Verificación de Proveedores; para Entrega 4 construye Gestión de Trabajos/Pagos/Reputación) |
 | Experto GCP | `.claude/agents/experto-gcp.md` | Traducir decisiones a servicios GCP concretos, IaC, portabilidad del PoC |
 | Ejecutor de experimentos | `.claude/agents/experimento-runner.md` | Construir/correr el PoC de fault-injection, producir datos crudos |
 | Validador de hipótesis | `.claude/agents/validador-hipotesis.md` | Juzgar de forma independiente y escéptica si H1 se valida o refuta |
@@ -89,13 +96,26 @@ contexto de la conversación original en la que se compartió.
 ## Estado actual (resumen — el detalle vivo está en los archivos citados arriba)
 
 - Entregas 1 y 2: completas.
-- Escenarios de calidad (`escenarios_calidad.md`): existen los 9, pero les faltan 5 campos que la
-  rúbrica exige por escenario (decisión arquitectural, puntos de sensibilidad, tradeoffs, riesgos,
-  rationale+diagrama) — pendiente en los 9, no solo en DISP-03.
-  Le corresponde a `disenador-escenarios`.
-- Experimento DISP-03: implementado y validado localmente (Docker + pytest, 7/7 casos pasan).
-  Terraform para GCP validado sintácticamente, nunca aplicado contra un proyecto real (requiere
-  `gcloud` + credenciales que nadie ha configurado todavía en ningún entorno de desarrollo usado).
-- **Mayor riesgo pendiente**: Regla 5 de la rúbrica (45pt) — implementación DDD del servicio elegido
-  — todavía sin empezar. Le corresponde a `implementador-ddd`.
-- Falta conseguir el template oficial de presentación de la Entrega 3 (no está en el repo).
+- Escenarios de calidad (`escenarios_calidad.md`): existen los 9. Los 5 campos que la rúbrica exige
+  por escenario (decisión arquitectural, puntos de sensibilidad, tradeoffs, riesgos,
+  rationale+diagrama) ya están completos en **DISP-03**; siguen pendientes en los otros 8
+  (DISP-01/02, MOD-01/02/03, ESC-01/02/03). Le corresponde a `disenador-escenarios`.
+- Experimento DISP-03: implementado y validado — localmente (Docker + pytest, 7/7 casos pasan) y
+  **contra un proyecto GCP real** (`hda-projectt`, 2026-09-06; H1 validada a escala de PoC, 3 bugs de
+  producción encontrados y corregidos que nunca aparecieron en local). La infra real se destruyó al
+  cerrar esa sesión (costo detenido); el código quedó commiteado en `main`.
+- Regla 5 de la rúbrica (45pt, implementación DDD del servicio elegido — Verificación de Proveedores):
+  implementada y verificada (13/13 pruebas de dominio, hexagonal confirmado por imports, CQS
+  explícito). Ver `implementacion/DISP-03/README.md`.
+- Falta conseguir el template oficial de presentación de la Entrega 3 (no está en el repo) — único
+  punto de Entrega 3 aún sin cerrar aparte de los campos 7-11 de los 8 escenarios restantes.
+- **Entrega 4 (siguiente):** plan y runbook recién integrados en `12-plan-entrega-4.md` /
+  `13-guia-entrega-4-pasos.md` — construir **3** microservicios propios (Gestión de Trabajos,
+  Proveedores, Reputación) más migrar Proveedores de Pub/Sub a **Apache Pulsar**, para revalidar
+  ESC-01/DISP-03(+02)/MOD-02 sobre la cadena completa. **Pagos NO es un 4to microservicio propio** —
+  es un `GENERIC_SUBDOMAIN` externo desde Entrega 1 (`01-dominios-subdominios.cml`,
+  `03-contextos-acotados-TO-BE.cml`, `05-vista-modulo.puml` lo marcan `<<externo>>` los tres,
+  independientemente entre sí); su Strategy/Adapter (MOD-02) viven como módulo ACL dentro de Gestión
+  de Trabajos, ver `12-plan-entrega-4.md` sección 0.1. Nada de esto existe todavía en
+  `implementacion/`; la migración de Proveedores invalida la evidencia de GCP-real citada arriba hasta
+  que se re-ejecute contra Pulsar.
