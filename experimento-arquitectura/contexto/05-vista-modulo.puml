@@ -1,0 +1,94 @@
+@startuml 05-vista-modulo
+
+' Hogar de los Alpes (HdA) - Vista de Módulo (TO-BE)
+' Diseño táctico - Diagrama de Módulo (vista funcional / estructural-estática)
+'
+' A diferencia del diagrama de Contexto (que muestra actores + límite del sistema),
+' aquí se muestra SOLO la estructura interna: los módulos/servicios, sus dependencias
+' estáticas (quién depende del contrato/evento de quién) y hacia qué sistemas externos
+' dependen vía ACL. No se incluyen actores humanos ni Partners B2B2C: esos son parte
+' de la vista de Contexto, no de la estructura del sistema.
+'
+' Convención ad-hoc (microservicios):
+'   flecha punteada  = dependencia asíncrona por evento de dominio (OHS/PL)
+'   flecha sólida    = dependencia síncrona / ACL hacia sistema externo (API, Webhook, Batch)
+'   la flecha apunta del productor/proveedor del contrato hacia el consumidor/dependiente
+'   (mismo sentido usado en 03-contextos-acotados-TO-BE.cml)
+
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor<<microservicio>> #DAE8FC
+  BorderColor<<microservicio>> #6C8EBF
+  BackgroundColor<<sensible>> #FFE6CC
+  BorderColor<<sensible>> #D79B00
+  BackgroundColor<<externo>> #F5F5F5
+  BorderColor<<externo>> #666666
+}
+
+title Hogar de los Alpes (HdA) — Vista de Módulo (TO-BE)
+
+package "Hogar de los Alpes — Módulos Core" {
+  component "Marketplace" as MKT <<microservicio>>
+  component "Siniestros" as SIN <<microservicio>>
+  component "Suscripciones" as SUS <<microservicio>>
+  component "Reputación y Calidad" as REP <<microservicio>>
+  component "Scoring y Crédito" as SCR <<microservicio>>
+  component "Gestión de Trabajos\n⚠ punto de sensibilidad" as GT <<sensible>>
+  component "Proveedores\n⚠ punto de sensibilidad" as PRV <<sensible>>
+}
+
+component "Sistemas de\nVerificación" as VER <<externo>>
+component "Notificaciones" as NOT <<externo>>
+component "Gestor\nDocumental" as DOC <<externo>>
+component "Pagos" as PAG <<externo>>
+component "Contabilidad" as CONT <<externo>>
+component "Gestión de\nAgentes" as AGT <<externo>>
+
+' --- Dependencias por evento de dominio (async) ---
+MKT ..> GT : publica\nIntención Trabajo
+SIN ..> GT : publica\nTrabajo Siniestro
+SUS ..> GT : publica\nCiclo Suscripción
+PRV ..> MKT : publica Habilitación
+PRV ..> SIN : publica Habilitación
+PRV ..> SUS : publica Habilitación
+GT ..> REP : publica\nTrabajo Completado
+GT ..> SCR : publica\nTrabajo Completado
+REP ..> MKT : publica\nScore Actualizado
+
+' --- Dependencias síncronas / ACL hacia sistemas externos ---
+PRV --> VER : consulta
+GT --> NOT : API REST
+MKT --> NOT : API REST
+GT --> DOC : API / S3
+PRV --> DOC : API / S3
+GT --> AGT : Webhooks
+PRV --> AGT : Webhooks
+GT --> PAG : API REST
+SUS --> PAG : API REST
+PAG --> CONT : Batch / API
+SCR --> CONT : Batch / API
+
+note bottom of GT
+  9 dependientes (3 productores que le publican +
+  2 consumidores de su evento + 4 ACL externos).
+  Cambiar su contrato de eventos (OHS/PL) rompe
+  en cascada a todo el resto del sistema.
+end note
+
+note bottom of PRV
+  Única fuente de "Habilitación" para 3 canales
+  (Marketplace/Siniestros/Suscripciones) y depende
+  de 3 sistemas externos de verificación (latencia/
+  disponibilidad fuera de nuestro control).
+end note
+
+legend right
+  |= símbolo |= significado |
+  | <back:#DAE8FC>  </back> | microservicio propio |
+  | <back:#FFE6CC>  </back> | módulo con punto de sensibilidad |
+  | <back:#F5F5F5>  </back> | sistema externo (SaaS/ERP comprado) |
+  | ..> | dependencia asíncrona (evento de dominio) |
+  | --> | dependencia síncrona (API/Webhook/Batch vía ACL) |
+endlegend
+
+@enduml
