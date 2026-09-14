@@ -28,7 +28,7 @@ jobs:
   # `opcional: false`: es el único de los tres cuya suite ya está probada y
   # no debe degradarse silenciosamente.
   python-lint-y-pruebas:
-    name: Python — lint, formato y pruebas (${{ matrix.servicio }})
+    name: Python — lint, formato y suite de pruebas (${{ matrix.servicio }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.opcional }}
     strategy:
