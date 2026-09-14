@@ -73,7 +73,9 @@ async def despachar(
                 verificacion_id=str(evento.verificacion_id),
             )
             servicio = ServicioDeElegibilidad(repo)
-            habilitado = await asyncio.to_thread(servicio.proveedor_esta_habilitado, evento.proveedor_id)
+            habilitado = await asyncio.to_thread(
+                servicio.proveedor_esta_habilitado, evento.proveedor_id
+            )
             if habilitado:
                 try:
                     await publicador.publicar_evento(
