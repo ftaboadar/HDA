@@ -32,3 +32,20 @@ variable "timeout_externo_s" {
   type        = number
   default     = 3
 }
+
+variable "pulsar_service_url" {
+  description = <<-EOT
+    URL del broker de Apache Pulsar (pulsar://host:6650), del stack
+    pulsar-infra/gcp (ver ../../DESPLIEGUE-GCP-INTEGRAL.md). Default
+    vacío: el transporte real de DISP-03 sigue siendo Pub/Sub
+    (TRANSPORTE=pubsub, ver pubsub.tf) — esta variable NO cambia ese
+    comportamiento, solo deja la env var disponible por si algún día
+    DISP-03 migra de transporte (igual que ya existe
+    PUBSUB_TOPIC_EVENTOS sin que la API lo use todavía). A diferencia de
+    gestion-de-trabajos/infra, aquí NO se habilita Direct VPC egress para
+    esto: como ningún código de app/ la lee hoy, no hay nada real que
+    conectar, y agregar esa complejidad de red sin uso sería prematuro.
+  EOT
+  type        = string
+  default     = ""
+}
