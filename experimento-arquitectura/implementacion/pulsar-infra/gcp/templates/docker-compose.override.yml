@@ -1,0 +1,32 @@
+# Override generado para el despliegue en GCP (VM de este stack) — se
+# aplica ENCIMA de ../../docker-compose.yml (que se deja sin tocar, tal
+# como pide la tarea) con:
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+#
+# Por qué existe (hallazgo de experto-gcp, ver DESPLIEGUE-GCP-INTEGRAL.md
+# para el detalle completo): ../../docker-compose.yml fija
+#   advertisedListeners=external:pulsar://127.0.0.1:6650
+# — correcto SOLO para un cliente Pulsar que corre en la misma máquina
+# Docker host (ahí 127.0.0.1 apunta al propio host). Cualquier cliente
+# (pulsar-client) que se conecte desde FUERA de esta VM primero hace un
+# "lookup" contra el broker, que le devuelve la URL de este "external
+# listener" para la conexión real de producción/consumo de mensajes — si
+# ese valor sigue siendo 127.0.0.1, el cliente externo intenta conectarse
+# a SU PROPIO loopback (no a esta VM) y la conexión de datos falla, aunque
+# el handshake inicial (TCP puro al puerto 6650 de la VM) sí haya
+# funcionado. Sin este override, publicar/consumir desde Cloud Run (u
+# cualquier cliente fuera de esta VM) fallaría en silencio más allá del
+# primer paquete.
+#
+# __ADVERTISED_IP__ se sustituye en tiempo de arranque (ver
+# templates/startup.sh.tpl) por la IP INTERNA de esta misma VM — no
+# Terraform, porque la instancia no puede referenciar su propia IP dentro
+# de su propio metadata_startup_script (dependencia circular). Se usa la
+# IP interna (no la externa) porque el tráfico real de producción/consumo
+# viaja por la VPC vía Direct VPC egress de los servicios de Cloud Run que
+# hablan con Pulsar (ver gestion-de-trabajos/infra/service.tf) — no por
+# internet.
+services:
+  broker:
+    environment:
+      - advertisedListeners=external:pulsar://__ADVERTISED_IP__:6650

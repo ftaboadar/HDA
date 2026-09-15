@@ -81,6 +81,12 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "PUBSUB_TOPIC_EVENTOS"
         value = google_pubsub_topic.eventos_integracion.name
       }
+      env {
+        # No lo usa ningún comando de la API hoy — mismo criterio que
+        # PUBSUB_TOPIC_EVENTOS arriba. Ver var.pulsar_service_url.
+        name  = "PULSAR_SERVICE_URL"
+        value = var.pulsar_service_url
+      }
 
       volume_mounts {
         name       = "cloudsql"
@@ -181,6 +187,13 @@ resource "google_cloud_run_v2_service" "worker" {
         # topic dedicado, que no tiene ninguna suscripción push activa.
         name  = "PUBSUB_TOPIC_EVENTOS"
         value = google_pubsub_topic.eventos_integracion.name
+      }
+      env {
+        # Ver var.pulsar_service_url — plumbing por simetría, sin uso
+        # real hoy (TRANSPORTE=pubsub sigue siendo el único transporte
+        # que el worker de DISP-03 implementa).
+        name  = "PULSAR_SERVICE_URL"
+        value = var.pulsar_service_url
       }
       env {
         name  = "MAX_REINTENTOS"
