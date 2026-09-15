@@ -10,6 +10,7 @@ module "api" {
   command = ["uvicorn"]
   args    = ["app.api.main:app", "--host", "0.0.0.0", "--port", "8080"]
 
+  enable_cloudsql          = true
   cloudsql_connection_name = google_sql_database_instance.reputacion.connection_name
 
   env_vars = [

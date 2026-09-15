@@ -106,8 +106,23 @@ variable "cpu_idle" {
   default     = true
 }
 
+variable "enable_cloudsql" {
+  description = <<-EOT
+    true si este servicio necesita conectarse a Cloud SQL. Es una variable
+    separada de `cloudsql_connection_name` (no basta con revisar si esa es
+    null) porque cuando el caller pasa
+    `google_sql_database_instance.foo.connection_name` de una instancia que
+    se crea en el MISMO plan, ese valor es "known after apply" — Terraform
+    no puede usar un valor así en `count`/`for_each` (error real,
+    encontrado corriendo `terraform plan`, no solo `validate`, contra los 3
+    servicios nuevos). Esta variable sí es estática en cualquier caller.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "cloudsql_connection_name" {
-  description = "connection_name de una instancia de Cloud SQL ya existente (ej. google_sql_database_instance.foo.connection_name). null si el servicio no necesita BD (ej. mocks-pagos)."
+  description = "connection_name de una instancia de Cloud SQL ya existente (ej. google_sql_database_instance.foo.connection_name). Ignorado si enable_cloudsql es false."
   type        = string
   default     = null
 }

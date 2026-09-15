@@ -8,8 +8,18 @@ terraform {
   }
 }
 
+locals {
+  # account_id de Service Account tiene un límite de 30 caracteres en GCP
+  # (^[a-z](?:[-a-z0-9]{4,28}[a-z0-9])$) — encontrado corriendo
+  # `terraform plan` de verdad (no lo atrapa `validate`) contra
+  # mocks-pagos/infra: "mocks-pagos-poc-mock-mercadopago" tiene 32. Se
+  # trunca a 30 y se quita un "-" colgante si la truncación cae justo
+  # después de uno (el regex no permite terminar en "-").
+  account_id_sin_guion_final = trimsuffix(substr("${var.entorno}-${var.service_name}", 0, 30), "-")
+}
+
 resource "google_service_account" "this" {
-  account_id   = "${var.entorno}-${var.service_name}"
+  account_id   = local.account_id_sin_guion_final
   display_name = "Runtime de ${var.service_name} (${var.entorno})"
 }
 
@@ -76,7 +86,7 @@ resource "google_cloud_run_v2_service" "this" {
       }
 
       dynamic "volume_mounts" {
-        for_each = var.cloudsql_connection_name == null ? [] : [1]
+        for_each = var.enable_cloudsql ? [1] : []
         content {
           name       = "cloudsql"
           mount_path = "/cloudsql"
@@ -85,7 +95,7 @@ resource "google_cloud_run_v2_service" "this" {
     }
 
     dynamic "volumes" {
-      for_each = var.cloudsql_connection_name == null ? [] : [1]
+      for_each = var.enable_cloudsql ? [1] : []
       content {
         name = "cloudsql"
         cloud_sql_instance {
@@ -100,7 +110,7 @@ resource "google_cloud_run_v2_service" "this" {
 # Cloud SQL Auth Proxy embebido de Cloud Run (mismo rol que
 # DISP-03/infra/iam.tf otorga a su SA de runtime).
 resource "google_project_iam_member" "cloudsql_client" {
-  count   = var.cloudsql_connection_name == null ? 0 : 1
+  count   = var.enable_cloudsql ? 1 : 0
   project = var.project_id
   role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.this.email}"
