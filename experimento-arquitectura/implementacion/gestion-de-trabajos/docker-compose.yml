@@ -1,0 +1,38 @@
+# Postgres real (Regla 5, criterio 3: persistencia real) + API de Gestión
+# de Trabajos. Mismo patrón que reputacion/docker-compose.yml — sin
+# Pulsar ni los mocks de pagos como dependencias obligatorias: el cliente
+# de Pulsar se conecta de forma perezosa (ver
+# app/infrastructure/messaging/publicador_pulsar.py) y las URLs de los
+# mocks son solo necesarias para POST /pagos, no para que la API arranque
+# ni para GET /salud — así este compose no bloquea CI ni desarrollo local
+# esperando a que Daniel/Johan tengan sus piezas arriba.
+#
+# Puerto de Postgres publicado en 5434 (no 5432/5433, ya usados por
+# DISP-03/reputación) para poder correr los 3 en paralelo sin choque.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hda
+      POSTGRES_PASSWORD: hda
+      POSTGRES_DB: gestion_trabajos
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hda -d gestion_trabajos"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  api:
+    build: .
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    restart: on-failure:5
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/gestion_trabajos
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy

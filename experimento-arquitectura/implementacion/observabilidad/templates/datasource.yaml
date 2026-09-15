@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: Google Cloud Monitoring
+    type: stackdriver
+    uid: gcm
+    access: proxy
+    isDefault: true
+    jsonData:
+      # authenticationType "gce": Grafana usa las credenciales por defecto
+      # del entorno (metadata server) para autenticarse contra Cloud
+      # Monitoring — funciona en Cloud Run igual que en GCE/GKE, sin
+      # necesitar un JSON de cuenta de servicio como secreto aparte. Sin
+      # roles/monitoring.viewer otorgado a la SA del servicio Grafana
+      # (ver grafana.tf), esto falla con 403 al primer query.
+      authenticationType: gce
+      defaultProject: ${project_id}

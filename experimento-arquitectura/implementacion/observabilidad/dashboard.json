@@ -1,0 +1,118 @@
+{
+  "title": "HdA — Cloud Run: p95 / throughput / tasa de error",
+  "uid": "hda-cloud-run-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "browser",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service_name",
+        "type": "textbox",
+        "label": "Servicio Cloud Run",
+        "query": "disp03-poc-api",
+        "current": { "text": "disp03-poc-api", "value": "disp03-poc-api" },
+        "description": "Nombre exacto del recurso google_cloud_run_v2_service (ej. disp03-poc-api, gestion-trabajos-poc-api, reputacion-poc-api, mocks-pagos-poc-mock-stripe). Textbox y no un query variable a propósito: no se validó contra un proyecto con servicios reales corriendo — un query variable fallaría en silencio en un proyecto vacío."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Latencia p95 (ms) — $service_name",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "stackdriver", "uid": "${datasource_uid}" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "projects/${project_id}",
+            "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\"",
+            "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+            "perSeriesAligner": "ALIGN_DELTA",
+            "alignmentPeriod": "60s"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ms" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Throughput (req/s) — $service_name",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "stackdriver", "uid": "${datasource_uid}" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "projects/${project_id}",
+            "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\"",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "perSeriesAligner": "ALIGN_RATE",
+            "alignmentPeriod": "60s"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Tasa de error 5xx (%) — $service_name",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "stackdriver", "uid": "${datasource_uid}" },
+      "description": "Cociente de dos queries (A: requests 5xx, B: requests totales) combinado con una transformación 'Add field from calculation' (A/B*100) del lado de Grafana — no una sola query nativa de Cloud Monitoring, porque response_code_class no admite un filtro '!=\"2xx\"' combinado con un ratio en una sola timeSeriesList.",
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "projects/${project_id}",
+            "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\" AND metric.label.response_code_class=\"5xx\"",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "perSeriesAligner": "ALIGN_RATE",
+            "alignmentPeriod": "60s"
+          }
+        },
+        {
+          "refId": "B",
+          "queryType": "timeSeriesList",
+          "timeSeriesList": {
+            "projectName": "projects/${project_id}",
+            "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\"",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "perSeriesAligner": "ALIGN_RATE",
+            "alignmentPeriod": "60s"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binary",
+            "binary": { "left": "A", "operator": "/", "right": "B", "reducer": "sum" },
+            "alias": "tasa_error_pct",
+            "replaceFields": false
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit" },
+        "overrides": []
+      }
+    }
+  ]
+}
