@@ -20,6 +20,8 @@ Reacciones registradas para `TrabajoFinalizado`:
 
 from __future__ import annotations
 
+import asyncio
+
 from app.application.ports.publicador import IPublicador
 from app.application.ports.registro_trabajos import (
     IRegistroTrabajosRepository,
@@ -69,14 +71,18 @@ async def _reaccionar_trabajo_finalizado(
     registro_repo: IRegistroTrabajosRepository | None,
 ) -> None:
     if registro_repo is not None:
-        registro_repo.guardar(
+        # asyncio.to_thread: registro_repo.guardar es SQLAlchemy síncrono —
+        # ver docstring de application/commands/crear_trabajo.py para el
+        # hallazgo completo (k6 real contra GCP, event loop bloqueado).
+        await asyncio.to_thread(
+            registro_repo.guardar,
             RegistroTrabajoElegible(
                 trabajo_id=evento.trabajo_id,
                 proveedor_id=evento.proveedor_id,
                 monto=evento.monto,
                 moneda=evento.moneda,
                 region=evento.region,
-            )
+            ),
         )
 
     if publicador is None:

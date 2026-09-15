@@ -14,6 +14,7 @@ Pulsar, publicado dentro de `CrearTrabajo`."""
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from fastapi import FastAPI, HTTPException
@@ -120,7 +121,10 @@ async def crear_trabajo(payload: TrabajoCreate):
 @app.get("/trabajos/{trabajo_id}", response_model=TrabajoOut)
 async def obtener_trabajo(trabajo_id: uuid.UUID):
     query = ConsultarTrabajo(_trabajo_repo)
-    trabajo = query.ejecutar(str(trabajo_id))
+    # asyncio.to_thread: ejecutar() es SQLAlchemy síncrono — ver docstring
+    # de application/commands/crear_trabajo.py para el hallazgo (k6 real
+    # bloqueando el event loop).
+    trabajo = await asyncio.to_thread(query.ejecutar, str(trabajo_id))
     if trabajo is None:
         raise HTTPException(status_code=404, detail="no encontrado")
     return _trabajo_a_schema(trabajo)
@@ -142,7 +146,7 @@ async def crear_pago(payload: PagoCreate):
 @app.get("/pagos/{pago_id}", response_model=PagoOut)
 async def obtener_pago(pago_id: uuid.UUID):
     query = ConsultarPago(_pago_repo)
-    pago = query.ejecutar(str(pago_id))
+    pago = await asyncio.to_thread(query.ejecutar, str(pago_id))
     if pago is None:
         raise HTTPException(status_code=404, detail="no encontrado")
     return _pago_a_schema(pago)

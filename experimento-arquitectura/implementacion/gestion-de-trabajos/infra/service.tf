@@ -28,7 +28,11 @@ module "api" {
   cloudsql_connection_name = google_sql_database_instance.gestion_trabajos.connection_name
 
   vpc_network    = "default"
-  vpc_subnetwork = data.google_compute_subnetwork.default.self_link
+  # Cloud Run v2 (network_interfaces.subnetwork) exige el formato
+  # "projects/*/regions/*/subnetworks/*", no la URL completa de self_link
+  # — encontrado corriendo terraform apply real (error 400 de la API),
+  # no lo atrapa validate ni plan.
+  vpc_subnetwork = data.google_compute_subnetwork.default.id
 
   env_vars = [
     {

@@ -15,10 +15,18 @@ dominio `TrabajoFinalizado`. Si no hay registro para ese `trabajo_id`, es
 porque Pagos nunca fue notificado de que ese trabajo existe/finalizó — el
 mismo caso que antes se reportaba como "trabajo no encontrado".
 
-CQS: `ejecutar()` retorna solo el `id` del pago creado."""
+CQS: `ejecutar()` retorna solo el `id` del pago creado.
+
+CORRECCIÓN (encontrada corriendo k6 real contra GCP): `_registro_repo`/
+`_pago_repo` son síncronos (SQLAlchemy) — invocados directo dentro de este
+`async def` bloqueaban el event loop del worker en cada llamada. Mismo
+hallazgo y mismo fix que `crear_trabajo.py` (ver su docstring), aplicado
+aquí por consistencia aunque este comando no fue el que ESC-01 midió
+directamente."""
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from app.application.dispatcher_eventos_dominio import despachar
@@ -52,8 +60,8 @@ class PagarTrabajo:
         self._pasarelas = pasarelas
 
     async def ejecutar(self, trabajo_id: str, pasarela: str) -> uuid.UUID:
-        registro = self._registro_repo.obtener_por_trabajo(
-            TrabajoId.desde_str(trabajo_id)
+        registro = await asyncio.to_thread(
+            self._registro_repo.obtener_por_trabajo, TrabajoId.desde_str(trabajo_id)
         )
         if registro is None:
             raise TrabajoNoEncontrado(trabajo_id)
@@ -82,7 +90,7 @@ class PagarTrabajo:
         # cae entre aquí y la respuesta de la pasarela, el registro de
         # intento de cobro ya quedó trazado (mismo principio que
         # Verificacion en DISP-03: persistir antes de la I/O externa).
-        self._pago_repo.guardar(pago)
+        await asyncio.to_thread(self._pago_repo.guardar, pago)
 
         resultado = await pasarela_impl.cobrar(pago)
         if resultado.exitoso:
@@ -91,7 +99,7 @@ class PagarTrabajo:
             pago.marcar_fallido(
                 resultado.motivo_falla or "error desconocido en la pasarela"
             )
-        self._pago_repo.guardar(pago)
+        await asyncio.to_thread(self._pago_repo.guardar, pago)
         await despachar(pago.recoger_eventos())
 
         log_evento(

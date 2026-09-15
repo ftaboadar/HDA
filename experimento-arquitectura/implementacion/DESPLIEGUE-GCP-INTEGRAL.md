@@ -5,11 +5,18 @@ real contra el proyecto `hda-projectt` (`southamerica-east1`), en el mismo estil
 `DISP-03/infra/` (prefijo `${entorno}` por stack, Service Account propia por servicio, IP pública +
 red autorizada abierta en Cloud SQL "solo para PoC", `allUsers` como invoker público).
 
-**Nada de esto se corrió contra GCP real desde esta sesión.** Se validó únicamente con
-`terraform fmt` + `terraform init -backend=false` + `terraform validate` (sintaxis/tipos, sin tocar
-la API de GCP) y con `docker build` local del Dockerfile nuevo — ver el resumen de verificación al
-final. El `terraform apply` real lo corre el equipo, explícitamente, cuando decida encender esto (son
-recursos facturables).
+**ACTUALIZACIÓN: esto SÍ se aplicó contra GCP real** (`hda-projectt`), por pedido explícito del
+usuario, en una sesión posterior a cuando se escribió el resto de este documento (el texto original
+de abajo describe el estado ANTES del apply — se deja tal cual como referencia del diseño, y esta
+sección nueva documenta lo que pasó al encenderlo de verdad). Ver "Estado real tras el despliegue"
+más abajo para los bugs encontrados (varios que ni `validate` ni `plan` podían atrapar) y el estado
+real de cada componente.
+
+**Nada de esto se corrió contra GCP real desde ESTA REDACCIÓN INICIAL del documento.** Se validó
+únicamente con `terraform fmt` + `terraform init -backend=false` + `terraform validate`
+(sintaxis/tipos, sin tocar la API de GCP) y con `docker build` local del Dockerfile nuevo — ver el
+resumen de verificación al final. El `terraform apply` real lo corre el equipo, explícitamente,
+cuando decida encender esto (son recursos facturables).
 
 **Incidente durante esta sesión, reportado con honestidad:** en un punto se invocó por error
 `terraform plan` sobre `pulsar-infra/gcp` (violando la restricción de "nada de plan/apply contra GCP
@@ -230,6 +237,59 @@ documento (`advertisedListeners`) es una amenaza a la validez adicional, especí
 GCP, que no existe ni en el docker-compose local ni en ningún experimento ya corrido** — cualquier
 corrida de `run-experiment` o prueba de carga contra este entorno de GCP debe confirmar primero que el
 override realmente resolvió el problema, no asumirlo.
+
+## Estado real tras el despliegue en GCP (2026-09-14)
+
+Los 6 stacks se aplicaron de verdad contra `hda-projectt` (106 recursos). Todos los servicios pasan
+`/salud`. Se encontraron y corrigieron, en el camino, bugs reales que ni `terraform validate` ni
+`terraform plan` podían atrapar (solo aparecen ejecutando de verdad):
+
+1. **Cloud Run v2 rechaza `self_link` como `vpc_subnetwork`** (`gestion-de-trabajos/infra/service.tf`)
+   — pedía el formato `projects/*/regions/*/subnetworks/*`, no la URL completa. Corregido a
+   `data.google_compute_subnetwork.default.id`.
+2. **`docker-compose-plugin` no existe en los repos de Debian por defecto**
+   (`pulsar-infra/gcp/templates/startup.sh.tpl`) — `apt-get install` fallaba y, por
+   `set -euxo pipefail`, abortaba el script completo antes de instalar Docker siquiera. Corregido
+   usando `get.docker.com`.
+3. **Los volúmenes nombrados de Docker se crean `root:root`** (`pulsar-infra/docker-compose.yml`) —
+   el usuario `pulsar` (uid 10000) del contenedor no podía escribir en `zk-data`/`bk-data`.
+   **Reproducido idéntico en local** (no es un problema de la VM) — este archivo nunca se había
+   corrido de verdad antes de hoy. Corregido con `user: "0:0"` en `zookeeper` y `bookie`.
+4. **Falta crear el tenant/namespace de Pulsar** — el cluster solo inicializa metadata
+   (`pulsar initialize-cluster-metadata`), nunca crea el tenant `hda` ni sus namespaces. Sin esto,
+   publicar en `persistent://hda/gestion-trabajos/trabajos.finalizado` falla con `TopicNotFound`. Se
+   creó manualmente (`pulsar-admin tenants create hda` + `namespaces create hda/gestion-trabajos` y
+   `hda/proveedores`) — **no está automatizado todavía**, es un paso manual pendiente de mover a
+   Terraform (`pulsar-admin` no tiene provider oficial; alternativa: un
+   `null_resource`+`local-exec` que lo corra vía el REST admin del broker, o un job de Kubernetes/VM
+   que lo haga en el primer arranque).
+5. **`gestion-de-trabajos/app/infrastructure/messaging/publicador_pulsar.py` serializaba con
+   `pulsar.schema.AvroSchema`**, pero (a) `pulsar-client==3.5.0` sin el extra `[avro]` no trae
+   `fastavro` y (b) el consumidor real de ese tópico
+   (`reputacion/app/infrastructure/messaging/consumidor_pulsar.py`) espera JSON plano
+   (`json.loads(mensaje.data())`) — dos servicios de equipos distintos, nunca probados juntos contra
+   un broker real hasta hoy. Se unificó al mismo contrato JSON que ya usa
+   `DISP-03/app/common/publicador.py`.
+6. **Bug de concurrencia real bajo carga (encontrado corriendo k6, no antes)**: todas las llamadas a
+   los repositorios de `gestion-de-trabajos` (SQLAlchemy, síncronas) se invocaban directo dentro de
+   handlers `async def` — bloqueaban el event loop del worker de Uvicorn en cada escritura/lectura a
+   Cloud SQL. Bajo la carga de ESC-01 esto serializaba efectivamente cada instancia (sin importar
+   `containerConcurrency=80`), causando p95 de 14.2s y 20% de requests fallidas. Se envolvió cada
+   llamada en `asyncio.to_thread` (mismo patrón ya auditado en
+   `DISP-03/app/application/commands/registrar_intento.py`) en los 5 archivos que tocaban un
+   repositorio. **Mejoró sustancialmente pero no resolvió el problema del todo**: una segunda corrida
+   de ESC-01 post-fix bajó a p95 9.7s / 11.9% de fallo — sigue sin cumplir el umbral. La causa raíz
+   residual (pool de conexiones a Cloud SQL, `max_instance_count`/tier insuficientes, u otra) no se
+   investigó más a fondo por tiempo — ver `k6/README.md` sección ESC-01, "Qué falta".
+7. **Imágenes construidas en Apple Silicon (arm64) sin `--platform linux/amd64`** fallan en Cloud Run
+   ("Container manifest type ... must support amd64/linux") — afectó a los 3 servicios nuevos hasta
+   que se reconstruyeron con esa flag explícita.
+
+**No validado**: ESC-03 (la corrida limpia post-fix de concurrencia se interrumpió antes de terminar,
+16 min de duración); el consumidor de Pulsar de Reputación sigue sin desplegarse (ver limitación ya
+documentada arriba), así que nadie confirmó todavía que Reputación reciba y procese el evento real
+publicado por Gestión de Trabajos, solo que el mensaje llega al tópico (confirmado vía
+`pulsar-admin topics stats`, `msgInCounter: 1`).
 
 ## Resumen de verificación
 

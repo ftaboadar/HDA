@@ -14,8 +14,13 @@ Regla 5, criterio 4: `pago.compensar()` registra el evento de dominio
 `pagar_trabajo.py`, lo recoge y lo pasa al dispatcher DESPUÉS de persistir
 el agregado, nunca antes (hallazgo de re-auditoría corregido: antes este
 comando dejaba el evento acumulado en el agregado sin recogerlo ni
-despacharlo, perdiéndose en silencio al salir de scope)."""
+despacharlo, perdiéndose en silencio al salir de scope).
 
+CORRECCIÓN (encontrada corriendo k6 real contra GCP, ver
+`crear_trabajo.py` para el hallazgo completo): `_pago_repo` es síncrono —
+envuelto en `asyncio.to_thread` para no bloquear el event loop."""
+
+import asyncio
 import uuid
 
 from app.application.dispatcher_eventos_dominio import despachar
@@ -35,12 +40,14 @@ class Compensar:
         self._pago_repo = pago_repo
 
     async def ejecutar(self, pago_id: str) -> uuid.UUID:
-        pago = self._pago_repo.obtener_por_id(PagoId.desde_str(pago_id))
+        pago = await asyncio.to_thread(
+            self._pago_repo.obtener_por_id, PagoId.desde_str(pago_id)
+        )
         if pago is None:
             raise PagoNoEncontrado(pago_id)
 
         pago.compensar()
-        self._pago_repo.guardar(pago)
+        await asyncio.to_thread(self._pago_repo.guardar, pago)
         await despachar(pago.recoger_eventos())
 
         log_evento(logger, "pago_compensado", pago_id=pago_id)

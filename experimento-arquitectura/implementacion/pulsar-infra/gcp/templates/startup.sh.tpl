@@ -8,8 +8,16 @@
 # google-guest-agent).
 set -euxo pipefail
 
-apt-get update
-apt-get install -y docker.io docker-compose-plugin
+# CORRECCIÓN (encontrada corriendo un apply real, no en validate/plan):
+# `docker-compose-plugin` NO existe en los repos de Debian por defecto —
+# solo en el repo propio de Docker. `apt-get install -y docker.io
+# docker-compose-plugin` fallaba con "Unable to locate package" y, por
+# `set -euxo pipefail`, abortaba el script entero ahí mismo — Docker nunca
+# llegaba a instalarse ni a arrancar. Se usa el script oficial de Docker
+# (get.docker.com), que agrega el repo correcto e instala
+# docker-ce/docker-ce-cli/containerd.io/docker-compose-plugin de una vez,
+# ya probado para Debian/Ubuntu.
+curl -fsSL https://get.docker.com | sh
 systemctl enable docker
 systemctl start docker
 

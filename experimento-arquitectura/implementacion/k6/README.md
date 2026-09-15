@@ -146,14 +146,17 @@ diagnosticar un umbral incumplido.
 | Entorno | Fecha | p95 aceptación medido | Throughput medido (req/s) | % aceptación medido | Variación p95 "otro dominio" | Veredicto cumple/no-cumple |
 |---|---|---|---|---|---|---|
 | Local (docker-compose) | TBD | TBD | TBD | TBD | TBD | *(responsabilidad de `validador-hipotesis`, no de este documento)* |
-| GCP real | TBD | TBD | TBD | TBD | TBD | *(idem)* |
+| GCP real (2026-09-14, 1ª corrida, antes del fix de concurrencia) | 2026-09-14 | 14208ms | 216 req/s | 79.9% (`esc01_aceptacion_ok`) | no medido | *(no cumple el umbral &lt;2s / ≥99.9% — ver "Qué falta" abajo, atribuido a `_repo.guardar` síncrono bloqueando el event loop)* |
+| GCP real (2026-09-14, 2ª corrida, después del fix de concurrencia) | 2026-09-14 | 9717ms | 326 req/s | 88.1% (`esc01_aceptacion_ok`) | no medido | *(mejoró sustancialmente pero SIGUE sin cumplir el umbral — ver "Qué falta")* |
+
+**Qué falta (ESC-01, honesto a propósito):** el fix de `asyncio.to_thread` (ver commit) resolvió el bloqueo del event loop pero no fue suficiente por sí solo — la causa raíz residual no se investigó más a fondo en esta sesión por tiempo (candidatos sin confirmar: tamaño del pool de conexiones de SQLAlchemy hacia Cloud SQL, `max_instance_count=10`/`containerConcurrency=80` del módulo insuficientes para el pico real, o el propio tier de Cloud SQL `db-custom-1-3840` saturado). Queda para quien retome esto: perfilar con las métricas de Cloud SQL (conexiones activas, CPU) durante una corrida de ESC-01 real.
 
 ### ESC-02 — 5x tráfico de un partner
 
 | Entorno | Fecha | p95 partner en pico | p95 otros partners | Auto-scaling medido (s) | % rate limiting a otros | Veredicto cumple/no-cumple |
 |---|---|---|---|---|---|---|
 | Local (docker-compose) | TBD | TBD | TBD | N/A (sin auto-scaling local) | TBD | *(responsabilidad de `validador-hipotesis`)* |
-| GCP real | TBD | TBD | TBD | TBD | TBD | *(idem)* |
+| GCP real | 2026-09-14 | 260.4ms | 261.7ms | no medido | 0% (0 de 14,789 requests) | *(cumple el umbral &lt;300ms en ambos casos, y el 0% de rate-limiting cruzado — veredicto final formal sigue siendo trabajo de `validador-hipotesis`)* |
 
 ### ESC-03 — Crecimiento sostenido 3x
 
