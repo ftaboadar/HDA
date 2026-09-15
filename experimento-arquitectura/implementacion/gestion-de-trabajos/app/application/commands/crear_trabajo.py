@@ -12,10 +12,21 @@ guarda el agregado y le pasa sus eventos a
 `application/dispatcher_eventos_dominio.py` — nunca publica ni notifica
 directamente. El dispatcher es quien decide traducir ese evento de dominio
 en un evento de INTEGRACIÓN hacia Pulsar Y en la reacción intra-servicio
-del módulo Pagos (ver docstring del dispatcher)."""
+del módulo Pagos (ver docstring del dispatcher).
+
+CORRECCIÓN (encontrada corriendo k6 real contra GCP, no en tests): `_repo.guardar`
+es una llamada SÍNCRONA de SQLAlchemy — invocarla directo dentro de un
+`async def` bloquea el event loop entero de ese worker de Uvicorn durante
+el round-trip a Cloud SQL. Bajo carga (ESC-01), esto serializa
+efectivamente todas las requests de una instancia sin importar
+`containerConcurrency`, causando colas de segundos y timeouts (p95 medido:
+14.2s, 20% de requests fallidas). Se envuelve en `asyncio.to_thread`, mismo
+patrón ya establecido y auditado en
+`DISP-03/app/application/commands/registrar_intento.py`."""
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from decimal import Decimal
 
@@ -56,7 +67,7 @@ class CrearTrabajo:
         # inmediato para poder demostrar el evento `trabajos.finalizado`
         # de punta a punta.
         trabajo.finalizar()
-        self._repo.guardar(trabajo)
+        await asyncio.to_thread(self._repo.guardar, trabajo)
 
         await despachar(
             trabajo.recoger_eventos(),

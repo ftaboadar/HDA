@@ -30,6 +30,17 @@ services:
     image: *pulsar-image
     container_name: hda-pulsar-zookeeper
     restart: on-failure
+    # CORRECCIÓN (bug real, encontrado corriendo `docker compose up` de
+    # verdad por primera vez — tanto en local como en la VM de GCP,
+    # idéntico en ambos, así que no es un problema del entorno): Docker
+    # crea los volúmenes nombrados nuevos con dueño root:root — el usuario
+    # `pulsar` (uid 10000, grupo root, sin bit de escritura de grupo en un
+    # directorio 755 root:root) no puede escribir en `zk-data`, y Zookeeper
+    # moría con "Unable to create data directory ... Permission denied"
+    # antes de siquiera arrancar. `user: "0:0"` es el fix pragmático
+    # estándar para este tipo de PoC (el broker en sí no corre como root,
+    # solo zookeeper/bookie por sus volúmenes).
+    user: "0:0"
     networks:
       - pulsar
     volumes:
@@ -72,6 +83,9 @@ services:
     image: *pulsar-image
     container_name: hda-pulsar-bookie
     restart: on-failure
+    # Mismo bug de permisos que zookeeper (ver su comentario arriba) sobre
+    # el volumen nombrado bk-data.
+    user: "0:0"
     networks:
       - pulsar
     depends_on:
