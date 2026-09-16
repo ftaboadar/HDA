@@ -58,24 +58,67 @@ RabbitMQ management UI: http://localhost:15672 (hda/hda). API: http://localhost:
 ## Correr en GCP (vía la CLI `hda-gcp`)
 
 Requiere `gcloud` autenticado (`gcloud auth login` + `gcloud auth application-default login`) y un
-proyecto de GCP con facturación habilitada. **Nada de esto se ejecutó desde este entorno de
-desarrollo** (no hay `gcloud` instalado ni credenciales configuradas aquí) — el Terraform se validó
-sintácticamente (`terraform init` + `terraform validate`), no contra un proyecto real.
+proyecto de GCP con facturación habilitada. **Ya se ejecutó contra un proyecto real** (`hda-projectt`,
+`southamerica-east1`) — ver `RESULTADOS-DISP03.md` para la corrida original y sus hallazgos (2 bugs
+reales encontrados solo en GCP, corregidos en `infra/iam.tf` y `app/worker/push_handler.py`). El
+segundo `apply` es necesario siempre: Cloud Run rechaza el primero porque la imagen todavía no existe
+en Artifact Registry.
 
 ```bash
 python -m cli.hda_gcp.main check                                    # valida gcloud/terraform/docker
 
 python -m cli.hda_gcp.main infra init
 python -m cli.hda_gcp.main infra plan  --project TU_PROYECTO
-python -m cli.hda_gcp.main infra apply --project TU_PROYECTO        # pide confirmación (recursos facturables)
+python -m cli.hda_gcp.main infra apply --project TU_PROYECTO        # pide confirmación (recursos facturables) — falla en Cloud Run, esperado
 
-python -m cli.hda_gcp.main images build-push --project TU_PROYECTO --repo disp03-poc-hda
+python -m cli.hda_gcp.main images build-push --project TU_PROYECTO --repo disp03-poc-hda   # en Mac: agregar --platform linux/amd64 --provenance=false si se corre docker build manual
 python -m cli.hda_gcp.main infra apply --project TU_PROYECTO        # vuelve a aplicar para que Cloud Run tome la imagen nueva
 
 python -m cli.hda_gcp.main run-experiment --target gcp               # corre los CP-1..CP-7 contra GCP real
 
 python -m cli.hda_gcp.main teardown --target gcp --project TU_PROYECTO   # destruye todo, pide confirmación
 ```
+
+## Colección Postman (demo manual para la sustentación)
+
+`postman/DISP-03.postman_collection.json` + dos entornos (`DISP-03-local.postman_environment.json`,
+`DISP-03-gcp.postman_environment.json`) — guion de demo click-a-click que replica CP-1, CP-4, CP-5 y
+CP-6 como requests manuales, para mostrar el mecanismo en vivo sin depender de la terminal. Carpetas
+numeradas 0..5 en orden de presentación (salud → baseline → inyectar falla → aislamiento → recuperar
+y reprocesar → consultas sueltas). Los IDs de verificación se encadenan solos entre requests vía
+variables de entorno (`id_policia`, `id_falla`, etc.) usando scripts de test — no hay que copiar/pegar
+UUIDs a mano. El paso que espera a que la certificadora caída agote sus reintentos se reintenta solo
+si se corre con Collection Runner/Newman (`postman.setNextRequest`); si se hace clic a clic, hay que
+apretar Send un par de veces ahí.
+
+Validada de punta a punta con `newman run postman/DISP-03.postman_collection.json -e
+postman/DISP-03-gcp.postman_environment.json` contra el proyecto real (34 requests, 0 fallos).
+Las URLs del entorno GCP quedan fijas al último `terraform apply` — si se vuelve a desplegar,
+actualizar `api_url`/`worker_url`/`mock_*_url` con `terraform output` desde `infra/`.
+
+## Bugs conocidos (encontrados en demo real, no corregidos a propósito)
+
+- **Falta `PUBSUB_TOPIC_SOLICITUDES` en el Worker** (`infra/cloudrun.tf`, ver comentario junto a
+  `PUBSUB_TOPIC_FALLIDAS`): cuando una verificación exitosa habilita a un proveedor nuevo
+  (`ServicioDeElegibilidad`), el dispatcher intenta publicar el evento de integración
+  `ProveedorHabilitado` y `publicar_evento()` explota con `RuntimeError: PUBSUB_TOPIC_SOLICITUDES
+  no configurado` — 500 en `/pubsub/push`, Pub/Sub reintrega, y el chequeo de idempotencia lo
+  enmascara devolviendo 200 en el segundo intento. El estado final de la `Verificacion` queda
+  `COMPLETADA` igual, por eso pasa inadvertido salvo mirando los logs de error del Worker en Cloud
+  Logging. Encontrado 2026-09-09 revisando logs en vivo, no por los CP-1..CP-7 (ninguno hace
+  `assert` sobre la publicación de `ProveedorHabilitado`).
+
+  **Se probó el fix obvio (agregar el `env` faltante) el mismo día y se revirtió**: expuso un
+  segundo bug más profundo. `publicar_evento()` (`app/common/publicador.py:107-115`) reutiliza el
+  mismo topic `solicitudes` para el evento de integración `ProveedorHabilitado` — en RabbitMQ
+  (local) es inofensivo porque el routing key evita que se enrute a la cola del Worker, pero en
+  Pub/Sub (GCP) no hay ese filtrado: la suscripción push le entrega **todo** mensaje del topic al
+  Worker, y como `ProveedorHabilitado` no tiene `verificacion_id`, `push_handler.py:79` explota con
+  `KeyError`. Confirmado con `gcloud pubsub subscriptions pull disp03-poc-verificacion-fallidas-pull`:
+  tras 5 intentos fallidos, el mensaje huérfano terminó en el topic `fallidas` (no corrompe la
+  tabla `verificaciones`, pero la ensucia con basura). El fix correcto no es solo esta variable de
+  entorno — hace falta un topic dedicado para `publicar_evento()`, sin suscripción push atada al
+  Worker (cambio de código + infra, no solo infra). Queda pendiente, fuera de alcance de esta sesión.
 
 ## Dos capas de reintento (diseño intencional, no duplicación accidental)
 

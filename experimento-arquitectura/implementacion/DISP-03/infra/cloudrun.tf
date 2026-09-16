@@ -100,6 +100,21 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "PUBSUB_TOPIC_FALLIDAS"
         value = google_pubsub_topic.fallidas.name
       }
+      # BUG CONOCIDO, sin corregir a propósito (ver README.md, sección "Bugs
+      # conocidos"): falta acá un env PUBSUB_TOPIC_SOLICITUDES para que el
+      # Worker pueda publicar el evento de integración "ProveedorHabilitado"
+      # (dispatcher_eventos_dominio.py). Se probó agregarlo (2026-09-09) y
+      # expuso un segundo bug más profundo: publicar_evento() reutiliza este
+      # mismo topic "solicitudes", que ya tiene una suscripción push apuntando
+      # al Worker — en GCP (a diferencia de RabbitMQ local, donde el routing
+      # key evita que el mensaje se enrute) TODO mensaje del topic le llega al
+      # Worker, y el mensaje de "ProveedorHabilitado" no tiene `verificacion_id`,
+      # así que push_handler.py:79 explota con KeyError. Tras 5 intentos
+      # fallidos termina como mensaje huérfano en el topic "fallidas" (DLQ) —
+      # no corrompe la tabla `verificaciones`, pero ensucia esa cola. El fix
+      # correcto necesita un topic propio para publicar_evento() (sin
+      # suscripción push atada), no solo agregar esta variable — cambio de
+      # código, no solo de infra, fuera de alcance por ahora.
       env {
         name  = "MAX_REINTENTOS"
         value = tostring(var.max_reintentos)

@@ -1,0 +1,111 @@
+@startuml 01-componentes-gcp
+
+' Hogar de los Alpes (HdA) - DISP-03 - Vista de Componentes (runtime real en GCP)
+'
+' Qué se desplegó realmente contra el proyecto GCP `hda-projectt`
+' (southamerica-east1) vía Terraform (infra/*.tf) — no es una propuesta,
+' es el mapa de lo que corrió el experimento. Ver RESULTADOS-DISP03.md.
+'
+' Convención (igual que 06-vista-cyc.puml):
+'   flecha punteada  = mensajería asíncrona (Pub/Sub)
+'   flecha sólida    = llamada síncrona (HTTP/OIDC, JDBC/socket, IAM)
+
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor<<cloudrun>> #DAE8FC
+  BorderColor<<cloudrun>> #6C8EBF
+  BackgroundColor<<mock>> #F5F5F5
+  BorderColor<<mock>> #666666
+  BackgroundColor<<sensible>> #FFE6CC
+  BorderColor<<sensible>> #D79B00
+}
+skinparam queue {
+  BackgroundColor #EDEDED
+  BorderColor #666666
+}
+skinparam database {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+}
+skinparam node {
+  BackgroundColor #FFFFFF
+  BorderColor #999999
+}
+
+title Hogar de los Alpes — DISP-03: Verificación de Proveedores\nVista de Componentes desplegada en GCP (Cloud Run + Pub/Sub + Cloud SQL)
+
+actor "Cliente\n(equipo / pytest)" as CLIENTE
+
+package "GCP — proyecto hda-projectt (southamerica-east1)" {
+
+  component "disp03-poc-api\n(Cloud Run)" as API <<cloudrun>>
+  component "disp03-poc-worker\n(Cloud Run, push endpoint)\n⚠ punto de sensibilidad" as WORKER <<sensible>>
+
+  queue "Pub/Sub" {
+    component "topic:\nverificacion-solicitudes" as T_SOL
+    component "topic:\nverificacion-fallidas (DLQ)" as T_DLQ
+  }
+
+  database "Cloud SQL Postgres 16\nverificacion (Verificacion +\nIntentoVerificacion)" as SQL
+
+  component "disp03-poc-mock-policia\n(Cloud Run)" as MOCK_POL <<mock>>
+  component "disp03-poc-mock-rues\n(Cloud Run)" as MOCK_RUES <<mock>>
+  component "disp03-poc-mock-certificadora\n(Cloud Run)" as MOCK_CERT <<mock>>
+
+  node "Artifact Registry\ndisp03-poc-hda\n(1 imagen -> 5 servicios)" as AR
+  node "IAM\nSA runtime + SA pubsub-invoker\n+ roles.serviceAccountTokenCreator" as IAM
+}
+
+CLIENTE --> API : POST /verificaciones\n(202 inmediato)
+API --> SQL : persiste Verificacion\n(PENDIENTE)
+API ..> T_SOL : publica solicitud
+
+T_SOL ..> WORKER : push HTTP\n(OIDC, SA pubsub-invoker)
+WORKER --> SQL : persiste cada\nIntentoVerificacion
+WORKER --> MOCK_POL : verifica (si tipo=policia)
+WORKER --> MOCK_RUES : verifica (si tipo=rues)
+WORKER --> MOCK_CERT : verifica (si tipo=certificadora)
+WORKER ..> T_DLQ : publica evento de dominio\n(reintentos agotados -> FALLIDA_DLQ)
+
+T_DLQ ..> T_DLQ : dead_letter_policy\n(respaldo infra, 5 intentos\nde entrega push fallidos)
+
+CLIENTE --> API : GET /dlq\nPOST /dlq/{id}/reprocesar
+API ..> T_SOL : republica\n(reproceso manual)
+
+AR .[#999999,dashed]. API : imagen (deploy-time)
+AR .[#999999,dashed]. WORKER
+AR .[#999999,dashed]. MOCK_POL
+IAM .[#999999,dashed]. WORKER : autoriza push
+IAM .[#999999,dashed]. API : roles.cloudsql.client\nroles.pubsub.editor
+
+note right of WORKER
+  Único componente con doble mecanismo
+  de reintento: tenacity (app, dentro de
+  cada push) + retry_policy de la
+  suscripción (infra, entre pushes).
+  Idempotencia manual: ignora redelivery
+  sobre verificación ya en estado terminal.
+end note
+
+note bottom of T_DLQ
+  Poblada por DOS caminos (ver README,
+  "Diferencias local vs. GCP"):
+  1) la propia app, cuando agota
+     reintentos y el agregado transiciona
+     a FALLIDA_DLQ (camino normal)
+  2) dead_letter_policy de Pub/Sub, solo
+     si el push al worker falla a nivel
+     de infraestructura (backup, no el
+     camino esperado en operación normal)
+end note
+
+legend right
+  |= símbolo |= significado |
+  | <back:#DAE8FC>  </back> | servicio propio (Cloud Run) |
+  | <back:#FFE6CC>  </back> | componente con punto de sensibilidad |
+  | <back:#F5F5F5>  </back> | mock de sistema externo (Policía/RUES/Certificadora) |
+  | ..> | asíncrono (Pub/Sub) |
+  | --> | síncrono (HTTP / JDBC-socket / IAM) |
+endlegend
+
+@enduml

@@ -1,0 +1,76 @@
+@startuml 02-flujo-verificacion
+
+' Hogar de los Alpes (HdA) - DISP-03 - Diagrama de flujo
+'
+' Camino completo de una verificación: aceptación desacoplada, reintentos
+' con backoff (tenacity, worker/core.py), transición a DLQ al agotar
+' reintentos (invariante del agregado, registrar_intento.py), y reproceso
+' manual. Incluye el chequeo de idempotencia de push_handler.py — el bug #2
+' encontrado corriendo el experimento contra GCP real (ver RESULTADOS-DISP03.md).
+
+title Hogar de los Alpes — DISP-03: flujo de una verificación de proveedor
+
+|#FFFFFF|Cliente|
+start
+:POST /verificaciones\n(proveedor_id, tipo_verificador);
+
+|#DAE8FC|API (Cloud Run)|
+:IniciarVerificacion —\npersiste Verificacion en PENDIENTE\n(Cloud SQL);
+:publica solicitud en\ntopic Pub/Sub "solicitudes";
+:responde 202 de inmediato;
+note right
+  Desacople productor/consumidor:
+  el cliente nunca espera al
+  verificador externo.
+end note
+
+|#FFFFFF|Cliente|
+:continúa (no bloqueado);
+
+|#FFE6CC|Worker (Cloud Run, push)|
+:Pub/Sub entrega el mensaje\nvía POST /pubsub/push (OIDC);
+if (verificación ya está en\nestado terminal?\n[COMPLETADA o FALLIDA_DLQ]) then (sí - redelivery)
+  :responde 200 "ya_procesada",\nno reprocesa;
+  note right
+    Mitiga at-least-once de Pub/Sub
+    (bug #2 encontrado en GCP real):
+    sin este chequeo, la redelivery
+    chocaba con el invariante del
+    agregado y se propagaba como 500.
+  end note
+  stop
+else (no)
+endif
+
+repeat
+  :llama al verificador externo\n(Policía / RUES / Certificadora)\ncon timeout;
+
+  |#F5F5F5|Sistema externo (mock)|
+  :responde ok / error / timeout;
+
+  |#FFE6CC|Worker (Cloud Run, push)|
+  :RegistrarIntento —\npersiste IntentoVerificacion;
+repeat while (intento exitoso?) is (no, quedan reintentos\n[backoff exponencial + jitter]) not (sí, o se agotó\nmax_reintentos)
+
+if (resultado final exitoso?) then (sí)
+  :agregado transiciona a COMPLETADA;<<#DAE8FC>>
+  :dispatcher despacha evento\nde dominio "VerificacionCompletada";<<#DAE8FC>>
+  stop
+else (no - reintentos agotados)
+  :agregado transiciona a FALLIDA_DLQ\n(invariante protegido en el dominio);<<#F8CECC>>
+  :dispatcher publica evento en\ntopic Pub/Sub "fallidas" (DLQ);<<#F8CECC>>
+  :queda visible en GET /dlq\ncon motivo de falla trazado;<<#F8CECC>>
+endif
+
+|#FFFFFF|Cliente|
+:revisa GET /dlq;
+:POST /dlq/{id}/reprocesar;
+
+|#DAE8FC|API (Cloud Run)|
+:ReprocesarDesdeDLQ —\nvalida que esté en FALLIDA_DLQ,\nvuelve a PENDIENTE;
+:republica en topic\n"solicitudes";
+note right: vuelve al inicio del flujo\ndel Worker (arriba)
+
+stop
+
+@enduml

@@ -1,0 +1,517 @@
+{
+  "info": {
+    "_postman_id": "8d03f8f2-cdb1-4fcc-85a6-10dd1972402b",
+    "name": "HdA — DISP-03 Verificación de Proveedores",
+    "description": "Guion de demo para la sustentación de Entrega 3 (MISO 2026-14). Sigue la misma hipótesis y tácticas que los casos de prueba automatizados CP-1..CP-7 (tests/test_escenarios_disp03.py), pero como requests manuales, click a click, para mostrar el mecanismo en vivo.\n\nOrden recomendado para la demo: 0 -> 1 -> 2 -> 3 -> 4 -> 5. Cada carpeta numerada es un paso de la narrativa; los IDs de verificación se guardan automáticamente en variables de entorno (id_policia, id_rues, id_certificadora, id_falla, id_aislamiento) para que el siguiente request los use sin copiar/pegar nada a mano.\n\nSeleccioná el entorno correcto antes de arrancar: 'DISP-03 - Local (docker-compose)' o 'DISP-03 - GCP (hda-projectt)'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0 - Salud",
+      "description": "Confirma que los 5 servicios responden antes de arrancar la demo. En Local, el Worker no tiene endpoint HTTP expuesto (consume por pull de RabbitMQ) — ese request solo aplica en GCP.",
+      "item": [
+        {
+          "name": "API — salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/salud", "host": ["{{api_url}}"], "path": ["salud"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Worker — invocación directa (esperado: 403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{worker_url}}/salud", "host": ["{{worker_url}}"], "path": ["salud"] },
+            "description": "Este 403 Forbidden es esperado y correcto, no un error: a diferencia de la API y los mocks (roles/run.invoker = allUsers), el Worker solo autoriza a la service account disp03-poc-pubsub-invoker (ver infra/iam.tf). Nadie puede invocarlo directo salvo Pub/Sub — es la mitigación de menor privilegio para el único servicio que ejecuta lógica de negocio sobre eventos. Útil en la sustentación para mostrar que el IAM está cerrado, no abierto por descuido."
+          },
+          "response": []
+        },
+        {
+          "name": "Mock Policía — salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{mock_policia_url}}/salud", "host": ["{{mock_policia_url}}"], "path": ["salud"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Mock RUES — salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{mock_rues_url}}/salud", "host": ["{{mock_rues_url}}"], "path": ["salud"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Mock Certificadora — salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{mock_certificadora_url}}/salud", "host": ["{{mock_certificadora_url}}"], "path": ["salud"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1 - Baseline (todo disponible)",
+      "description": "Equivalente a CP-1: los 3 verificadores en modo 'ok'. Muestra el 202 inmediato (desacople) y que las 3 terminan en COMPLETADA.",
+      "item": [
+        {
+          "name": "Reset mocks a 'ok'",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": [""] }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modo\": \"ok\",\n  \"latencia_ms\": 300,\n  \"tasa_error\": 0.0\n}"
+            },
+            "url": { "raw": "{{mock_certificadora_url}}/_control/config", "host": ["{{mock_certificadora_url}}"], "path": ["_control", "config"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear verificación — Policía",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('id_policia', data.id);",
+                  "  pm.test('202 aceptada', () => pm.response.to.have.status(202));",
+                  "  pm.test('estado inicial PENDIENTE', () => pm.expect(data.estado).to.eql('PENDIENTE'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"demo-policia-1\",\n  \"tipo_verificador\": \"policia\"\n}"
+            },
+            "url": { "raw": "{{api_url}}/verificaciones", "host": ["{{api_url}}"], "path": ["verificaciones"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar verificación — Policía",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.test('llegó a estado terminal', () => pm.expect(['COMPLETADA','FALLIDA_DLQ']).to.include(data.estado));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/verificaciones/{{id_policia}}", "host": ["{{api_url}}"], "path": ["verificaciones", "{{id_policia}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear verificación — RUES",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('id_rues', data.id);",
+                  "  pm.test('202 aceptada', () => pm.response.to.have.status(202));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"demo-rues-1\",\n  \"tipo_verificador\": \"rues\"\n}"
+            },
+            "url": { "raw": "{{api_url}}/verificaciones", "host": ["{{api_url}}"], "path": ["verificaciones"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar verificación — RUES",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/verificaciones/{{id_rues}}", "host": ["{{api_url}}"], "path": ["verificaciones", "{{id_rues}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear verificación — Certificadora",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('id_certificadora', data.id);",
+                  "  pm.test('202 aceptada', () => pm.response.to.have.status(202));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"demo-certificadora-1\",\n  \"tipo_verificador\": \"certificadora\"\n}"
+            },
+            "url": { "raw": "{{api_url}}/verificaciones", "host": ["{{api_url}}"], "path": ["verificaciones"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar verificación — Certificadora",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/verificaciones/{{id_certificadora}}", "host": ["{{api_url}}"], "path": ["verificaciones", "{{id_certificadora}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2 - Inyectar falla (certificadora caída)",
+      "description": "Equivalente a CP-4: la certificadora se cae de forma dura y sostenida. Tras agotar reintentos (tenacity, backoff exponencial+jitter), el agregado transiciona a FALLIDA_DLQ y queda visible en /dlq con motivo trazado.",
+      "item": [
+        {
+          "name": "Config Certificadora -> caído",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"modo\": \"caido\"\n}" },
+            "url": { "raw": "{{mock_certificadora_url}}/_control/config", "host": ["{{mock_certificadora_url}}"], "path": ["_control", "config"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear verificación durante la caída",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.environment.set('_poll_falla_intentos', '0');",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('id_falla', data.id);",
+                  "  pm.test('202 aceptada igual (no bloquea)', () => pm.response.to.have.status(202));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"demo-falla-1\",\n  \"tipo_verificador\": \"certificadora\"\n}"
+            },
+            "url": { "raw": "{{api_url}}/verificaciones", "host": ["{{api_url}}"], "path": ["verificaciones"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar verificación (repetir hasta ver FALLIDA_DLQ)",
+          "description": "Si corrés esto a mano, apretá Send un par de veces hasta ver FALLIDA_DLQ (los reintentos con backoff tardan unos segundos). Si lo corrés con Collection Runner/Newman, este mismo request se reintenta solo hasta 10 veces via postman.setNextRequest — no hace falta intervención manual.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  const terminal = ['COMPLETADA', 'FALLIDA_DLQ'].includes(data.estado);",
+                  "  if (terminal) {",
+                  "    pm.test('llegó a estado terminal', () => pm.expect(terminal).to.be.true);",
+                  "    return;",
+                  "  }",
+                  "  const intentos = parseInt(pm.environment.get('_poll_falla_intentos') || '0', 10);",
+                  "  if (intentos < 10) {",
+                  "    pm.environment.set('_poll_falla_intentos', String(intentos + 1));",
+                  "    postman.setNextRequest(pm.info.requestName);",
+                  "  } else {",
+                  "    pm.test('llegó a estado terminal (se agotaron los reintentos de polling)', () => pm.expect(terminal).to.be.true);",
+                  "  }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/verificaciones/{{id_falla}}", "host": ["{{api_url}}"], "path": ["verificaciones", "{{id_falla}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Ver DLQ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.test('la verificación fallida aparece en /dlq', () => {",
+                  "    const ids = data.map(v => v.id);",
+                  "    pm.expect(ids).to.include(pm.environment.get('id_falla'));",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/dlq", "host": ["{{api_url}}"], "path": ["dlq"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3 - Aislamiento (mientras certificadora sigue caída)",
+      "description": "Equivalente a CP-5: con la certificadora todavía caída, una verificación de Policía debe completarse normal — 0% de impacto cruzado.",
+      "item": [
+        {
+          "name": "Crear verificación — Policía (certificadora sigue caída)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.environment.set('id_aislamiento', data.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"demo-aislamiento-1\",\n  \"tipo_verificador\": \"policia\"\n}"
+            },
+            "url": { "raw": "{{api_url}}/verificaciones", "host": ["{{api_url}}"], "path": ["verificaciones"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar — debe COMPLETADA rápido, sin esperar a la certificadora",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.test('no fue afectada por la caída de certificadora', () => pm.expect(data.estado).to.eql('COMPLETADA'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/verificaciones/{{id_aislamiento}}", "host": ["{{api_url}}"], "path": ["verificaciones", "{{id_aislamiento}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4 - Recuperar y reprocesar",
+      "description": "Equivalente a CP-6: la certificadora se recupera, se reprocesa manualmente la verificación que había caído en DLQ, y debe terminar COMPLETADA.",
+      "item": [
+        {
+          "name": "Config Certificadora -> ok",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"modo\": \"ok\",\n  \"latencia_ms\": 300,\n  \"tasa_error\": 0.0\n}" },
+            "url": { "raw": "{{mock_certificadora_url}}/_control/config", "host": ["{{mock_certificadora_url}}"], "path": ["_control", "config"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Reprocesar desde DLQ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('vuelve a PENDIENTE', () => pm.expect(pm.response.json().estado).to.eql('PENDIENTE'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{api_url}}/dlq/{{id_falla}}/reprocesar", "host": ["{{api_url}}"], "path": ["dlq", "{{id_falla}}", "reprocesar"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar — debe terminar COMPLETADA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const data = pm.response.json();",
+                  "  pm.test('reproceso exitoso', () => pm.expect(data.estado).to.eql('COMPLETADA'));",
+                  "  pm.test('reprocesos incrementado', () => pm.expect(data.reprocesos).to.be.above(0));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/verificaciones/{{id_falla}}", "host": ["{{api_url}}"], "path": ["verificaciones", "{{id_falla}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5 - Consultas generales y extras",
+      "description": "Requests sueltos, útiles para responder preguntas fuera del guion durante la sustentación.",
+      "item": [
+        {
+          "name": "Listar todas las verificaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{api_url}}/verificaciones", "host": ["{{api_url}}"], "path": ["verificaciones"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar verificaciones — filtro por estado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/verificaciones?estado=FALLIDA_DLQ",
+              "host": ["{{api_url}}"],
+              "path": ["verificaciones"],
+              "query": [{ "key": "estado", "value": "FALLIDA_DLQ" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar verificaciones — filtro por proveedor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/verificaciones?proveedor_id=demo-falla-1",
+              "host": ["{{api_url}}"],
+              "path": ["verificaciones"],
+              "query": [{ "key": "proveedor_id", "value": "demo-falla-1" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revalidar proveedor (manual)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/proveedores/demo-certificadora-1/revalidar?tipo_verificador=certificadora&motivo=PROGRAMADA",
+              "host": ["{{api_url}}"],
+              "path": ["proveedores", "demo-certificadora-1", "revalidar"],
+              "query": [
+                { "key": "tipo_verificador", "value": "certificadora" },
+                { "key": "motivo", "value": "PROGRAMADA" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Config genérico de mock — errores intermitentes (CP-3)",
+          "description": "Ejemplo de modo 'error_parcial' con tasa_error — sobre el mock que se indique en la URL (por defecto certificadora).",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"modo\": \"error_parcial\",\n  \"tasa_error\": 0.5\n}" },
+            "url": { "raw": "{{mock_certificadora_url}}/_control/config", "host": ["{{mock_certificadora_url}}"], "path": ["_control", "config"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Ver estado actual de un mock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{mock_certificadora_url}}/_control/estado", "host": ["{{mock_certificadora_url}}"], "path": ["_control", "estado"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
