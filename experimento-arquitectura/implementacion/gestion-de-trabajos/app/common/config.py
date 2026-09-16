@@ -25,19 +25,40 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://hda:hda@postgres:5432/gestion_trabajos"
 
     # --- Pool de conexiones SQLAlchemy (ver docstring de app/common/db.py) ---
-    # Reemplazan el default de SQLAlchemy (pool_size=5 + max_overflow=10 = 15
-    # conexiones), insuficiente bajo ráfaga concurrente: hallazgo real de la
-    # prueba de carga de DISP-02 (agotamiento del pool con POST /novedades
-    # masivo) y sospechado como causa raíz de que ESC-01 siga sin pasar su
-    # umbral (<2s) en GCP con Cloud Run a max_instance_count=10 (ver
-    # RESULTADOS-ESCALABILIDAD-GCP.md, sección 3, punto 1). Configurables por
-    # variable de entorno (DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_TIMEOUT)
-    # para poder subir/bajar el valor por instancia de Cloud Run sin tocar
-    # código, o bajarlos si el tier de Cloud SQL no soporta
-    # (pool_size+max_overflow) × max_instance_count conexiones simultáneas.
-    db_pool_size: int = 50
-    db_max_overflow: int = 50
-    db_pool_timeout: int = 30
+    # RE-DIMENSIONADO (sesión de cálculo de capacidad post-corridas 1 y 2 de
+    # ESC-01 en GCP real, ver infra/service.tf y comentario junto a
+    # `sql_tier` en infra/variables.tf): el valor anterior (50+50=100) NO
+    # era la causa raíz de que ESC-01 siguiera sin pasar su umbral -- era
+    # peor que eso, era una fuente de SOBRESUSCRIPCIÓN de conexiones contra
+    # Postgres. `db_pool_size + db_max_overflow` debe ser el MISMO número
+    # que `max_instance_request_concurrency` (Cloud Run, infra/service.tf) y
+    # que `max_workers` del ThreadPoolExecutor (app/api/main.py, ahora
+    # derivado de estos dos settings, no un literal aparte) -- los tres
+    # deben coincidir, nunca el segundo/tercero mayor que el primero. Ese
+    # número, multiplicado por `max_instance_count` (hoy 20), es la demanda
+    # máxima de conexiones simultáneas contra Postgres en el peor caso: debe
+    # quedar por debajo de `max_connections` de la instancia de Cloud SQL,
+    # con margen (no al límite). `max_connections` NO es configurable acá:
+    # depende de la memoria del tier de Cloud SQL (ver tabla oficial de
+    # `google_sql_database_instance.database_flags` / Cloud SQL "Supported
+    # flags" para postgres: 3.75-6GB -> 100, 6-7.5GB -> 200, 7.5-15GB -> 400
+    # ...). El tier actual, `db-custom-2-7680` (7.5GB), cae en el bucket de
+    # 400. Con 10+5=15 por instancia × 20 instancias = 300 conexiones en el
+    # peor caso -- 75% de 400, dejando ~100 de margen para conexiones de
+    # sistema/monitoreo de Cloud SQL y solapes transitorios de escalado (no
+    # el 100% exacto). Configurables por variable de entorno (DB_POOL_SIZE,
+    # DB_MAX_OVERFLOW, DB_POOL_TIMEOUT) para poder re-tunear sin tocar
+    # código, siempre manteniendo la igualdad con `max_instance_request_
+    # concurrency` de infra/service.tf.
+    db_pool_size: int = 10
+    db_max_overflow: int = 5
+    # Antes 30s: con el pool correctamente dimensionado (sin sobresuscripción)
+    # este timeout no debería dispararse en operación normal. Si se dispara
+    # de todos modos (pico transitorio durante un evento de escalado de
+    # Cloud Run), preferimos que la request falle RÁPIDO -- y cuente como
+    # rechazo medible -- a que espere hasta 30s y garantice por sí sola
+    # violar el p95 < 2s de ESC-01 aunque termine "exitosa".
+    db_pool_timeout: int = 5
 
     pulsar_service_url: str = "pulsar://localhost:6650"
     # Nombre completo de tópico persistente en Pulsar (namespace propio de

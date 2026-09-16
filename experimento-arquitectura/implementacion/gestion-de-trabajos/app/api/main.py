@@ -34,6 +34,7 @@ from app.application.commands.crear_trabajo import CrearTrabajo
 from app.application.commands.publicar_novedad import PublicarNovedad
 from app.application.queries.consultar_novedad import ConsultarNovedad
 from app.application.queries.consultar_trabajo import ConsultarTrabajo
+from app.common.config import settings
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.schemas import (
@@ -86,18 +87,22 @@ def _trabajo_a_schema(t: Trabajo) -> TrabajoOut:
 async def startup() -> None:
     Base.metadata.create_all(bind=engine)
     # Sube el executor por defecto de asyncio (default: min(32, cpu+4)
-    # threads) a un tamaño acorde al pool de conexiones de
-    # `common/db.py` (50+50). Cada `asyncio.to_thread(repo.guardar, ...)`
-    # (ver `application/commands/publicar_novedad.py`) necesita un hilo
-    # propio mientras espera su turno de conexión a Postgres — con el
-    # default de ~20 hilos, una ráfaga de miles de `POST /novedades`
-    # concurrentes (DISP-02, ver
-    # tests/integracion/test_disp02_throttler.py) generaba una cola de
-    # hilos que hacía que las peticiones HTTP entrantes tardaran más de lo
-    # que el cliente de prueba esperaba (hallazgo real de la primera
-    # corrida de esta tarea: `httpx.PoolTimeout` del lado del cliente).
+    # threads) a un tamaño DERIVADO de `settings.db_pool_size +
+    # settings.db_max_overflow` -- ya NO un literal aparte (era 100 fijo,
+    # desincronizado del pool real y de `max_instance_request_concurrency`
+    # de Cloud Run, causa raíz de que subir la concurrencia de Cloud Run a
+    # 200 sin tocar este número solo moviera la cola adentro de la
+    # instancia — ver comentario junto a `sql_tier` en
+    # infra/variables.tf para el cálculo completo de capacidad). Cada
+    # `asyncio.to_thread(...)` (guardar Trabajo, guardar RegistroTrabajo,
+    # y el `run_in_executor` de PublicadorPulsar — las tres comparten
+    # este mismo executor) necesita un hilo propio; con menos hilos que
+    # `containerConcurrency`, las requests entrantes hacen cola DENTRO de
+    # la instancia antes de tocar la base de datos o Pulsar.
     asyncio.get_event_loop().set_default_executor(
-        ThreadPoolExecutor(max_workers=100)
+        ThreadPoolExecutor(
+            max_workers=settings.db_pool_size + settings.db_max_overflow
+        )
     )
     _throttler.iniciar()
     log_evento(logger, "api_iniciada")

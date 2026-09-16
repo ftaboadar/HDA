@@ -13,16 +13,26 @@ propia escritura síncrona vía `asyncio.to_thread` (ver
 `application/commands/publicar_novedad.py`) — con el default de 15
 conexiones, la ráfaga saturaba el pool y las peticiones HTTP entrantes se
 acumulaban hasta agotar el `PoolTimeout` del lado del cliente de prueba
-(hallazgo real de la primera corrida de esta tarea, no una suposición). El
-default actual, 50+50=100 conexiones por instancia, es suficiente para esta
-escala de PoC; también es sospechoso como causa de que ESC-01 siga sin
-pasar su umbral (<2s) en GCP bajo Cloud Run con `max_instance_count=10`
-(ver `RESULTADOS-ESCALABILIDAD-GCP.md`, sección 3, punto 1) — al ser
-configurable por variable de entorno, se puede retunear por instancia sin
-tocar código, o bajarlo si el tier de Cloud SQL no soporta
-(pool_size+max_overflow) × max_instance_count conexiones simultáneas. Una
-escala mayor (o múltiples réplicas) requeriría un pooler externo
-(PgBouncer) en vez de subir más este número, fuera de alcance aquí."""
+(hallazgo real de la primera corrida de esta tarea, no una suposición).
+
+RE-DIMENSIONADO (sesión de cálculo de capacidad, ver comentario extendido
+junto a `db_pool_size`/`db_max_overflow` en `app/common/config.py` y junto
+a `sql_tier` en `infra/variables.tf`): el default anterior, 50+50=100 por
+instancia, NO era insuficiente en cantidad absoluta — era MAYOR que
+`max_connections` real de Postgres dividido entre las instancias posibles,
+es decir, generaba sobresuscripción de conexiones contra Cloud SQL en vez
+de resolverla (causa raíz confirmada de que las corridas 1 y 2 de ESC-01 en
+GCP no mejoraran). El nuevo default, 10+5=15, se eligió para que
+`(pool_size+max_overflow) × max_instance_count` quede por debajo de
+`max_connections` de la instancia de Cloud SQL con margen — no para
+"aguantar más carga" en abstracto. Una escala mayor (más instancias o un
+tier de Cloud SQL más grande) requeriría subir este número EN CONJUNTO con
+`max_connections` (vía tier o `database_flags`) y con
+`max_instance_request_concurrency` de Cloud Run — nunca uno solo de los
+tres; o adoptar un pooler externo (PgBouncer) o el "Managed Connection
+Pooling" nativo de Cloud SQL Enterprise Plus si el número de conexiones
+necesario supera lo que cualquier tier razonable de Cloud SQL ofrece de
+forma nativa — fuera de alcance en este PoC."""
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
