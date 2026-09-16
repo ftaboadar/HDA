@@ -72,7 +72,24 @@ module "api" {
     },
   ]
 
-  min_instance_count = 0
+  # Antes 0: la corrida de ESC-01 con concurrency=15 mostró "The request
+  # was aborted because there was no available instance" en los logs de
+  # Cloud Run durante el pico -- el autoscaler se quedó plantado en 10
+  # instancias activas (no en el max_instance_count=20 configurado, y no
+  # por ninguna cuota de proyecto/región -- se verificó
+  # instance_limit_with_direct_vpc_egress_regional=100, muy por encima).
+  # Causa real: al bajar concurrency de 200 a 15 para eliminar la
+  # sobresuscripción de conexiones, cada instancia aguanta ~13x menos
+  # tráfico -- para sostener el mismo pico (1157 req/s) hacen falta muchas
+  # más instancias nuevas, arrancando más rápido de lo que un cold start
+  # (boot de Python/FastAPI + pool de conexiones) permite. 10 instancias
+  # calientes de entrada cubren el nivel que el autoscaler ya demostró
+  # necesitar sin cold start; de 10 a 20 (si el pico lo exige) todavía
+  # implica arrancar 10 más en caliente -- mitigación parcial, no
+  # garantiza cerrar el umbral por sí sola. Costo: instancias facturando
+  # de forma continua, no solo bajo demanda -- apagar (min=0) fuera de
+  # una corrida de este experimento.
+  min_instance_count = 10
   max_instance_count = 20
   # Antes 200, desincronizado de max_workers (100 fijo en main.py) y del
   # pool de conexiones (50+50) -- generaba cola interna en la instancia Y
