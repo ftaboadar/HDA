@@ -16,9 +16,9 @@ variable "entorno" {
 }
 
 variable "sql_tier" {
-  description = "Tier de Cloud SQL — dimensionado para PoC académico, no para producción"
+  description = "Tier de Cloud SQL — dimensionado para PoC académico, no para producción. Subido de db-custom-1-3840 a db-custom-2-7680 para el intento de cerrar la brecha de ESC-01 (ver experimento-arquitectura/implementacion/PENDIENTES-SESION.md sección 2)."
   type        = string
-  default     = "db-custom-1-3840"
+  default     = "db-custom-2-7680"
 }
 
 variable "pulsar_service_url" {

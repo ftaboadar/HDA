@@ -27,7 +27,7 @@ module "api" {
   enable_cloudsql          = true
   cloudsql_connection_name = google_sql_database_instance.gestion_trabajos.connection_name
 
-  vpc_network    = "default"
+  vpc_network = "default"
   # Cloud Run v2 (network_interfaces.subnetwork) exige el formato
   # "projects/*/regions/*/subnetworks/*", no la URL completa de self_link
   # — encontrado corriendo terraform apply real (error 400 de la API),
@@ -57,8 +57,9 @@ module "api" {
     },
   ]
 
-  min_instance_count = 0
-  max_instance_count = 10
+  min_instance_count               = 0
+  max_instance_count               = 20
+  max_instance_request_concurrency = 200
 
   depends_on = [google_project_service.apis]
 }
