@@ -1,17 +1,17 @@
 # Resultados del experimento de escalabilidad — Infra GCP integral + k6
 
-Documenta la corrida real (2026-09-14) de los 3 escenarios de Escalabilidad
-(`experimento-arquitectura/contexto/escenarios_calidad.md`, ESC-01/02/03) contra
-infraestructura de GCP real desplegada para la ocasión (`hda-projectt`, 106 recursos,
-7 stacks Terraform — ver `DESPLIEGUE-GCP-INTEGRAL.md`), más las decisiones de arquitectura,
-puntos de sensibilidad y tradeoffs que salieron de esa corrida. Mismo estándar de honestidad
-que `DISP-03/RESULTADOS-DISP03.md`: solo se reporta lo que de verdad se ejecutó y midió.
+Documenta la corrida real (2026-09-14) del escenario de Escalabilidad ESC-01
+(`experimento-arquitectura/contexto/escenarios_calidad.md`) contra infraestructura de GCP real
+desplegada para la ocasión (`hda-projectt`, 106 recursos, 7 stacks Terraform — ver
+`DESPLIEGUE-GCP-INTEGRAL.md`), más las decisiones de arquitectura, puntos de sensibilidad y
+tradeoffs que salieron de esa corrida. Mismo estándar de honestidad que
+`DISP-03/RESULTADOS-DISP03.md`: solo se reporta lo que de verdad se ejecutó y midió.
 
 **Alcance de este documento**: complementa (no reemplaza) las 5 columnas ATAM que
-`escenarios_calidad.md` todavía tiene pendientes para ESC-01/02/03 — decisión arquitectural,
+`escenarios_calidad.md` todavía tiene pendientes para ESC-01 — decisión arquitectural,
 puntos de sensibilidad, tradeoffs, riesgos, rationale — con evidencia real de una corrida
-contra GCP, no solo diseño en el papel. El veredicto formal cumple/no-cumple de cada
-escenario sigue siendo trabajo exclusivo de `validador-hipotesis`; aquí se documentan
+contra GCP, no solo diseño en el papel. El veredicto formal cumple/no-cumple del escenario
+sigue siendo trabajo exclusivo de `validador-hipotesis`; aquí se documentan
 mediciones crudas y las decisiones que las explican.
 
 ## 1. Resultados
@@ -20,21 +20,17 @@ mediciones crudas y las decisiones que las explican.
 
 | Escenario | Componente | p95 medido | Umbral | Throughput | % fallo | Veredicto crudo |
 |---|---|---|---|---|---|---|
-| ESC-02 (5x un partner) | DISP-03 | 260.4ms (partner pico) / 261.7ms (otros) | <300ms | 44.8 req/s, 14,789 requests | 0% | Dentro del umbral en ambas series; 0% rate-limiting cruzado |
 | ESC-01 (pico 4x, 1ª corrida) | Gestión de Trabajos | 14,208ms | <2,000ms | 216 req/s, 159,779 requests | 20.0% | Fuera del umbral — causa identificada (sección 3) |
 | ESC-01 (pico 4x, 2ª corrida, post-fix) | Gestión de Trabajos | 9,717ms | <2,000ms | 326 req/s, 244,801 requests | 11.9% | Mejora real (-32% p95, -40% tasa de fallo) pero sigue fuera del umbral |
-| ESC-03 (crecimiento 3x) | Gestión de Trabajos + DISP-03 | — | <300ms | — | — | No medido contra GCP: la única corrida post-fix se interrumpió antes de completar los 16 min |
 
 ### 1.2 Local (`docker-compose`, duración reducida ~2.2min/escenario para esta iteración — ver nota de comparabilidad en sección 2.7)
 
 | Escenario | Componente | p95 medido | Umbral | Throughput | % fallo | Veredicto crudo |
 |---|---|---|---|---|---|---|
-| ESC-02 (5x un partner, duración completa 5m30s) | DISP-03 | 6.4ms | <300ms | 48.8 req/s, 9,139 requests | 0% | Dentro del umbral, sin margen de duda |
 | ESC-01 (pico 4x, corta, sin Pulsar local arriba) | Gestión de Trabajos | 60,000ms (timeout) | <2,000ms | 71.7 req/s, 10,391 requests | 98.7% | Artefacto de entorno, no un resultado real — ver sección 2.7 |
 | ESC-01 (pico 4x, corta, con Pulsar local arreglado) | Gestión de Trabajos | 3,346ms | <2,000ms | 575.5 req/s, 74,818 requests | **0%** | Fuera del umbral de latencia, pero 100% de aceptación (`esc01_aceptacion_ok`: 1.0) y 0% de fallo HTTP |
-| ESC-03 (crecimiento 3x, corta, con Pulsar) | Gestión de Trabajos + DISP-03 | 16.7ms (trabajos) / 11.9ms (proveedores) | <300ms | 19.8 req/s, 2,674 requests | 0% | Dentro del umbral en ambas series |
 
-Detalle crudo en `k6/results/esc-0{1,2}-summary.json` (JSON completo de k6) y en
+Detalle crudo en `k6/results/esc-01-summary.json` (JSON completo de k6) y en
 `k6/README.md` (tabla resumen con fecha/entorno).
 
 ## 2. Decisiones de arquitectura tomadas en esta iteración
@@ -99,12 +95,11 @@ infraestructura" de este PR — quedan documentadas, no implementadas.
 
 ### 2.7 Comparación local vs. GCP — por qué los números salieron así (justificación)
 
-Se corrió una versión local de los 3 escenarios contra `docker-compose` para tener un punto de
-comparación sin costo. **Nota de comparabilidad**: ESC-01 y ESC-03 se corrieron con duración
-reducida (~2.2min por escenario en vez de 12-16min) para esta iteración puntual — las tasas
-objetivo (RPS pico) son las mismas, solo se sostiene el pico menos tiempo. ESC-02 sí se corrió a
-duración completa. Ningún número local reemplaza al de GCP; se usan para AISLAR variables, no
-para sustituir la medición formal.
+Se corrió una versión local de ESC-01 contra `docker-compose` para tener un punto de
+comparación sin costo. **Nota de comparabilidad**: se corrió con duración reducida (~2.2min en vez
+de 12min) para esta iteración puntual — las tasas objetivo (RPS pico) son las mismas, solo se
+sostiene el pico menos tiempo. Ningún número local reemplaza al de GCP; se usa para AISLAR
+variables, no para sustituir la medición formal.
 
 **Primer intento de ESC-01 local — un hallazgo, no un resultado real**: la primera corrida dio
 98.7% de fallo con p95 en el techo de 60s. Investigado con `docker logs`/`docker stats`: el
@@ -220,31 +215,28 @@ capacidad bruta ni a un bug de la aplicación en sí. Por orden de impacto esper
 3. **Repetir ESC-01 completo (12 min, no la versión corta) contra GCP** con `min_instance_count`
    elevado desde el inicio (evita cold starts a mitad de ráfaga, candidato #3) — comparar contra
    el resultado ya documentado con `min_instance_count=0`.
-4. **Terminar una corrida de ESC-03 completa (16 min) contra GCP real** — la única corrida
-   post-fix de concurrencia se interrumpió antes de terminar; localmente sí pasó limpio
-   (sección 1.2), pero eso no reemplaza la medición formal contra GCP.
-5. **Corregir `advertisedListeners` en `pulsar-infra/docker-compose.yml`** para que cualquier
+4. **Corregir `advertisedListeners` en `pulsar-infra/docker-compose.yml`** para que cualquier
    contenedor Docker (no solo el host) pueda conectarse — hoy requiere un override manual
    (sección 2.7) para poder correr pruebas locales realistas con Pulsar de verdad arriba. Mismo
    patrón que ya existe para GCP (`pulsar-infra/gcp/templates/docker-compose.override.yml`),
    trasladado a un archivo equivalente para desarrollo local.
-6. **Automatizar la creación del tenant/namespace de Pulsar en Terraform** (hoy es un paso
+5. **Automatizar la creación del tenant/namespace de Pulsar en Terraform** (hoy es un paso
    manual post-`apply`, sin el cual todo el camino de integración falla en silencio tras un
    `destroy`+`apply` limpio).
-7. **Decidir, como equipo, si vale la pena desplegar el consumidor de Reputación** (con uno de
+6. **Decidir, como equipo, si vale la pena desplegar el consumidor de Reputación** (con uno de
   los dos caminos ya documentados) para cerrar el ciclo de integración de punta a punta —
   confirmado que el mensaje llega al tópico, no que Reputación lo procese.
 
 ## Referencias
 
-- `experimento-arquitectura/contexto/escenarios_calidad.md` — definición fuente de ESC-01/02/03.
+- `experimento-arquitectura/contexto/escenarios_calidad.md` — definición fuente de ESC-01.
 - `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`, Regla 3 — exigencia de
   volúmenes reales/compresión temporal documentada.
 - `k6/README.md` — metodología de medición, factor de compresión por escenario, tabla de
   resultados.
-- `k6/results/esc-0{1,2}-summary.json` — JSON completo de k6 de las corridas contra GCP real.
-- `k6/results-local/*.json` — JSON completo de k6 de las corridas locales (sección 1.2/2.7);
-  `esc-01-corto-local.json` y `esc-03-corto-local.json` son las versiones de duración reducida
-  con Pulsar local ya funcionando (no la primera corrida sin Pulsar, descartada como artefacto).
+- `k6/results/esc-01-summary.json` — JSON completo de k6 de la corrida contra GCP real.
+- `k6/results-local/esc-01-corto-local.json` — JSON completo de k6 de la corrida local (sección
+  1.2/2.7), versión de duración reducida con Pulsar local ya funcionando (no la primera corrida
+  sin Pulsar, descartada como artefacto).
 - `DESPLIEGUE-GCP-INTEGRAL.md` — inventario completo de los 7 stacks, orden de apply/destroy, y
   el detalle técnico de cada uno de los 7 bugs reales encontrados.
