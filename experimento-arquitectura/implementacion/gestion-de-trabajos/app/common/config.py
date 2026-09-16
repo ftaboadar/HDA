@@ -24,6 +24,21 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg2://hda:hda@postgres:5432/gestion_trabajos"
 
+    # --- Pool de conexiones SQLAlchemy (ver docstring de app/common/db.py) ---
+    # Reemplazan el default de SQLAlchemy (pool_size=5 + max_overflow=10 = 15
+    # conexiones), insuficiente bajo ráfaga concurrente: hallazgo real de la
+    # prueba de carga de DISP-02 (agotamiento del pool con POST /novedades
+    # masivo) y sospechado como causa raíz de que ESC-01 siga sin pasar su
+    # umbral (<2s) en GCP con Cloud Run a max_instance_count=10 (ver
+    # RESULTADOS-ESCALABILIDAD-GCP.md, sección 3, punto 1). Configurables por
+    # variable de entorno (DB_POOL_SIZE, DB_MAX_OVERFLOW, DB_POOL_TIMEOUT)
+    # para poder subir/bajar el valor por instancia de Cloud Run sin tocar
+    # código, o bajarlos si el tier de Cloud SQL no soporta
+    # (pool_size+max_overflow) × max_instance_count conexiones simultáneas.
+    db_pool_size: int = 50
+    db_max_overflow: int = 50
+    db_pool_timeout: int = 30
+
     pulsar_service_url: str = "pulsar://localhost:6650"
     # Nombre completo de tópico persistente en Pulsar (namespace propio de
     # este servicio, ver 12-plan-entrega-4.md sección 3) — no solo el

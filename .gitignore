@@ -13,6 +13,7 @@ __pycache__/
 
 # Resultados de ejecución de experimentos (datos crudos, no versionados)
 experimento-arquitectura/implementacion/*/tests/results/*.jsonl
+experimento-arquitectura/implementacion/k6/results/*.jsonl
 
 # SO
 .DS_Store
