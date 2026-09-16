@@ -89,6 +89,44 @@ Recomendado: correr con `--out json=results/esc-01-raw.jsonl` además del `handl
 exporta el script, para tener el detalle punto-a-punto de cada request si se necesita
 diagnosticar un umbral incumplido.
 
+### Por qué correr k6 desde una VM y no en local
+
+`esc-01.js` usa el executor `ramping-arrival-rate` con `preAllocatedVUs: 200`/`maxVUs: 2000`
+(modelo abierto: sostiene la tasa objetivo, hasta 1157 req/s en el pico, sin importar cuánto
+tarden en responder las requests en vuelo). Con las latencias ya observadas contra GCP real bajo
+el escenario sin corregir (p95 de varios segundos, picos de hasta ~60s), sostener esa tasa exige
+mantener miles de conexiones TCP/TLS concurrentes abiertas. Corrido desde una laptop en una red
+doméstica, ese volumen de conexiones satura la tabla de NAT/conntrack (y la CPU) del router de
+consumo — tumba la conectividad de **toda** la red, no solo la de k6. Confirmado en esta sesión:
+correrlo en local contra las URLs de Cloud Run dejó sin red al resto de dispositivos de la casa.
+
+La corrida **local contra `docker-compose`** (sección de arriba) no tiene este problema — ese
+tráfico nunca sale de la máquina/red Docker interna. El problema es específico de apuntar
+`esc-01.js` a URLs públicas de Cloud Run desde una conexión residencial.
+
+**Solución**: `infra/` en este mismo directorio provisiona una VM de Compute Engine en
+`southamerica-east1` (misma región que el resto de los stacks) con k6 preinstalado y
+`esc-01.js`/`lib/config.js` embebidos tal cual — la carga sale desde la red de Google directo
+hacia Cloud Run, sin pasar por ningún router doméstico, y de paso da una medición más realista
+(sin la latencia/jitter de la conexión del desarrollador metida en el resultado).
+
+```bash
+cd infra
+terraform init
+terraform apply -var project_id=hda-projectt   # recursos facturables — confirmar antes de aplicar
+
+# entrar y correr la prueba:
+$(terraform output -raw ssh_iap_command)
+#   dentro de la VM:
+#   cd /opt/k6-runner
+#   k6 run -e DISP03_URL="..." -e GESTION_TRABAJOS_URL="..." --out json=results/esc-01-raw.jsonl esc-01.js
+
+# traer los resultados de vuelta:
+$(terraform output -raw scp_resultados_command)
+
+terraform destroy -var project_id=hda-projectt   # apagar la VM cuando ya no se necesite
+```
+
 ## Qué se validó de verdad en esta sesión (smoke test local)
 
 - **`esc-01.js`**: validado solo en modo `SMOKE` contra un puerto sin servidor arriba
