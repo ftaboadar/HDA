@@ -29,9 +29,20 @@ mediciones crudas y las decisiones que las explican.
 |---|---|---|---|---|---|---|
 | ESC-01 (pico 4x, corta, sin Pulsar local arriba) | Gestión de Trabajos | 60,000ms (timeout) | <2,000ms | 71.7 req/s, 10,391 requests | 98.7% | Artefacto de entorno, no un resultado real — ver sección 2.7 |
 | ESC-01 (pico 4x, corta, con Pulsar local arreglado) | Gestión de Trabajos | 3,346ms | <2,000ms | 575.5 req/s, 74,818 requests | **0%** | Fuera del umbral de latencia, pero 100% de aceptación (`esc01_aceptacion_ok`: 1.0) y 0% de fallo HTTP |
+| ESC-01 (pico 4x, **duración completa** ~10.9min, post pool de conexiones configurable — `db_pool_size`/`db_max_overflow`/`db_pool_timeout`, mismo default 50/50/30s) | Gestión de Trabajos | 7,869ms | <2,000ms | 333 req/s, 217,322 requests | 2.08% (`esc01_aceptacion_ok` 97.9%) | Mejora sobre la corrida corta anterior en fallo HTTP, pero **sigue fuera del umbral de latencia** — no se forzó el resultado |
+
+**Nota de comparabilidad**: la fila anterior usa la duración real del escenario (~10.9min, no la
+versión "corta" ~2.2min de las 2 filas de arriba), así que no es directamente comparable con ellas
+en throughput acumulado — sí lo es en p95, que es la métrica del umbral. Sigue sin confirmarse el
+candidato de causa raíz (tier de Cloud SQL / `containerConcurrency` insuficiente para el pico real,
+ver sección 3) porque el pool de conexiones ya no es el cuello de botella evidente al ser
+configurable y quedarse en el mismo valor (50/50) que la corrida GCP post-fix que dio 9,717ms —
+hacerlo configurable resuelve la operabilidad (retunear sin redeploy) pero no cierra por sí solo la
+brecha de latencia. Detalle crudo (post-fix) en `k6/results/esc-01-summary.json`; baseline
+pre-fix conservado en `k6/results/esc-01-summary-pre-pool-fix.json`.
 
 Detalle crudo en `k6/results/esc-01-summary.json` (JSON completo de k6) y en
-`k6/README.md` (tabla resumen con fecha/entorno).
+`k6/README.md` (tabla resumen con fecha/entorno, todavía no actualizada con esta corrida — pendiente).
 
 ## 2. Decisiones de arquitectura tomadas en esta iteración
 
