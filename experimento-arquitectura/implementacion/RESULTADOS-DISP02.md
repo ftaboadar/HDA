@@ -32,8 +32,8 @@ Agentes", que impone rate limiting. Umbral de la fila:
 | `crm_limite_rps` (mock, vía `POST /_control/config`) | 20 req/s | Límite real que el doble del CRM hace cumplir (ventana deslizante de 1s) |
 | `crm_limite_rps` (cliente, `settings`) | 20 req/s | Igual al del mock — evita que el token bucket del cliente dispare 429 innecesarios por exceso propio |
 | `throttler_cola_tamano` | 10.000 (default, sin cambios) | Suficiente para N=2.000 de esta corrida; no hizo falta subirlo |
-| `throttler_max_reintentos` | 5 (default, sin cambios) | No hizo falta subirlo — los reintentos por 429 se resuelven con 1-2 intentos usando `Retry-After` |
-| `throttler_backoff_base_s` / `throttler_backoff_max_s` | 0.5 / 30.0 (default, sin cambios) | No aplica en la práctica: casi todos los reintentos usan `Retry-After` del CRM (1s fijo), no el backoff local |
+| `throttler_max_reintentos` | 6 (`docker-compose.disp02.yml`, distinto del default 5) | No hizo falta agotarlo — los reintentos por 429 se resuelven con 1-3 intentos usando `Retry-After` |
+| `throttler_backoff_base_s` / `throttler_backoff_max_s` | 0.3 / 10.0 (`docker-compose.disp02.yml`, distinto del default 0.5/30.0) | No aplica en la práctica: casi todos los reintentos usan `Retry-After` del CRM (1s fijo), no el backoff local |
 | `N_NOVEDADES` (tamaño de la ráfaga) | 2.000 | Lectura literal de "miles" (plural) del estímulo de DISP-02; ~25x el piso mínimo de "más de 4x" el límite del CRM (4×20=80) |
 | Conexiones del pool de Postgres (`common/db.py`) | `pool_size=50, max_overflow=50` (subido del default 5+10) | Ajuste real necesario — ver "Qué se ajustó y por qué" |
 | Executor por defecto de asyncio (`api/main.py`) | `ThreadPoolExecutor(max_workers=100)` (subido del default ~20) | Ajuste real necesario — ver abajo |
