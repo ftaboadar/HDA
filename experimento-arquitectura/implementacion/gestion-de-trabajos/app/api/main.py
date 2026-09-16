@@ -14,22 +14,43 @@ Pulsar, publicado dentro de `CrearTrabajo`.
 Nota (separación de Pagos): las rutas `POST /pagos`, `GET /pagos/{id}` y
 `POST /pagos/{id}/compensar` que antes vivían aquí como submódulo ACL se
 movieron al microservicio independiente `implementacion/pagos/` — ver su
-README.md."""
+README.md.
+
+DISP-02 (Sidecar/Throttler hacia el CRM "Gestión de Agentes", ver
+`escenarios_calidad.md`): `POST /novedades` responde `202 Accepted` de
+inmediato — no espera la entrega real al CRM externo (eso lo hace, en
+background, `ThrottlerCrm`, arrancado en `startup` y cancelado limpio en
+`shutdown`)."""
 
 from __future__ import annotations
 
 import asyncio
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, HTTPException
 
 from app.application.commands.crear_trabajo import CrearTrabajo
+from app.application.commands.publicar_novedad import PublicarNovedad
+from app.application.queries.consultar_novedad import ConsultarNovedad
 from app.application.queries.consultar_trabajo import ConsultarTrabajo
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging, log_evento
-from app.common.schemas import TrabajoCreate, TrabajoIdOut, TrabajoOut
+from app.common.schemas import (
+    NovedadCreate,
+    NovedadIdOut,
+    NovedadOut,
+    TrabajoCreate,
+    TrabajoIdOut,
+    TrabajoOut,
+)
 from app.domain.trabajo.trabajo import Trabajo
+from app.infrastructure.adapters.throttler_crm import AdaptadorGestionAgentesHttp
 from app.infrastructure.messaging.publicador_pulsar import PublicadorPulsar
+from app.infrastructure.messaging.throttler import ThrottlerCrm
+from app.infrastructure.persistence.novedad_repository_sqlalchemy import (
+    NovedadRepositorySQLAlchemy,
+)
 from app.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import (
     RegistroTrabajosRepositorySQLAlchemy,
 )
@@ -43,6 +64,10 @@ app = FastAPI(title="Gestión de Trabajos — API (Entrega 4 PoC, skeleton)")
 _trabajo_repo = TrabajoRepositorySQLAlchemy()
 _registro_repo = RegistroTrabajosRepositorySQLAlchemy()
 _publicador = PublicadorPulsar()
+
+_novedad_repo = NovedadRepositorySQLAlchemy()
+_crm_puerto = AdaptadorGestionAgentesHttp()
+_throttler = ThrottlerCrm(puerto_crm=_crm_puerto, repo=_novedad_repo)
 
 
 def _trabajo_a_schema(t: Trabajo) -> TrabajoOut:
@@ -60,7 +85,28 @@ def _trabajo_a_schema(t: Trabajo) -> TrabajoOut:
 @app.on_event("startup")
 async def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    # Sube el executor por defecto de asyncio (default: min(32, cpu+4)
+    # threads) a un tamaño acorde al pool de conexiones de
+    # `common/db.py` (50+50). Cada `asyncio.to_thread(repo.guardar, ...)`
+    # (ver `application/commands/publicar_novedad.py`) necesita un hilo
+    # propio mientras espera su turno de conexión a Postgres — con el
+    # default de ~20 hilos, una ráfaga de miles de `POST /novedades`
+    # concurrentes (DISP-02, ver
+    # tests/integracion/test_disp02_throttler.py) generaba una cola de
+    # hilos que hacía que las peticiones HTTP entrantes tardaran más de lo
+    # que el cliente de prueba esperaba (hallazgo real de la primera
+    # corrida de esta tarea: `httpx.PoolTimeout` del lado del cliente).
+    asyncio.get_event_loop().set_default_executor(
+        ThreadPoolExecutor(max_workers=100)
+    )
+    _throttler.iniciar()
     log_evento(logger, "api_iniciada")
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    await _throttler.detener()
+    log_evento(logger, "api_detenida")
 
 
 @app.get("/salud")
@@ -88,3 +134,33 @@ async def obtener_trabajo(trabajo_id: uuid.UUID):
     if trabajo is None:
         raise HTTPException(status_code=404, detail="no encontrado")
     return _trabajo_a_schema(trabajo)
+
+
+@app.post("/novedades", response_model=NovedadIdOut, status_code=202)
+async def publicar_novedad(payload: NovedadCreate):
+    """202 Accepted, no 201 Created: la `Novedad` ya quedó persistida como
+    PENDIENTE y encolada en el Throttler, pero su entrega real al CRM
+    "Gestión de Agentes" es asíncrona (DISP-02) — el código de estado deja
+    explícito que la petición fue aceptada para proceso, no completada."""
+    comando = PublicarNovedad(_novedad_repo, _throttler)
+    novedad_id = await comando.ejecutar(payload.trabajo_id, payload.descripcion)
+    log_evento(logger, "novedad_publicada", novedad_id=str(novedad_id))
+    return NovedadIdOut(id=novedad_id)
+
+
+@app.get("/novedades/{novedad_id}", response_model=NovedadOut)
+async def obtener_novedad(novedad_id: uuid.UUID):
+    """Agregado en esta tarea (DISP-02) — ver docstring de
+    `application/queries/consultar_novedad.py`."""
+    query = ConsultarNovedad(_novedad_repo)
+    novedad = await asyncio.to_thread(query.ejecutar, str(novedad_id))
+    if novedad is None:
+        raise HTTPException(status_code=404, detail="no encontrada")
+    return NovedadOut(
+        id=novedad.id,
+        trabajo_id=novedad.trabajo_id.valor,
+        descripcion=novedad.descripcion,
+        estado=novedad.estado.value,
+        intentos=novedad.intentos,
+        creado_en=novedad.creado_en,
+    )

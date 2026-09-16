@@ -16,7 +16,7 @@ finalizaron y en qué términos."""
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Numeric, String
+from sqlalchemy import Column, DateTime, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.common.db import Base
@@ -56,3 +56,21 @@ class RegistroTrabajoElegibleORM(Base):
     monto = Column(Numeric, nullable=False)
     moneda = Column(String, nullable=False)
     region = Column(String, nullable=False)
+
+
+class NovedadORM(Base):
+    """Persistencia real (Regla 5, criterio 3) del agregado `Novedad`
+    (DISP-02, Sidecar/Throttler hacia el CRM "Gestión de Agentes" — ver
+    `domain/novedades/novedad.py`). Tabla propia, independiente de
+    `trabajos`: `Novedad` es su propio agregado raíz (ver docstring de ese
+    archivo sobre la inconsistencia explícita con
+    `07-vista-informacion.puml`)."""
+
+    __tablename__ = "novedades"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trabajo_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    descripcion = Column(String, nullable=False)
+    estado = Column(String, nullable=False, default="PENDIENTE", index=True)
+    intentos = Column(Integer, nullable=False, default=0)
+    creado_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)

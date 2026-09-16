@@ -1,0 +1,18 @@
+# Doble standalone del CRM "Gestión de Agentes" (DISP-02, ver
+# escenarios_calidad.md). Puerto 9200 en el host para que coincida con el
+# default de `crm_mock_url` en gestion-de-trabajos/app/common/config.py.
+#
+# Para la prueba de carga end-to-end (DISP-02) no se usa este compose
+# standalone directamente: se usa
+# `gestion-de-trabajos/docker-compose.disp02.yml`, que construye este mismo
+# Dockerfile pero conectado a la red por defecto de ese compose (así la API
+# de gestion-de-trabajos alcanza a este mock por nombre de servicio,
+# `mock-crm`, sin depender de `host.docker.internal`). Este compose queda
+# para levantar el mock de forma aislada (debug manual, `curl` directo).
+
+services:
+  mock-crm:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "9200:8000"
