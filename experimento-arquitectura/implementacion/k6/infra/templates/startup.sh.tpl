@@ -25,3 +25,11 @@ ${config_content}
 CONFIG_EOF
 
 mkdir -p /opt/k6-runner/results
+
+# Este script corre como root; quien entra por `gcloud compute ssh` es un
+# usuario normal (su propia cuenta IAM/OS Login) y necesita poder escribir
+# en results/ para que `k6 run --out json=...` y `handleSummary` no fallen
+# con "permission denied" (encontrado en la primera corrida real desde esta
+# VM — no lo atrapaba ni el plan ni el apply, solo correr el test de
+# verdad).
+chmod -R 777 /opt/k6-runner
