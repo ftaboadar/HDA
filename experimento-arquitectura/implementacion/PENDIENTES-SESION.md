@@ -55,10 +55,9 @@ prompts separados — pídelos aparte", así que no se generaron sin pedido expl
   tradeoffs, riesgos, rationale+diagrama) — solo ESC-01 y DISP-03 los tienen completos. (*ESC-02/03
   fuera de alcance del proyecto, pero la fila puede seguir en el documento histórico — confirmar si
   toca borrarla también ahí.)
-- `06-vista-cyc.puml` todavía nombra el tópico `trabajo.completado` (`T4`) con consumidores
-  `Reputación`/`Scoring` — nomenclatura vieja; el plan de Entrega 4 lo renombra a
-  `trabajos.finalizado` con consumidores **Proveedores** y **Reputación**. Ver pendiente #7 en
-  `escenarios_calidad.md`.
+- **[Cerrado]** `06-vista-cyc.puml` renombrado a `trabajos.finalizado` con consumidores
+  **Proveedores** y **Reputación** (se quitó `Scoring`, que no consume este evento). Ver
+  pendiente #7 en `escenarios_calidad.md`.
 - `07-vista-informacion.puml` no tiene `Moneda`/`Pais` explícitos aunque el código de `pagos/` ya
   los resolvió de facto (`Dinero.moneda`, `Region`) — ver "Veredicto" de `RESULTADOS-MOD02.md`.
 - DISP-02: brechas 1-7 documentadas en el cierre de `RESULTADOS-DISP02.md` (carga sostenida real en

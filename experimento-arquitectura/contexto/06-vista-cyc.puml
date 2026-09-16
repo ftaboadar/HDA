@@ -14,6 +14,12 @@
 ' Verificación (submódulo de Proveedores, DISP-03) con su propia cola, DLQ y el
 ' Contexto Externo de verificación (Policía/RUES/Certificadora), validado
 ' empíricamente en implementacion/DISP-03/ (commits ca76f60..ef391c5 contra GCP real).
+'
+' Cierra pendiente #7 (ver contexto/escenarios_calidad.md, sección "Pendientes"):
+' el tópico T4 se llamaba "trabajo.completado" con consumidores Reputación y
+' Scoring — nomenclatura previa a 12-plan-entrega-4.md, que lo renombra a
+' "trabajos.finalizado" y fija los consumidores reales de la Entrega 4 como
+' Proveedores y Reputación (Scoring no consume este evento).
 
 skinparam componentStyle rectangle
 skinparam component {
@@ -53,7 +59,7 @@ queue "Message Broker" {
   component "trabajo.intencion" as T1
   component "trabajo.siniestro" as T2
   component "trabajo.suscripcion" as T3
-  component "trabajo.completado" as T4
+  component "trabajos.finalizado" as T4
   component "DLQ trabajo.fallidos" as DLQ <<sensible>>
 }
 
@@ -71,8 +77,7 @@ component "Gestión de Agentes" as AGT <<externo>>
 component "Pagos" as PAG <<externo>>
 
 cloud "Procesos consumidores (async)" {
-  component "Reputación\n(consumer group)" as REP <<proceso>>
-  component "Scoring\n(consumer group)" as SCR <<proceso>>
+  component "Reputación\n(consumer liviano,\nEvent Sourcing)" as REP <<proceso>>
 }
 
 ' --- Runtime de Proveedores / Verificación — DISP-03 ---
@@ -120,9 +125,18 @@ T3 ..> GT : consume
 T2 ..> DLQ : reintentos\nagotados (pico 4x)
 
 GT --> DB : lee / escribe\nagregado Trabajo
-GT ..> T4 : publica evento
-T4 ..> REP : consume
-T4 ..> SCR : consume
+GT ..> T4 : publica evento\n(gordo, con carga de estado)
+T4 ..> REP : consume (subscription propia,\nliviano: recibe y registra)
+T4 ..> PRV : consume (subscription propia,\nliviano: recibe y registra,\nEntrega 4)
+
+note right of T4
+  **ESC-01** (ver contexto/escenarios_calidad.md)
+  Tópico Pulsar particionado, con subscription
+  independiente por consumidor (Proveedores,
+  Reputación) — el lag de uno no bloquea al otro.
+  Auto-scaling de ambos disparado por el lag de
+  su propia subscription (API de stats de Pulsar).
+end note
 
 GT --> ACL1
 GT --> ACL2
