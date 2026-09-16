@@ -1,14 +1,14 @@
 """Adaptador concreto de `IRegistroTrabajosRepository` sobre
 SQLAlchemy/Postgres — única pieza que traduce entre `RegistroTrabajoElegible`
-(puerto de aplicación de ESTE servicio) y `RegistroTrabajoElegibleORM`
-(persistencia). Mismo principio que `trabajo_repository_sqlalchemy.py`."""
+(puerto de aplicación) y `RegistroTrabajoElegibleORM` (persistencia). Mismo
+principio que `pago_repository_sqlalchemy.py` / `trabajo_repository_sqlalchemy.py`."""
 
 from app.application.ports.registro_trabajos import (
     IRegistroTrabajosRepository,
     RegistroTrabajoElegible,
 )
 from app.common.db import SessionLocal
-from app.domain.trabajo.value_objects import ProveedorId, Region, TrabajoId
+from app.domain.pagos.value_objects import ProveedorId, Region, TrabajoId
 from app.infrastructure.persistence.models_db import RegistroTrabajoElegibleORM
 
 

@@ -1,7 +1,7 @@
 """Engine/sesión SQLAlchemy — persistencia real (Postgres), no un dict en
-memoria. Desde la separación de Pagos en su propio microservicio (ver
-`implementacion/pagos/README.md`), esta base de datos solo cubre las tablas
-de Gestión de Trabajos (`trabajos`, `trabajos_elegibles_pago`)."""
+memoria. Base de datos propia de este microservicio (`hda_pagos`), separada
+de la de Gestión de Trabajos desde que Pagos dejó de ser un submódulo ACL
+dentro de ese proceso (ver README.md, sección "Frontera del API")."""
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker

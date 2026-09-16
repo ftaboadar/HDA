@@ -9,14 +9,19 @@ sin ningún punto de despacho desacoplado ni ninguna reacción de otro módulo
 del servicio (hallazgo de auditoría, Regla 5 criterio 4).
 
 Reacciones registradas para `TrabajoFinalizado`:
-1. Módulo Pagos (MISMO servicio, `application/ports/registro_trabajos.py`):
-   se entera de que el trabajo existe y en qué términos, sin tocar
-   `ITrabajoRepository` (el repositorio del OTRO módulo) — así
-   `PagarTrabajo` puede depender solo de este registro. Esta es la
-   comunicación intra-servicio por eventos que exige el criterio.
+1. Registro local `IRegistroTrabajosRepository`
+   (`application/ports/registro_trabajos.py`): deja trazado qué trabajos
+   finalizaron y en qué términos, sin acoplar este módulo a nada externo.
 2. Evento de INTEGRACIÓN hacia otros microservicios (Proveedores,
    Reputación) vía `IPublicador` — mismo comportamiento que existía antes,
-   solo que ahora vive aquí en vez de estar inline en el comando."""
+   solo que ahora vive aquí en vez de estar inline en el comando.
+
+Separación de Pagos (ver `implementacion/pagos/README.md`): el agregado
+`Pago` y sus eventos de dominio (`PagoMarcadoExitoso`, `PagoMarcadoFallido`,
+`PagoCompensado`) se movieron a ese microservicio independiente — este
+dispatcher ya NO los conoce ni los despacha; su propia copia de este mismo
+archivo, en `implementacion/pagos/app/application/dispatcher_eventos_dominio.py`,
+es quien ahora los despacha dentro de ese proceso."""
 
 from __future__ import annotations
 
@@ -28,11 +33,6 @@ from app.application.ports.registro_trabajos import (
     RegistroTrabajoElegible,
 )
 from app.common.logging_utils import configurar_logging, log_evento
-from app.domain.pagos.eventos import (
-    PagoCompensado,
-    PagoMarcadoExitoso,
-    PagoMarcadoFallido,
-)
 from app.domain.seedwork.domain_event import DomainEvent
 from app.domain.trabajo.eventos import TrabajoFinalizado
 
@@ -48,21 +48,6 @@ async def despachar(
     for evento in eventos:
         if isinstance(evento, TrabajoFinalizado):
             await _reaccionar_trabajo_finalizado(evento, publicador, registro_repo)
-        elif isinstance(
-            evento, (PagoMarcadoExitoso, PagoMarcadoFallido, PagoCompensado)
-        ):
-            # Ningún módulo reacciona todavía a estos (Pagos no tiene
-            # tópico propio, ver ports/publicador.py) — se despachan igual
-            # para que quede trazado el evento real, no solo la asignación
-            # de atributo dentro de Pago. Extensible sin tocar Pago.py el
-            # día que algo deba reaccionar (ej. una notificación).
-            log_evento(
-                logger,
-                "evento_dominio_pago_despachado",
-                tipo=evento.tipo,
-                pago_id=str(evento.pago_id),
-                trabajo_id=str(evento.trabajo_id),
-            )
 
 
 async def _reaccionar_trabajo_finalizado(

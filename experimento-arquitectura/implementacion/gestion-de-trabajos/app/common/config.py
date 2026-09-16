@@ -3,10 +3,11 @@ patrón que implementacion/DISP-03/app/common/config.py.
 
 Los valores por defecto asumen desarrollo local. `pulsar_service_url`
 apunta al cluster local que construye Daniel en
-`implementacion/pulsar-infra/` (ver 12-plan-entrega-4.md sección 3);
-`stripe_mock_url`/`mercadopago_mock_url` apuntan a los mocks que construye
-Johan en `implementacion/mocks-pagos/` — ambos son stubs razonables para no
-bloquear este desarrollo mientras esas piezas se terminan en paralelo."""
+`implementacion/pulsar-infra/` (ver 12-plan-entrega-4.md sección 3).
+
+Separación de Pagos: `stripe_mock_url`/`mercadopago_mock_url` (mocks de
+Stripe/MercadoPago) se movieron a `implementacion/pagos/app/common/config.py`
+— ya no se usan en este servicio."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,13 +25,6 @@ class Settings(BaseSettings):
     pulsar_topic_trabajos_finalizado: str = (
         "persistent://hda/gestion-trabajos/trabajos.finalizado"
     )
-
-    # Mocks de sistemas externos (Pagos, GENERIC_SUBDOMAIN — ver
-    # 12-plan-entrega-4.md sección 0.1). Stub local por defecto: cada quien
-    # levanta implementacion/mocks-pagos/ para probar contra algo real.
-    stripe_mock_url: str = "http://localhost:9100"
-    mercadopago_mock_url: str = "http://localhost:9100"
-    http_timeout_s: float = 5.0
 
 
 settings = Settings()

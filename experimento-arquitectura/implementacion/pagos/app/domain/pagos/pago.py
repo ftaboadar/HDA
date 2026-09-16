@@ -1,10 +1,9 @@
-"""Agregado `Pago` — raíz de agregado propia del submódulo ACL de Pagos
-(distinta de `Trabajo`, aunque vivan en el mismo microservicio/BD). No
-existe en 07-vista-informacion.puml (ver docstring de
-`domain/trabajo/trabajo.py` para la nota de inconsistencia explícita) —
-Pagos es un `GENERIC_SUBDOMAIN` comprado (Stripe/MercadoPago), este
-agregado es solo el registro local de qué se le pidió cobrar/compensar a
-ese sistema externo, no una reimplementación de su dominio."""
+"""Agregado `Pago` — raíz de agregado propia del microservicio Pagos. No
+existe en 07-vista-informacion.puml (inconsistencia explícita, ver README.md
+de este servicio, sección "Qué falta") — Pagos es un `GENERIC_SUBDOMAIN`
+comprado (Stripe/MercadoPago), este agregado es solo el registro local de
+qué se le pidió cobrar/compensar a ese sistema externo, no una
+reimplementación de su dominio."""
 
 from __future__ import annotations
 
@@ -16,9 +15,15 @@ from app.domain.pagos.eventos import (
     PagoMarcadoExitoso,
     PagoMarcadoFallido,
 )
-from app.domain.pagos.value_objects import EstadoPago, PagoId, Pasarela
+from app.domain.pagos.value_objects import (
+    Dinero,
+    EstadoPago,
+    PagoId,
+    Pasarela,
+    Region,
+    TrabajoId,
+)
 from app.domain.seedwork.aggregate_root import AggregateRoot
-from app.domain.trabajo.value_objects import Dinero, Region, TrabajoId
 
 
 class ErrorTransicionInvalidaPago(Exception):

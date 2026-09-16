@@ -8,8 +8,7 @@ from decimal import Decimal
 import pytest
 
 from app.domain.pagos.fabrica import FabricaPago
-from app.domain.pagos.value_objects import Pasarela
-from app.domain.trabajo.value_objects import Dinero, Region, TrabajoId
+from app.domain.pagos.value_objects import Dinero, Pasarela, Region, TrabajoId
 from app.infrastructure.adapters.regla_brasil import ReglaBrasil
 from app.infrastructure.adapters.regla_colombia import ReglaColombia
 

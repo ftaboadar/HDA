@@ -14,8 +14,7 @@ from app.application.commands.compensar import Compensar, PagoNoEncontrado
 from app.domain.pagos.eventos import PagoCompensado
 from app.domain.pagos.fabrica import FabricaPago
 from app.domain.pagos.pago import Pago
-from app.domain.pagos.value_objects import EstadoPago, Pasarela
-from app.domain.trabajo.value_objects import Dinero, Region, TrabajoId
+from app.domain.pagos.value_objects import Dinero, EstadoPago, Pasarela, Region, TrabajoId
 
 
 class _PagoRepositorioFalso:

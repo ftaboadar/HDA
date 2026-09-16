@@ -17,8 +17,9 @@ comando dejaba el evento acumulado en el agregado sin recogerlo ni
 despacharlo, perdiéndose en silencio al salir de scope).
 
 CORRECCIÓN (encontrada corriendo k6 real contra GCP, ver
-`crear_trabajo.py` para el hallazgo completo): `_pago_repo` es síncrono —
-envuelto en `asyncio.to_thread` para no bloquear el event loop."""
+`gestion-de-trabajos/app/application/commands/crear_trabajo.py` para el
+hallazgo completo): `_pago_repo` es síncrono — envuelto en
+`asyncio.to_thread` para no bloquear el event loop."""
 
 import asyncio
 import uuid

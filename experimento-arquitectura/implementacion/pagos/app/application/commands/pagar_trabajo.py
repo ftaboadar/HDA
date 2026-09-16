@@ -1,28 +1,29 @@
 """Comando `PagarTrabajo` — usa la Strategy `ReglaRegional` (selecciona la
 regla según la región del trabajo) y el Adapter `IPasarelaDePago`
-(selecciona la pasarela pedida por el cliente HTTP). Ninguna llamada a
-Pulsar aquí: Pagos no tiene tópico propio (12-plan-entrega-4.md sección 3)
-— la única comunicación que cruza el proceso es el HTTP síncrono hacia el
-mock externo, permitido explícitamente por la sección 3.1 del plan.
+(selecciona la pasarela pedida por el cliente HTTP). Este microservicio no
+tiene tópico de integración propio — la única comunicación que cruza el
+proceso es el HTTP síncrono hacia el mock externo (Stripe/MercadoPago).
 
-Regla 5, criterio 4: este comando ya NO recibe `ITrabajoRepository` (el
-repositorio del módulo Trabajo) inyectado — antes lo usaba para leer
-`region`/`monto` directamente, acoplando Pagos al repositorio ajeno en vez
-de a un evento. Ahora depende solo de `IRegistroTrabajosRepository`
-(`app/application/ports/registro_trabajos.py`), poblado exclusivamente por
-`application/dispatcher_eventos_dominio.py` al reaccionar al evento de
-dominio `TrabajoFinalizado`. Si no hay registro para ese `trabajo_id`, es
-porque Pagos nunca fue notificado de que ese trabajo existe/finalizó — el
+Regla 5, criterio 4: este comando NO recibe el repositorio del agregado
+`Trabajo` (eso vive en OTRO microservicio, Gestión de Trabajos) — depende
+solo de `IRegistroTrabajosRepository`
+(`app/application/ports/registro_trabajos.py`), un registro propio de este
+servicio. Antes de la separación en microservicios, ese registro lo poblaba
+`application/dispatcher_eventos_dominio.py` reaccionando al evento de
+DOMINIO `TrabajoFinalizado` intra-proceso; ahora lo puebla `POST /pagos`
+(`app/api/main.py`) explícitamente en el mismo request, a partir de los
+datos que el cliente HTTP ya conoce del trabajo (ver README.md, sección
+"Frontera del API", para la justificación completa de este cableado nuevo).
+Si no hay registro para ese `trabajo_id`, es porque nunca se pobló — el
 mismo caso que antes se reportaba como "trabajo no encontrado".
 
 CQS: `ejecutar()` retorna solo el `id` del pago creado.
 
-CORRECCIÓN (encontrada corriendo k6 real contra GCP): `_registro_repo`/
-`_pago_repo` son síncronos (SQLAlchemy) — invocados directo dentro de este
-`async def` bloqueaban el event loop del worker en cada llamada. Mismo
-hallazgo y mismo fix que `crear_trabajo.py` (ver su docstring), aplicado
-aquí por consistencia aunque este comando no fue el que ESC-01 midió
-directamente."""
+CORRECCIÓN (encontrada corriendo k6 real contra GCP, heredada de
+`gestion-de-trabajos/app/application/commands/crear_trabajo.py`):
+`_registro_repo`/`_pago_repo` son síncronos (SQLAlchemy) — invocados directo
+dentro de este `async def` bloquearían el event loop del worker en cada
+llamada, por eso van envueltos en `asyncio.to_thread`."""
 
 from __future__ import annotations
 
@@ -36,8 +37,7 @@ from app.common.logging_utils import configurar_logging, log_evento
 from app.domain.pagos.fabrica import FabricaPago
 from app.domain.pagos.regla_regional import ReglaRegional
 from app.domain.pagos.repository import IPagoRepository
-from app.domain.pagos.value_objects import Pasarela
-from app.domain.trabajo.value_objects import Dinero, Region, TrabajoId
+from app.domain.pagos.value_objects import Dinero, Pasarela, Region, TrabajoId
 
 logger = configurar_logging("application.commands.pagar_trabajo")
 

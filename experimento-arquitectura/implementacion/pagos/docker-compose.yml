@@ -1,0 +1,36 @@
+# Postgres real (Regla 5, criterio 3: persistencia real) + API de Pagos.
+# Mismo patrón que gestion-de-trabajos/docker-compose.yml — sin Pulsar ni
+# los mocks de pagos como dependencias obligatorias: las URLs de los mocks
+# son solo necesarias para POST /pagos, no para que la API arranque ni para
+# GET /salud.
+#
+# Puerto de Postgres publicado en 5435 (no 5432/5433/5434, ya usados por
+# DISP-03/reputación/gestión-de-trabajos respectivamente) para poder correr
+# los 4 en paralelo sin choque. API en el puerto host 8003.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hda
+      POSTGRES_PASSWORD: hda
+      POSTGRES_DB: hda_pagos
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hda -d hda_pagos"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  api:
+    build: .
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    restart: on-failure:5
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/hda_pagos
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy

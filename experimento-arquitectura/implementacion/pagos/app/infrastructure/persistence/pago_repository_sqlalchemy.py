@@ -5,8 +5,14 @@ traduce entre `Pago` (dominio) y `PagoORM` (persistencia)."""
 from app.common.db import SessionLocal
 from app.domain.pagos.pago import Pago
 from app.domain.pagos.repository import IPagoRepository
-from app.domain.pagos.value_objects import EstadoPago, PagoId, Pasarela
-from app.domain.trabajo.value_objects import Dinero, Region, TrabajoId
+from app.domain.pagos.value_objects import (
+    Dinero,
+    EstadoPago,
+    PagoId,
+    Pasarela,
+    Region,
+    TrabajoId,
+)
 from app.infrastructure.persistence.models_db import PagoORM
 
 

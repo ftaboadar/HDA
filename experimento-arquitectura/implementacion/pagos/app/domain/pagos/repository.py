@@ -5,8 +5,7 @@ app/infrastructure/persistence/pago_repository_sqlalchemy.py."""
 import abc
 
 from app.domain.pagos.pago import Pago
-from app.domain.pagos.value_objects import PagoId
-from app.domain.trabajo.value_objects import TrabajoId
+from app.domain.pagos.value_objects import PagoId, TrabajoId
 
 
 class IPagoRepository(abc.ABC):

@@ -1,8 +1,9 @@
 """Puerto genérico de repositorio — cada agregado define su propia interfaz
-concreta (ver app/domain/trabajo/repository.py y app/domain/pagos/repository.py)
-siguiendo esta forma; no se fuerza herencia porque Python no exige ABC
-genérica para que el patrón funcione, pero queda documentado el contrato
-esperado aquí."""
+concreta (ver app/domain/trabajo/repository.py; el agregado `Pago` tenía la
+suya análoga aquí antes de moverse a su propio microservicio, ver
+`implementacion/pagos/app/domain/pagos/repository.py`) siguiendo esta forma;
+no se fuerza herencia porque Python no exige ABC genérica para que el
+patrón funcione, pero queda documentado el contrato esperado aquí."""
 
 import abc
 from typing import Generic, TypeVar

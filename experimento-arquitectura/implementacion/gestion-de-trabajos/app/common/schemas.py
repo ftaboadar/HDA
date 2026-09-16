@@ -33,24 +33,3 @@ class TrabajoOut(BaseModel):
     moneda: str
     region: str
     fecha_creacion: datetime
-
-
-class PagoCreate(BaseModel):
-    trabajo_id: uuid.UUID
-    pasarela: str  # "stripe" | "mercadopago"
-
-
-class PagoIdOut(BaseModel):
-    id: uuid.UUID
-
-
-class PagoOut(BaseModel):
-    id: uuid.UUID
-    trabajo_id: uuid.UUID
-    monto: Decimal
-    moneda: str
-    region: str
-    pasarela: str
-    estado: str
-    referencia_externa: str | None = None
-    motivo_falla: str | None = None

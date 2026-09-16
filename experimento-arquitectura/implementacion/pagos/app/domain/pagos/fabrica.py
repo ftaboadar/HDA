@@ -5,8 +5,7 @@ falla."""
 import uuid
 
 from app.domain.pagos.pago import Pago
-from app.domain.pagos.value_objects import Pasarela
-from app.domain.trabajo.value_objects import Dinero, Region, TrabajoId
+from app.domain.pagos.value_objects import Dinero, Pasarela, Region, TrabajoId
 
 
 class FabricaPago:
