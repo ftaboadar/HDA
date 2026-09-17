@@ -40,23 +40,33 @@ variable "sql_tier" {
     (15 por instancia × max_instance_count=20 = 300, 75% de 400) deja
     margen razonable SIN subir de tier ni fijar `database_flags` manual.
 
-    CONFIRMADO (no ya condicional): con la sobresuscripción resuelta (15/15/15)
-    y el cold-start del autoscaler resuelto (min_instance_count=10, ver
-    service.tf), la corrida de ESC-01 llegó a 100% de aceptación / 0% de
-    fallo, pero Cloud SQL quedó al 99.5% de CPU sostenido durante todo el
-    pico (verificado con Cloud Monitoring, métrica
-    cloudsql.googleapis.com/database/cpu/utilization, ventana
-    2026-09-17T00:04-00:10Z) con solo ~150 conexiones activas (muy por
-    debajo de max_connections=400) -- el cuello de botella real ahora es
-    cómputo, no cantidad de conexiones. Subido a `db-custom-4-15360`
-    (4 vCPU / 15GB, el doble de cómputo), que también sube `max_connections`
-    al bucket de 500 (más margen para una futura subida de concurrency).
-    Managed Connection Pooling (Cloud SQL Enterprise Plus) o PgBouncer
-    siguen sin justificarse a esta escala (cientos de conexiones, no miles;
-    el problema es CPU, no cantidad de conexiones).
+    Con la sobresuscripción resuelta (15/15/15) y el cold-start del
+    autoscaler resuelto (min_instance_count=10, ver service.tf), la corrida
+    de ESC-01 llegó a 100% de aceptación / 0% de fallo con ESTE tier
+    (db-custom-2-7680) -- p95 5646ms, la mejor corrida real hasta ahora
+    (2026-09-17, ver k6/results/esc-01-summary-min-instances-fix.json).
+    Cloud SQL quedó al 99.5% de CPU sostenido durante el pico en esa
+    corrida.
+
+    SE PROBÓ subir a `db-custom-4-15360` (4 vCPU/15GB, doble de cómputo)
+    esperando aliviar ese 99.5% de CPU -- **empeoró de forma reproducible**
+    en 2 corridas independientes (p95 7352ms y 7521ms, 3.7-4.6% de fallo,
+    miles de "no available instance" en los logs de Cloud Run, ver
+    k6/results/esc-01-summary-tier4-fix.json y RESULTADOS-ESCALABILIDAD-GCP.md
+    sección "Anomalía sin resolver"). Se descartaron 2 hipótesis: (1) ruido
+    de reinicio de la instancia -- descartado corriendo de nuevo con la
+    instancia estable 20+ min; (2) pools de conexión stale en las instancias
+    de Cloud Run que llevaban corriendo desde antes del cambio de tier --
+    descartado forzando un redeploy completo (instancias 100% nuevas, pools
+    frescos) y el resultado siguió siendo peor (p95 8612ms). La causa real
+    de por qué el tier más grande rinde peor queda SIN CONFIRMAR -- revertido
+    a `db-custom-2-7680` (la config con mejor resultado medido) en vez de
+    seguir gastando corridas reales para adivinar. Pendiente para quien
+    retome esto con más tiempo: instrumentar latencia interna del código
+    (no solo métricas de infra) para aislar la causa.
   EOT
   type        = string
-  default     = "db-custom-4-15360"
+  default     = "db-custom-2-7680"
 }
 
 variable "pulsar_service_url" {
