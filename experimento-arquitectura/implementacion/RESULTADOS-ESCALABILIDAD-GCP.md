@@ -38,8 +38,24 @@ ESC-01.
 | 5 | + Cloud SQL `db-custom-4-15360` (4 vCPU, doble de cómputo — corrida justo tras el reinicio del tier) | 7,352ms | 4.6% | 659 req/s | Ráfaga puntual (~3s) |
 | 6 | Igual a 5, pero con la instancia de Cloud SQL verificada estable 20+ min antes de correr | 7,521ms | 3.7% | 668 req/s | 17,874 |
 | 7 | Igual a 6, con redeploy forzado de Cloud Run (instancias 100% nuevas, pools de conexión frescos) | 8,613ms | 5.9% | 656 req/s | 26,801 |
+| 8 | **Replicación de la corrida 4** — mismo tier (`db-custom-2-7680`), misma config, instancia verificada estable 10+ min antes de correr | 7,455ms | 0.6% | 550 req/s | 2,562 |
 
-**Config final (revertida a la corrida 4, el mejor resultado medido)**: `db-custom-2-7680` (2 vCPU) +
+**Hallazgo importante de la corrida 8 (replicación) — hay que matizar la conclusión de abajo**: con
+la MISMA configuración exacta de la corrida 4 (mismo tier, mismo `concurrency`/pool/`min_instances`,
+instancia igual de estable), el resultado NO se replicó limpiamente — p95 subió de 5,646ms a
+7,455ms y aparecieron 2,562 `"no available instance"` donde antes hubo 0. La diferencia entre la
+corrida 4 y la 8 (mismo tier) es casi tan grande como la diferencia entre el tier chico y el grande
+(corridas 4 vs. 5-7) — **hay variación real entre corridas que el experimento no está controlando**,
+y una sola corrida "buena" (la 4) no alcanza para afirmar con confianza que un tier es mejor que
+otro. Candidatos sin confirmar para esa variación: contención en la VM `k6-runner-poc-vm` misma
+(comparte recursos con otros procesos del proyecto), variabilidad de "vecino ruidoso" en la
+infraestructura compartida de GCP, o algo no determinístico en cómo Cloud Run decide escalar sus
+propias instancias. Confirmar esto con rigor requeriría varias corridas por configuración
+(estadística, no una corrida puntual) — no se hizo por costo (8 corridas reales de ~12min ya
+consumidas en esta sesión).
+
+**Config final aplicada (la de mejor resultado *promedio* observado, no garantizado)**:
+`db-custom-2-7680` (2 vCPU) +
 `containerConcurrency=15` == `max_workers`(ThreadPoolExecutor) == `db_pool_size(10)+db_max_overflow(5)`
 + `min_instance_count=10` + `max_instance_count=20`. Ver el comentario junto a `sql_tier` en
 `gestion-de-trabajos/infra/variables.tf` para el cálculo completo de capacidad
@@ -60,24 +76,27 @@ ESC-01.
    ~150 conexiones activas (muy por debajo de `max_connections`≈400) — no era cantidad de
    conexiones, era cómputo.
 
-**Anomalía sin resolver**: subir el tier a `db-custom-4-15360` (4 vCPU) para aliviar el punto 3
-**empeoró el resultado de forma reproducible** (corridas 5, 6 y 7 — 3 corridas independientes, la
-5 justo tras el reinicio del tier, la 6 con la instancia verificada estable, la 7 con Cloud Run
-además redesplegado con instancias 100% nuevas). CPU de Cloud SQL bajó a ~65-68% (con margen), pero
+**Anomalía original, ahora reinterpretada tras la corrida 8**: subir el tier a `db-custom-4-15360`
+(4 vCPU) para aliviar el punto 3 parecía empeorar el resultado de forma reproducible en 3 corridas
+(5, 6, 7) frente a la corrida 4. CPU de Cloud SQL bajó a ~65-68% (con margen), pero
 "no available instance" en los logs de Cloud Run subió de 0 (corrida 4) a miles (corridas 6-7), y
-Cloud Run se mantuvo aplanado en 10 instancias activas en las 5 corridas (3-7) pese a
+Cloud Run se mantuvo aplanado en 10 instancias activas en todas las corridas (3-8) pese a
 `max_instance_count=20` y sin ninguna cuota de por medio (`instance_limit_with_direct_vpc_egress_regional`
 verificado en 100, muy por encima). Se descartaron 2 hipótesis con corridas reales: ruido
-operacional del reinicio de Cloud SQL, y pools de conexión "stale" en instancias de Cloud Run que
-llevaban corriendo desde antes del cambio de tier. **La causa real de por qué más cómputo en
-Postgres empeora el resultado en Cloud Run queda sin confirmar** — requeriría instrumentar latencia
-interna del código (no solo métricas de infra de Cloud Monitoring) para aislarla. Se revirtió a
-`db-custom-2-7680` (la config con mejor resultado medido, corrida 4) en vez de seguir gastando
-corridas reales para adivinar.
+operacional del reinicio de Cloud SQL, y pools de conexión "stale". **Pero la corrida 8 (replicación
+con el tier chico, misma config exacta que la 4) tampoco reprodujo el 0% de fallo de la corrida 4**
+(dio 0.6% de fallo y 2,562 "no available instance") — así que ya no está claro que el tier grande
+sea la variable que explica la diferencia; puede ser variación entre corridas del propio
+experimento (candidatos: contención en la VM generadora de carga, "vecino ruidoso" en GCP, o
+autoscaling no determinístico de Cloud Run). **Sin confirmar** cuál de las dos explicaciones es la
+correcta — requeriría varias corridas por configuración (estadística) para separar señal de ruido,
+no se hizo por costo (8 corridas reales de ~12min ya consumidas en esta sesión). Se dejó la config
+del tier chico aplicada (mejor promedio observado: corridas 4 y 8 vs. 5, 6 y 7) en vez de seguir
+gastando corridas reales para decidir entre las dos hipótesis.
 
-Detalle crudo de las 5 corridas en `k6/results/esc-01-summary-gcp-tuned-vm-run.json` (corrida 2,
-sin el fix de sobresuscripción), `esc-01-summary-min-instances-fix.json` (corrida 4, la mejor) y
-`esc-01-summary-tier4-fix.json` (corrida 6).
+Detalle crudo en `k6/results/esc-01-summary-gcp-tuned-vm-run.json` (corrida 2, sin el fix de
+sobresuscripción), `esc-01-summary-min-instances-fix.json` (corrida 4), `esc-01-summary-tier4-fix.json`
+(corrida 6) y `esc-01-summary-replicacion-tier2.json` (corrida 8, la replicación).
 
 ### 1.2 Local (`docker-compose`, duración reducida ~2.2min/escenario para esta iteración — ver nota de comparabilidad en sección 2.7)
 
@@ -252,16 +271,17 @@ control fino).*
    de integración entre bounded contexts construidos por personas distintas**: un cambio
    unilateral de formato en el productor (como el que ya rompió esto una vez, con Avro) rompe al
    consumidor sin que ninguno de los dos servicios, probados por separado, lo detecte.
-6. **[Nuevo, 2026-09-17, sin resolver]** El tier de cómputo de Cloud SQL es sensible en una
-   dirección contraintuitiva: subir de `db-custom-2-7680` (2 vCPU) a `db-custom-4-15360` (4 vCPU)
-   **empeoró** el p95 y la tasa de fallo de ESC-01 de forma reproducible (3 corridas
-   independientes, ver sección 1.1.1), pese a bajar la CPU de Postgres de 99.5% a ~65-68%. Se
-   descartaron ruido de reinicio y pools de conexión stale como causa. Candidato más probable, sin
-   confirmar: algo en cómo Cloud Run decide escalar (o no) sus propias instancias en reacción a un
-   backend más rápido — Cloud Run se mantuvo aplanado en 10 instancias activas en ambos tiers,
-   pero con el tier grande generó miles de `"no available instance"` que con el tier chico eran
-   cero. Requiere instrumentar latencia interna del código para confirmar, no solo métricas de
-   infra.
+6. **[Nuevo, 2026-09-17, sin resolver]** ESC-01 contra GCP real tiene **variación significativa
+   entre corridas con la misma configuración exacta** — la corrida 4 dio 0% de fallo/5,646ms y su
+   replicación (corrida 8, mismo tier, misma config, instancia igual de estable) dio 0.6%
+   fallo/7,455ms. Esa variación es casi tan grande como la diferencia que se le atribuyó al tier de
+   Cloud SQL (corridas 5-7, tier grande, 3.7-5.9% fallo) — así que no está confirmado si subir el
+   tier realmente empeora el resultado, o si ambos grupos de corridas caen dentro del ruido normal
+   del experimento. Candidatos sin confirmar: contención en la VM generadora de carga
+   (`k6-runner-poc-vm`), variabilidad de "vecino ruidoso" en infraestructura compartida de GCP, o
+   autoscaling no determinístico de Cloud Run (aplanado en 10 instancias activas en TODAS las
+   corridas 3-8, pese a `max_instance_count=20`). Confirmar esto con rigor requiere varias corridas
+   por configuración (estadística), no una corrida puntual — no se hizo por costo.
 
 ## 4. Tradeoffs
 
@@ -295,12 +315,14 @@ capacidad bruta ni a un bug de la aplicación en sí. Por orden de impacto esper
 3. **[Hecho, 2026-09-17]** ~~Repetir ESC-01 completo con `min_instance_count` elevado~~ — hecho,
    es la corrida 4 de la sección 1.1.1: `min_instance_count=10` fue el cambio que más impacto tuvo
    de toda la sesión (100% aceptación, 0% fallo, 0 `"no available instance"`).
-4. **[Nuevo, 2026-09-17]** Investigar por qué subir el tier de Cloud SQL de 2 a 4 vCPU empeora el
-   resultado de ESC-01 (sección 1.1.1, "Anomalía sin resolver" / sección 3, punto 6) —
-   instrumentar latencia interna del código (no solo métricas de Cloud Monitoring de infra) para
-   aislar la causa real. Se descartaron 2 hipótesis baratas (ruido de reinicio, pools stale); lo
-   que falta requiere más tiempo del que se justificaba gastar en esta sesión (7 corridas reales
-   de ~12min cada una ya consumidas).
+4. **[Nuevo, 2026-09-17]** Separar señal de ruido en los resultados de ESC-01 contra GCP real
+   (sección 1.1.1, sección 3 punto 6): la corrida 4 (mejor resultado) no se replicó limpiamente
+   en la corrida 8 con la misma config exacta — la variación entre corridas "iguales" es casi tan
+   grande como la diferencia atribuida al tier de Cloud SQL. Requiere correr varias repeticiones
+   por configuración (no una corrida puntual) para saber con confianza estadística si el tier
+   realmente importa, y instrumentar latencia interna del código (no solo métricas de infra) para
+   explicar de dónde sale esa variación. No se hizo por costo (8 corridas reales de ~12min cada
+   una ya consumidas en esta sesión).
 5. **Corregir `advertisedListeners` en `pulsar-infra/docker-compose.yml`** para que cualquier
    contenedor Docker (no solo el host) pueda conectarse — hoy requiere un override manual
    (sección 2.7) para poder correr pruebas locales realistas con Pulsar de verdad arriba. Mismo

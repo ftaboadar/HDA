@@ -140,8 +140,8 @@ terraform destroy -var project_id=hda-projectt   # apagar la VM cuando ya no se 
 ## Resultados (última actualización: 2026-09-17)
 
 Mismo estándar que `DISP-03/RESULTADOS-DISP03.md`: solo números de corridas reales, nunca
-inventados. Detalle completo, diagnóstico en cadena y la anomalía sin resolver del tier de Cloud
-SQL: `../RESULTADOS-ESCALABILIDAD-GCP.md`, sección 1.1.1.
+inventados. Detalle completo, diagnóstico en cadena y la variación entre corridas sin resolver:
+`../RESULTADOS-ESCALABILIDAD-GCP.md`, sección 1.1.1.
 
 ### ESC-01 — Pico 4x en 48h
 
@@ -152,15 +152,19 @@ SQL: `../RESULTADOS-ESCALABILIDAD-GCP.md`, sección 1.1.1.
 | GCP real (2026-09-14, 2ª corrida, después del fix `asyncio.to_thread`) | 2026-09-14 | 9717ms | 326 req/s | 88.1% | No cumple |
 | GCP real, corrida desde `k6-runner-poc-vm` (2026-09-16, concurrency=15/15/15 sincronizado, sin `min_instance_count`) | 2026-09-16 | 9991ms | 543 req/s | 85.8% | No cumple |
 | **GCP real, + `min_instance_count=10`** (2026-09-16) | 2026-09-16 | **5646ms** | 544 req/s | **100%** | No cumple, pero es la mejor corrida real — 0% de fallo |
-| GCP real, + Cloud SQL 4 vCPU (2026-09-17, ver anomalía) | 2026-09-17 | 7521ms | 668 req/s | 96.3% | No cumple — tier más grande empeoró, sin causa confirmada |
+| GCP real, + Cloud SQL 4 vCPU (2026-09-17) | 2026-09-17 | 7352-8613ms | 656-668 req/s | 94.1-96.3% | No cumple |
+| GCP real, replicación de la mejor corrida (misma config exacta, tier 2 vCPU, 2026-09-17) | 2026-09-17 | 7455ms | 550 req/s | 99.4% | No cumple — no reprodujo el 0% de fallo de la corrida anterior |
 
 **Qué falta (ESC-01, honesto a propósito):** con la sobresuscripción de conexiones y el cold-start
 del autoscaler ya resueltos (ver `RESULTADOS-ESCALABILIDAD-GCP.md` sección 1.1.1), la mejor corrida
-real sigue en 5.6s de p95 contra un umbral de 2s. Cloud SQL (2 vCPU) queda al 99.5% de CPU en esa
-corrida — el cuello de botella real hoy. Subir a 4 vCPU debería ayudar y en cambio empeoró de forma
-reproducible (3 corridas), por una causa no confirmada. Queda para quien retome esto: instrumentar
-latencia interna del código (no solo métricas de infra) para aislar por qué más cómputo en Postgres
-empeora el resultado en Cloud Run.
+real (5.6s p95, 0% fallo) sigue sin pasar el umbral de 2s. Al intentar replicar esa misma
+configuración exacta, el resultado NO se reprodujo limpiamente (7.5s p95, 0.6% fallo) — hay
+variación real entre corridas del experimento que es casi tan grande como la diferencia que se le
+había atribuido al tier de Cloud SQL. No está confirmado si subir el tier realmente empeora el
+resultado o si es ruido del experimento (candidatos: la VM que genera la carga, "vecino ruidoso" en
+GCP, autoscaling no determinístico de Cloud Run). Queda para quien retome esto: correr varias
+repeticiones por configuración para separar señal de ruido con confianza estadística, e
+instrumentar latencia interna del código (no solo métricas de infra).
 
 ## Referencias
 
