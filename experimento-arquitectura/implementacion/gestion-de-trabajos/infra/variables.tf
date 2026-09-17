@@ -40,28 +40,23 @@ variable "sql_tier" {
     (15 por instancia × max_instance_count=20 = 300, 75% de 400) deja
     margen razonable SIN subir de tier ni fijar `database_flags` manual.
 
-    Recomendación CONDICIONAL (no aplicada acá): si una corrida de ESC-01
-    con esta config consistente (15/15/15) sigue sin llegar a la tasa pico
-    objetivo (1157 req/s, ver k6/esc-01.js) o sigue violando el p95 < 2s
-    *por saturación real de Cloud SQL* (no por sobresuscripción, que ya
-    quedó resuelta), el siguiente paso preferido es subir de tier otra vez
-    (ej. db-custom-4-15360, 15GB -> bucket 500) y no manual
-    `database_flags.max_connections` sobre el tier actual: subir de tier da
-    más CPU/IOPS real (la app hace 2 escrituras síncronas por request, más
-    el publish a Pulsar en el mismo executor -- un problema de cómputo, no
-    solo de cantidad de conexiones) Y más `max_connections` "gratis" con el
-    mismo margen de memoria que Google ya calculó, en vez de forzar un
-    número de conexiones por encima del default sin saber cuánta memoria
-    por conexión deja disponible ese tier. Managed Connection Pooling
-    (Cloud SQL Enterprise Plus) o PgBouncer NO se recomiendan en esta
-    escala: la demanda real (cientos de conexiones, no miles) todavía cabe
-    cómodo en un tier más grande de Enterprise estándar, y esas opciones
-    agregan costo de edición y complejidad operativa (Auth Proxy >=2.15.2,
-    versión de mantenimiento mínima, reinicio para habilitar) que no se
-    justifican todavía para un PoC de 2 meses.
+    CONFIRMADO (no ya condicional): con la sobresuscripción resuelta (15/15/15)
+    y el cold-start del autoscaler resuelto (min_instance_count=10, ver
+    service.tf), la corrida de ESC-01 llegó a 100% de aceptación / 0% de
+    fallo, pero Cloud SQL quedó al 99.5% de CPU sostenido durante todo el
+    pico (verificado con Cloud Monitoring, métrica
+    cloudsql.googleapis.com/database/cpu/utilization, ventana
+    2026-09-17T00:04-00:10Z) con solo ~150 conexiones activas (muy por
+    debajo de max_connections=400) -- el cuello de botella real ahora es
+    cómputo, no cantidad de conexiones. Subido a `db-custom-4-15360`
+    (4 vCPU / 15GB, el doble de cómputo), que también sube `max_connections`
+    al bucket de 500 (más margen para una futura subida de concurrency).
+    Managed Connection Pooling (Cloud SQL Enterprise Plus) o PgBouncer
+    siguen sin justificarse a esta escala (cientos de conexiones, no miles;
+    el problema es CPU, no cantidad de conexiones).
   EOT
   type        = string
-  default     = "db-custom-2-7680"
+  default     = "db-custom-4-15360"
 }
 
 variable "pulsar_service_url" {
