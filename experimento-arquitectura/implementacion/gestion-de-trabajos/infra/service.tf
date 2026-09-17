@@ -102,6 +102,21 @@ module "api" {
   # la tabla de Cloud SQL para Postgres) -- ver detalle junto a `sql_tier`.
   max_instance_request_concurrency = 15
 
+  # [2026-09-17] Nunca se había tocado -- Cloud Run asignaba 1 vCPU/512Mi
+  # por instancia por default silencioso (infra-modules/cloud-run-service
+  # no exponía `cpu`/`memory` antes de hoy). Con containerConcurrency=15 y
+  # Python (GIL: un solo hilo ejecuta bytecode a la vez, sin importar
+  # cuántos hilos tenga el ThreadPoolExecutor), 15 hilos concurrentes
+  # compitiendo por 1 sola vCPU para cualquier trabajo real de CPU
+  # (parseo/validación Pydantic, serialización, mapeo de SQLAlchemy) es
+  # candidato directo a la variación de latencia sin explicar entre
+  # corridas de ESC-01 (ver RESULTADOS-ESCALABILIDAD-GCP.md sección 1.1.1
+  # y 3 punto 6) -- nunca se varió esto en toda la sesión de tuning.
+  # Subido a 2 vCPU / 1Gi (Cloud Run exige memoria proporcional al pasar
+  # de 1 a 2 vCPU) para dar a esos 15 hilos un segundo núcleo real.
+  cpu    = "2"
+  memory = "1Gi"
+
   depends_on = [google_project_service.apis]
 }
 

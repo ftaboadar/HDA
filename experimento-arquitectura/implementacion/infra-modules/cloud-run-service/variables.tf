@@ -89,6 +89,31 @@ variable "startup_cpu_boost" {
   default = true
 }
 
+variable "cpu" {
+  description = <<-EOT
+    vCPUs por instancia (string, formato que espera Cloud Run v2: "1", "2",
+    "4"...). Default "1" -- mismo comportamiento que antes de que esta
+    variable existiera (Cloud Run asigna 1 vCPU si no se especifica nada
+    en `resources.limits`, sin que sea una decisión consciente). Subir
+    esto importa cuando `max_instance_request_concurrency` > 1: con
+    Python y un ThreadPoolExecutor sirviendo requests concurrentes, el
+    GIL hace que solo un hilo ejecute bytecode a la vez -- con 1 sola
+    vCPU, N hilos concurrentes compiten por ese único núcleo para
+    cualquier trabajo real de CPU (parseo/validación/serialización), no
+    solo para I/O. Ver gestion-de-trabajos/infra/service.tf para el caso
+    real que motivó exponer esto (ESC-01, variación de latencia sin
+    explicación aislada solo con métricas de infra).
+  EOT
+  type        = string
+  default     = "1"
+}
+
+variable "memory" {
+  description = "Memoria por instancia (formato Cloud Run v2, ej. \"512Mi\", \"1Gi\"). Default \"512Mi\" -- mismo default silencioso de Cloud Run que ya regía antes de esta variable."
+  type        = string
+  default     = "512Mi"
+}
+
 variable "cpu_idle" {
   description = <<-EOT
     true (default de Cloud Run): la CPU se limita fuera de la ventana de
