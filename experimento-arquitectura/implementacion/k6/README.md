@@ -137,21 +137,30 @@ terraform destroy -var project_id=hda-projectt   # apagar la VM cuando ya no se 
   eso es explícitamente trabajo de una corrida real posterior (local a baja escala primero, luego
   GCP), no de este smoke test.
 
-## Plantilla de resultados (placeholders — llenar después de correr de verdad)
+## Resultados (última actualización: 2026-09-17)
 
-> Todos los valores de abajo son `TBD`. No reemplazar por números inventados; dejar `TBD` hasta
-> tener una corrida real registrada, con fecha, entorno y comando exacto usado — mismo estándar que
-> `DISP-03/RESULTADOS-DISP03.md`.
+Mismo estándar que `DISP-03/RESULTADOS-DISP03.md`: solo números de corridas reales, nunca
+inventados. Detalle completo, diagnóstico en cadena y la anomalía sin resolver del tier de Cloud
+SQL: `../RESULTADOS-ESCALABILIDAD-GCP.md`, sección 1.1.1.
 
 ### ESC-01 — Pico 4x en 48h
 
-| Entorno | Fecha | p95 aceptación medido | Throughput medido (req/s) | % aceptación medido | Variación p95 "otro dominio" | Veredicto cumple/no-cumple |
-|---|---|---|---|---|---|---|
-| Local (docker-compose) | TBD | TBD | TBD | TBD | TBD | *(responsabilidad de `validador-hipotesis`, no de este documento)* |
-| GCP real (2026-09-14, 1ª corrida, antes del fix de concurrencia) | 2026-09-14 | 14208ms | 216 req/s | 79.9% (`esc01_aceptacion_ok`) | no medido | *(no cumple el umbral &lt;2s / ≥99.9% — ver "Qué falta" abajo, atribuido a `_repo.guardar` síncrono bloqueando el event loop)* |
-| GCP real (2026-09-14, 2ª corrida, después del fix de concurrencia) | 2026-09-14 | 9717ms | 326 req/s | 88.1% (`esc01_aceptacion_ok`) | no medido | *(mejoró sustancialmente pero SIGUE sin cumplir el umbral — ver "Qué falta")* |
+| Entorno | Fecha | p95 aceptación medido | Throughput medido (req/s) | % aceptación medido | Veredicto cumple/no-cumple |
+|---|---|---|---|---|---|
+| Local (docker-compose, duración completa ~10.9min, pool 50/50) | 2026-09-16 | 7869ms | 333 req/s | 97.9% | *(responsabilidad de `validador-hipotesis`, no de este documento)* |
+| GCP real (2026-09-14, 1ª corrida, antes del fix de concurrencia) | 2026-09-14 | 14208ms | 216 req/s | 79.9% | No cumple |
+| GCP real (2026-09-14, 2ª corrida, después del fix `asyncio.to_thread`) | 2026-09-14 | 9717ms | 326 req/s | 88.1% | No cumple |
+| GCP real, corrida desde `k6-runner-poc-vm` (2026-09-16, concurrency=15/15/15 sincronizado, sin `min_instance_count`) | 2026-09-16 | 9991ms | 543 req/s | 85.8% | No cumple |
+| **GCP real, + `min_instance_count=10`** (2026-09-16) | 2026-09-16 | **5646ms** | 544 req/s | **100%** | No cumple, pero es la mejor corrida real — 0% de fallo |
+| GCP real, + Cloud SQL 4 vCPU (2026-09-17, ver anomalía) | 2026-09-17 | 7521ms | 668 req/s | 96.3% | No cumple — tier más grande empeoró, sin causa confirmada |
 
-**Qué falta (ESC-01, honesto a propósito):** el fix de `asyncio.to_thread` (ver commit) resolvió el bloqueo del event loop pero no fue suficiente por sí solo — la causa raíz residual no se investigó más a fondo en esta sesión por tiempo (candidatos sin confirmar: tamaño del pool de conexiones de SQLAlchemy hacia Cloud SQL, `max_instance_count=10`/`containerConcurrency=80` del módulo insuficientes para el pico real, o el propio tier de Cloud SQL `db-custom-1-3840` saturado). Queda para quien retome esto: perfilar con las métricas de Cloud SQL (conexiones activas, CPU) durante una corrida de ESC-01 real.
+**Qué falta (ESC-01, honesto a propósito):** con la sobresuscripción de conexiones y el cold-start
+del autoscaler ya resueltos (ver `RESULTADOS-ESCALABILIDAD-GCP.md` sección 1.1.1), la mejor corrida
+real sigue en 5.6s de p95 contra un umbral de 2s. Cloud SQL (2 vCPU) queda al 99.5% de CPU en esa
+corrida — el cuello de botella real hoy. Subir a 4 vCPU debería ayudar y en cambio empeoró de forma
+reproducible (3 corridas), por una causa no confirmada. Queda para quien retome esto: instrumentar
+latencia interna del código (no solo métricas de infra) para aislar por qué más cómputo en Postgres
+empeora el resultado en Cloud Run.
 
 ## Referencias
 
