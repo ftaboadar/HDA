@@ -153,18 +153,20 @@ inventados. Detalle completo, diagnóstico en cadena y la variación entre corri
 | GCP real, corrida desde `k6-runner-poc-vm` (2026-09-16, concurrency=15/15/15 sincronizado, sin `min_instance_count`) | 2026-09-16 | 9991ms | 543 req/s | 85.8% | No cumple |
 | **GCP real, + `min_instance_count=10`** (2026-09-16) | 2026-09-16 | **5646ms** | 544 req/s | **100%** | No cumple, pero es la mejor corrida real — 0% de fallo |
 | GCP real, + Cloud SQL 4 vCPU (2026-09-17) | 2026-09-17 | 7352-8613ms | 656-668 req/s | 94.1-96.3% | No cumple |
-| GCP real, replicación de la mejor corrida (misma config exacta, tier 2 vCPU, 2026-09-17) | 2026-09-17 | 7455ms | 550 req/s | 99.4% | No cumple — no reprodujo el 0% de fallo de la corrida anterior |
+| GCP real, replicación con tier 2 vCPU (2026-09-17) | 2026-09-17 | 7455ms | 550 req/s | 99.4% | No cumple — no reprodujo el 0% de fallo de la corrida 4 |
+| **GCP real, + `cpu=2`/`memory=1Gi` por instancia** (2026-09-17) | 2026-09-17 | **5189ms** | 499 req/s | **100%** | No cumple, pero mejor p95 de toda la sesión — 0% de fallo |
+| **GCP real, replicación del fix de CPU** (2026-09-17) | 2026-09-17 | **5457ms** | 551 req/s | **100%** | No cumple, pero confirma el fix — también 0% de fallo |
 
-**Qué falta (ESC-01, honesto a propósito):** con la sobresuscripción de conexiones y el cold-start
-del autoscaler ya resueltos (ver `RESULTADOS-ESCALABILIDAD-GCP.md` sección 1.1.1), la mejor corrida
-real (5.6s p95, 0% fallo) sigue sin pasar el umbral de 2s. Al intentar replicar esa misma
-configuración exacta, el resultado NO se reprodujo limpiamente (7.5s p95, 0.6% fallo) — hay
-variación real entre corridas del experimento que es casi tan grande como la diferencia que se le
-había atribuido al tier de Cloud SQL. No está confirmado si subir el tier realmente empeora el
-resultado o si es ruido del experimento (candidatos: la VM que genera la carga, "vecino ruidoso" en
-GCP, autoscaling no determinístico de Cloud Run). Queda para quien retome esto: correr varias
-repeticiones por configuración para separar señal de ruido con confianza estadística, e
-instrumentar latencia interna del código (no solo métricas de infra).
+**Qué falta (ESC-01, honesto a propósito):** con la sobresuscripción de conexiones, el cold-start
+del autoscaler y (el hallazgo final) 1 sola vCPU por instancia compitiendo con el GIL de Python
+todos resueltos (ver `RESULTADOS-ESCALABILIDAD-GCP.md` sección 1.1.1), la mejor config confirmada
+(2 corridas consistentes, 9 y 10) da p95 ~5.2-5.5s con 0% de fallo — sigue sin pasar el umbral de
+2s, pero es el resultado más limpio y reproducible de toda la sesión. Queda sin resolver, sin
+bloquear el cierre: por qué el tier de Cloud SQL no se comportó de forma consistente entre
+corridas (corrida 4 vs. su replicación, corrida 8) — candidatos sin confirmar: la VM que genera la
+carga, "vecino ruidoso" en GCP, autoscaling no determinístico de Cloud Run. Para llegar a <2s desde
+acá: perfilar qué consume esos ~5s dentro del código mismo (no solo infra) — 2 escrituras
+síncronas + 1 publish a Pulsar por request, todo compartiendo un solo `ThreadPoolExecutor`.
 
 ## Referencias
 
