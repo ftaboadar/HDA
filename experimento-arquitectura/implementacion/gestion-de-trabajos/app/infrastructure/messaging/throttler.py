@@ -221,7 +221,9 @@ class ThrottlerCrm:
             intento=novedad.intentos,
             espera_s=round(espera_s, 3),
             motivo_falla=resultado.motivo_falla,
-            origen_espera="retry_after_crm" if resultado.reintentar_despues_s else "backoff_local",
+            origen_espera="retry_after_crm"
+            if resultado.reintentar_despues_s
+            else "backoff_local",
         )
         await asyncio.sleep(espera_s)
         await self._cola.put(novedad)

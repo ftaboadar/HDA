@@ -33,9 +33,7 @@ class _RepoNovedadFalso(INovedadRepository):
         return self._por_id.get(id.valor)
 
     def listar_pendientes(self) -> list[Novedad]:
-        return [
-            n for n in self._por_id.values() if n.estado == EstadoNovedad.PENDIENTE
-        ]
+        return [n for n in self._por_id.values() if n.estado == EstadoNovedad.PENDIENTE]
 
 
 class _CrmSiempreExitoso(IGestionAgentesPort):

@@ -123,7 +123,10 @@ async def _crear_novedad(
     async with semaforo:
         resp = await cliente.post(
             "/novedades",
-            json={"trabajo_id": trabajo_id, "descripcion": f"novedad de carga DISP-02 #{i}"},
+            json={
+                "trabajo_id": trabajo_id,
+                "descripcion": f"novedad de carga DISP-02 #{i}",
+            },
         )
         resp.raise_for_status()
         return resp.json()["id"]
@@ -141,13 +144,18 @@ async def test_disp02_rafaga_mayor_a_4x_sin_perdida_por_rate_limiting():
         await _configurar_mock_crm(control, CRM_LIMITE_RPS)
 
     limites = httpx.Limits(max_connections=150, max_keepalive_connections=150)
-    semaforo = asyncio.Semaphore(150)  # concurrencia acotada del cliente, ver docstring de _crear_novedad
+    semaforo = asyncio.Semaphore(
+        150
+    )  # concurrencia acotada del cliente, ver docstring de _crear_novedad
     async with httpx.AsyncClient(base_url=API_URL, timeout=60, limits=limites) as api:
         trabajo_id_comun = str(uuid.uuid4())
 
         t0 = time.time()
         ids = await asyncio.gather(
-            *[_crear_novedad(api, trabajo_id_comun, i, semaforo) for i in range(N_NOVEDADES)]
+            *[
+                _crear_novedad(api, trabajo_id_comun, i, semaforo)
+                for i in range(N_NOVEDADES)
+            ]
         )
         t_fin_encolado = time.time()
 
@@ -260,9 +268,9 @@ async def test_disp02_rafaga_mayor_a_4x_sin_perdida_por_rate_limiting():
         f"{pct_entregado_15min:.2%} entregadas dentro de 15min reales, "
         f"se exige >= {UMBRAL_PCT_ENTREGADO_15MIN:.0%}"
     )
-    assert pct_entregado_1h == 1.0, (
-        f"{pct_entregado_1h:.2%} entregadas dentro de 1h real, se exige 100%"
-    )
+    assert (
+        pct_entregado_1h == 1.0
+    ), f"{pct_entregado_1h:.2%} entregadas dentro de 1h real, se exige 100%"
 
 
 @pytest.mark.asyncio
@@ -285,7 +293,9 @@ async def test_disp02_disponibilidad_api_independiente_del_crm_saturado():
     async with httpx.AsyncClient(timeout=10) as control:
         await _configurar_mock_crm(control, limite_rps=1)
 
-    n_novedades_saturacion = 100  # suficiente para mantener al Throttler ocupado varios segundos a 1rps
+    n_novedades_saturacion = (
+        100  # suficiente para mantener al Throttler ocupado varios segundos a 1rps
+    )
     limites = httpx.Limits(max_connections=50)
     semaforo = asyncio.Semaphore(50)
     async with httpx.AsyncClient(base_url=API_URL, timeout=30, limits=limites) as api:

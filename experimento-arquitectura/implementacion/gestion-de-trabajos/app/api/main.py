@@ -100,9 +100,7 @@ async def startup() -> None:
     # `containerConcurrency`, las requests entrantes hacen cola DENTRO de
     # la instancia antes de tocar la base de datos o Pulsar.
     asyncio.get_event_loop().set_default_executor(
-        ThreadPoolExecutor(
-            max_workers=settings.db_pool_size + settings.db_max_overflow
-        )
+        ThreadPoolExecutor(max_workers=settings.db_pool_size + settings.db_max_overflow)
     )
     _throttler.iniciar()
     log_evento(logger, "api_iniciada")

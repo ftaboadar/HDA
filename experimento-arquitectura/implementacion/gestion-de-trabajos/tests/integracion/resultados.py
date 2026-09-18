@@ -17,7 +17,9 @@ def reiniciar() -> None:
     RUTA_RESULTADOS.write_text("")
 
 
-def registrar(caso: str, metrica: str, valor, umbral, cumple: bool, detalle: str = "") -> None:
+def registrar(
+    caso: str, metrica: str, valor, umbral, cumple: bool, detalle: str = ""
+) -> None:
     RUTA_RESULTADOS.parent.mkdir(parents=True, exist_ok=True)
     with RUTA_RESULTADOS.open("a", encoding="utf-8") as f:
         f.write(
