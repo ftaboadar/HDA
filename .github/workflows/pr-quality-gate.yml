@@ -38,12 +38,19 @@ jobs:
           - servicio: DISP-03
             carpeta: experimento-arquitectura/implementacion/DISP-03
             opcional: false
+            compose_file: docker-compose.yml
           - servicio: gestion-de-trabajos
             carpeta: experimento-arquitectura/implementacion/gestion-de-trabajos
             opcional: true
+            # docker-compose.yml "normal" no trae el mock del CRM — los tests
+            # de integración de DISP-02 (tests/integracion/test_disp02_throttler.py)
+            # necesitan el stack completo de docker-compose.disp02.yml (api +
+            # postgres + mock-crm), ver ese archivo para el detalle.
+            compose_file: docker-compose.disp02.yml
           - servicio: reputacion
             carpeta: experimento-arquitectura/implementacion/reputacion
             opcional: true
+            compose_file: docker-compose.yml
     steps:
       - uses: actions/checkout@v4
 
@@ -90,20 +97,20 @@ jobs:
       - name: Levantar el stack local (docker compose)
         if: steps.existe.outputs.ok == 'true'
         working-directory: ${{ matrix.carpeta }}
-        run: docker compose up -d --build
+        run: docker compose -f ${{ matrix.compose_file }} up -d --build
 
       - name: Esperar a que la API esté sana
         if: steps.existe.outputs.ok == 'true'
         working-directory: ${{ matrix.carpeta }}
         run: |
-          PORT=$(docker compose port api 8000 | head -n 1 | awk -F: '{print $NF}')
+          PORT=$(docker compose -f ${{ matrix.compose_file }} port api 8000 | head -n 1 | awk -F: '{print $NF}')
           echo "API_URL=http://localhost:$PORT" >> $GITHUB_ENV
           for i in $(seq 1 30); do
             curl -sf http://localhost:$PORT/salud > /dev/null && exit 0
             sleep 2
           done
           echo "La API no quedó sana a tiempo"
-          docker compose logs
+          docker compose -f ${{ matrix.compose_file }} logs
           exit 1
 
       - name: Correr la suite de pruebas
@@ -119,12 +126,12 @@ jobs:
       - name: Logs de los servicios (solo si algo falló)
         if: failure() && steps.existe.outputs.ok == 'true'
         working-directory: ${{ matrix.carpeta }}
-        run: docker compose logs
+        run: docker compose -f ${{ matrix.compose_file }} logs
 
       - name: Apagar el stack
         if: always() && steps.existe.outputs.ok == 'true'
         working-directory: ${{ matrix.carpeta }}
-        run: docker compose down -v
+        run: docker compose -f ${{ matrix.compose_file }} down -v
 
   terraform:
     name: Terraform — formato y validación (infra GCP)

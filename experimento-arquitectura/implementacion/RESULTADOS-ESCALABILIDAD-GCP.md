@@ -1,17 +1,17 @@
 # Resultados del experimento de escalabilidad — Infra GCP integral + k6
 
-Documenta la corrida real (2026-09-14) de los 3 escenarios de Escalabilidad
-(`experimento-arquitectura/contexto/escenarios_calidad.md`, ESC-01/02/03) contra
-infraestructura de GCP real desplegada para la ocasión (`hda-projectt`, 106 recursos,
-7 stacks Terraform — ver `DESPLIEGUE-GCP-INTEGRAL.md`), más las decisiones de arquitectura,
-puntos de sensibilidad y tradeoffs que salieron de esa corrida. Mismo estándar de honestidad
-que `DISP-03/RESULTADOS-DISP03.md`: solo se reporta lo que de verdad se ejecutó y midió.
+Documenta la corrida real (2026-09-14) del escenario de Escalabilidad ESC-01
+(`experimento-arquitectura/contexto/escenarios_calidad.md`) contra infraestructura de GCP real
+desplegada para la ocasión (`hda-projectt`, 106 recursos, 7 stacks Terraform — ver
+`DESPLIEGUE-GCP-INTEGRAL.md`), más las decisiones de arquitectura, puntos de sensibilidad y
+tradeoffs que salieron de esa corrida. Mismo estándar de honestidad que
+`DISP-03/RESULTADOS-DISP03.md`: solo se reporta lo que de verdad se ejecutó y midió.
 
 **Alcance de este documento**: complementa (no reemplaza) las 5 columnas ATAM que
-`escenarios_calidad.md` todavía tiene pendientes para ESC-01/02/03 — decisión arquitectural,
+`escenarios_calidad.md` todavía tiene pendientes para ESC-01 — decisión arquitectural,
 puntos de sensibilidad, tradeoffs, riesgos, rationale — con evidencia real de una corrida
-contra GCP, no solo diseño en el papel. El veredicto formal cumple/no-cumple de cada
-escenario sigue siendo trabajo exclusivo de `validador-hipotesis`; aquí se documentan
+contra GCP, no solo diseño en el papel. El veredicto formal cumple/no-cumple del escenario
+sigue siendo trabajo exclusivo de `validador-hipotesis`; aquí se documentan
 mediciones crudas y las decisiones que las explican.
 
 ## 1. Resultados
@@ -20,22 +20,118 @@ mediciones crudas y las decisiones que las explican.
 
 | Escenario | Componente | p95 medido | Umbral | Throughput | % fallo | Veredicto crudo |
 |---|---|---|---|---|---|---|
-| ESC-02 (5x un partner) | DISP-03 | 260.4ms (partner pico) / 261.7ms (otros) | <300ms | 44.8 req/s, 14,789 requests | 0% | Dentro del umbral en ambas series; 0% rate-limiting cruzado |
 | ESC-01 (pico 4x, 1ª corrida) | Gestión de Trabajos | 14,208ms | <2,000ms | 216 req/s, 159,779 requests | 20.0% | Fuera del umbral — causa identificada (sección 3) |
 | ESC-01 (pico 4x, 2ª corrida, post-fix) | Gestión de Trabajos | 9,717ms | <2,000ms | 326 req/s, 244,801 requests | 11.9% | Mejora real (-32% p95, -40% tasa de fallo) pero sigue fuera del umbral |
-| ESC-03 (crecimiento 3x) | Gestión de Trabajos + DISP-03 | — | <300ms | — | — | No medido contra GCP: la única corrida post-fix se interrumpió antes de completar los 16 min |
+
+### 1.1.1 GCP real, sesión de dimensionamiento de capacidad (2026-09-17)
+
+Corridas contra `k6-runner-poc-vm` (VM de Compute Engine en `southamerica-east1`, no desde una red
+doméstica — ver `k6/README.md` sección "Por qué correr k6 desde una VM y no en local", causa real:
+`ramping-arrival-rate` con `maxVUs=2000` satura el NAT del router doméstico bajo las latencias que
+salían en las corridas 1-2 de arriba). Todas contra `gestion-trabajos-poc-api` real, mismo umbral
+ESC-01.
+
+| # | Cambio | p95 | % fallo | Throughput | "no available instance" (logs Cloud Run) |
+|---|---|---|---|---|---|
+| 3 | `containerConcurrency`/`max_workers`/pool de conexiones sincronizados en 15 (eliminaba sobresuscripción: antes 200/100/100, nunca coincidían) | 9,991ms | 14.2% | 543 req/s | Cientos, sostenidos durante el pico |
+| **4** | **+ `min_instance_count=10`** (elimina cold-start del autoscaler) | **5,646ms** | **0%** | 544 req/s | **0** |
+| 5 | + Cloud SQL `db-custom-4-15360` (4 vCPU, doble de cómputo — corrida justo tras el reinicio del tier) | 7,352ms | 4.6% | 659 req/s | Ráfaga puntual (~3s) |
+| 6 | Igual a 5, pero con la instancia de Cloud SQL verificada estable 20+ min antes de correr | 7,521ms | 3.7% | 668 req/s | 17,874 |
+| 7 | Igual a 6, con redeploy forzado de Cloud Run (instancias 100% nuevas, pools de conexión frescos) | 8,613ms | 5.9% | 656 req/s | 26,801 |
+| 8 | **Replicación de la corrida 4** — mismo tier (`db-custom-2-7680`), misma config, instancia verificada estable 10+ min antes de correr | 7,455ms | 0.6% | 550 req/s | 2,562 |
+| **9** | **+ `cpu=2`/`memory=1Gi` por instancia** (antes 1 vCPU/512Mi, el default silencioso de Cloud Run nunca ajustado en la sesión) | **5,189ms** | **0%** | 499 req/s | **0** |
+| **10** | **Replicación de la corrida 9** — misma config, instancia estable, corrida completa (recuperada tras un corte de túnel SSH a mitad de un primer intento sin datos) | **5,457ms** | **0%** | 551 req/s | **0** |
+
+**Hallazgo importante de la corrida 8 (replicación) — hay que matizar la conclusión de abajo**: con
+la MISMA configuración exacta de la corrida 4 (mismo tier, mismo `concurrency`/pool/`min_instances`,
+instancia igual de estable), el resultado NO se replicó limpiamente — p95 subió de 5,646ms a
+7,455ms y aparecieron 2,562 `"no available instance"` donde antes hubo 0. La diferencia entre la
+corrida 4 y la 8 (mismo tier) es casi tan grande como la diferencia entre el tier chico y el grande
+(corridas 4 vs. 5-7) — **hay variación real entre corridas que el experimento no está controlando**,
+y una sola corrida "buena" (la 4) no alcanza para afirmar con confianza que un tier es mejor que
+otro. Candidatos sin confirmar para esa variación: contención en la VM `k6-runner-poc-vm` misma
+(comparte recursos con otros procesos del proyecto), variabilidad de "vecino ruidoso" en la
+infraestructura compartida de GCP, o algo no determinístico en cómo Cloud Run decide escalar sus
+propias instancias. Confirmar esto con rigor requeriría varias corridas por configuración
+(estadística, no una corrida puntual) — no se hizo por costo (8 corridas reales de ~12min ya
+consumidas en esta sesión).
+
+**Config final aplicada, con el fix de CPU confirmado por 2 corridas independientes (9 y 10)**:
+Cloud SQL `db-custom-2-7680` (2 vCPU) + `containerConcurrency=15` ==
+`max_workers`(ThreadPoolExecutor) == `db_pool_size(10)+db_max_overflow(5)` + `min_instance_count=10`
++ `max_instance_count=20` + **`cpu=2`/`memory=1Gi` por instancia de Cloud Run** (antes 1 vCPU/512Mi,
+ver punto 4 del diagnóstico abajo). Ver el comentario junto a `sql_tier` en
+`gestion-de-trabajos/infra/variables.tf` y junto a `cpu` en
+`infra-modules/cloud-run-service/variables.tf` para el detalle completo.
+
+**Diagnóstico confirmado, en cadena — cada fix resolvió su problema y destapó el siguiente**:
+1. **Sobresuscripción de conexiones** (corridas 1-3): `containerConcurrency` (200) no coincidía con
+   `max_workers`/pool de conexiones (100) ni con `max_connections` real de Postgres — con
+   `max_instance_count=10-20`, la demanda máxima superaba 5-10x la capacidad real de Postgres.
+   Corregido sincronizando los 3 números.
+2. **Cold-start del autoscaler** (corrida 3, resuelto en la 4): con concurrency bajado a 15, cada
+   instancia aguanta mucho menos tráfico — el autoscaler necesitaba arrancar instancias nuevas más
+   rápido de lo que un cold start (boot de Python/FastAPI + pool de conexiones) permite. Logs de
+   Cloud Run: `"The request was aborted because there was no available instance"`. Resuelto con
+   `min_instance_count=10` (instancias siempre calientes) — **corrida 4: 100% aceptación, 0% fallo**.
+3. **CPU de Cloud SQL saturada al 99.5%** (corrida 4, confirmado con Cloud Monitoring): con los 2
+   problemas anteriores resueltos, Cloud SQL (2 vCPU) quedó como el cuello de botella real, con solo
+   ~150 conexiones activas (muy por debajo de `max_connections`≈400) — no era cantidad de
+   conexiones, era cómputo.
+4. **[Resuelto, corridas 9-10] 1 sola vCPU por instancia de Cloud Run, nunca ajustada en toda la
+   sesión, compitiendo con el GIL de Python**: `resources.limits.cpu` no existía como variable en
+   `infra-modules/cloud-run-service` — Cloud Run asignaba 1 vCPU/512Mi por default silencioso. Con
+   `containerConcurrency=15` y un `ThreadPoolExecutor(max_workers=15)`, hasta 15 hilos compiten por
+   un solo núcleo para cualquier trabajo real de CPU (parseo/validación Pydantic, serialización,
+   mapeo de SQLAlchemy) — el GIL de Python solo deja ejecutar bytecode a un hilo a la vez. Subido a
+   `cpu=2`/`memory=1Gi`: **corrida 9 dio el mejor resultado de toda la sesión (p95 5,189ms, 0%
+   fallo, 0 "no available instance")**, y **la corrida 10 (replicación exacta) lo confirmó** (p95
+   5,457ms, 0% fallo, 0 "no available instance") — a diferencia del tier de Cloud SQL, este fix SÍ
+   es reproducible en 2 corridas independientes.
+
+**Sobre la anomalía original del tier de Cloud SQL (corridas 5-8)**: subir el tier a `db-custom-4-15360`
+(4 vCPU) para aliviar el punto 3 parecía empeorar el resultado de forma reproducible en 3 corridas
+(5, 6, 7) frente a la corrida 4. CPU de Cloud SQL bajó a ~65-68% (con margen), pero
+"no available instance" en los logs de Cloud Run subió de 0 (corrida 4) a miles (corridas 6-7), y
+Cloud Run se mantuvo aplanado en 10 instancias activas en todas las corridas (3-8) pese a
+`max_instance_count=20` y sin ninguna cuota de por medio (`instance_limit_with_direct_vpc_egress_regional`
+verificado en 100, muy por encima). Se descartaron 2 hipótesis con corridas reales: ruido
+operacional del reinicio de Cloud SQL, y pools de conexión "stale". **Pero la corrida 8 (replicación
+con el tier chico, misma config exacta que la 4) tampoco reprodujo el 0% de fallo de la corrida 4**
+(dio 0.6% de fallo y 2,562 "no available instance") — así que ya no está claro que el tier grande
+sea la variable que explica la diferencia; puede ser variación entre corridas del propio
+experimento (candidatos: contención en la VM generadora de carga, "vecino ruidoso" en GCP, o
+autoscaling no determinístico de Cloud Run). **Sin confirmar** cuál de las dos explicaciones es la
+correcta — requeriría varias corridas por configuración (estadística) para separar señal de ruido.
+No se resolvió, pero ya no bloquea: el fix de CPU (punto 4 arriba) se confirmó con 2 corridas
+consistentes sobre el tier chico, así que la config final no necesita resolver esta duda del tier
+para cerrar la sesión con un resultado confiable.
+
+Detalle crudo en `k6/results/esc-01-summary-gcp-tuned-vm-run.json` (corrida 2, sin el fix de
+sobresuscripción), `esc-01-summary-min-instances-fix.json` (corrida 4), `esc-01-summary-tier4-fix.json`
+(corrida 6), `esc-01-summary-replicacion-tier2.json` (corrida 8), `esc-01-summary-2vcpu-fix.json`
+(corrida 9) y `esc-01-summary-2vcpu-replicacion.json` (corrida 10, la mejor confirmada).
 
 ### 1.2 Local (`docker-compose`, duración reducida ~2.2min/escenario para esta iteración — ver nota de comparabilidad en sección 2.7)
 
 | Escenario | Componente | p95 medido | Umbral | Throughput | % fallo | Veredicto crudo |
 |---|---|---|---|---|---|---|
-| ESC-02 (5x un partner, duración completa 5m30s) | DISP-03 | 6.4ms | <300ms | 48.8 req/s, 9,139 requests | 0% | Dentro del umbral, sin margen de duda |
 | ESC-01 (pico 4x, corta, sin Pulsar local arriba) | Gestión de Trabajos | 60,000ms (timeout) | <2,000ms | 71.7 req/s, 10,391 requests | 98.7% | Artefacto de entorno, no un resultado real — ver sección 2.7 |
 | ESC-01 (pico 4x, corta, con Pulsar local arreglado) | Gestión de Trabajos | 3,346ms | <2,000ms | 575.5 req/s, 74,818 requests | **0%** | Fuera del umbral de latencia, pero 100% de aceptación (`esc01_aceptacion_ok`: 1.0) y 0% de fallo HTTP |
-| ESC-03 (crecimiento 3x, corta, con Pulsar) | Gestión de Trabajos + DISP-03 | 16.7ms (trabajos) / 11.9ms (proveedores) | <300ms | 19.8 req/s, 2,674 requests | 0% | Dentro del umbral en ambas series |
+| ESC-01 (pico 4x, **duración completa** ~10.9min, post pool de conexiones configurable — `db_pool_size`/`db_max_overflow`/`db_pool_timeout`, mismo default 50/50/30s) | Gestión de Trabajos | 7,869ms | <2,000ms | 333 req/s, 217,322 requests | 2.08% (`esc01_aceptacion_ok` 97.9%) | Mejora sobre la corrida corta anterior en fallo HTTP, pero **sigue fuera del umbral de latencia** — no se forzó el resultado |
 
-Detalle crudo en `k6/results/esc-0{1,2}-summary.json` (JSON completo de k6) y en
-`k6/README.md` (tabla resumen con fecha/entorno).
+**Nota de comparabilidad**: la fila anterior usa la duración real del escenario (~10.9min, no la
+versión "corta" ~2.2min de las 2 filas de arriba), así que no es directamente comparable con ellas
+en throughput acumulado — sí lo es en p95, que es la métrica del umbral. Sigue sin confirmarse el
+candidato de causa raíz (tier de Cloud SQL / `containerConcurrency` insuficiente para el pico real,
+ver sección 3) porque el pool de conexiones ya no es el cuello de botella evidente al ser
+configurable y quedarse en el mismo valor (50/50) que la corrida GCP post-fix que dio 9,717ms —
+hacerlo configurable resuelve la operabilidad (retunear sin redeploy) pero no cierra por sí solo la
+brecha de latencia. Detalle crudo (post-fix) en `k6/results/esc-01-summary.json`; baseline
+pre-fix conservado en `k6/results/esc-01-summary-pre-pool-fix.json`.
+
+Detalle crudo en `k6/results/esc-01-summary.json` (JSON completo de k6) y en
+`k6/README.md` (tabla resumen con fecha/entorno, todavía no actualizada con esta corrida — pendiente).
 
 ## 2. Decisiones de arquitectura tomadas en esta iteración
 
@@ -99,12 +195,11 @@ infraestructura" de este PR — quedan documentadas, no implementadas.
 
 ### 2.7 Comparación local vs. GCP — por qué los números salieron así (justificación)
 
-Se corrió una versión local de los 3 escenarios contra `docker-compose` para tener un punto de
-comparación sin costo. **Nota de comparabilidad**: ESC-01 y ESC-03 se corrieron con duración
-reducida (~2.2min por escenario en vez de 12-16min) para esta iteración puntual — las tasas
-objetivo (RPS pico) son las mismas, solo se sostiene el pico menos tiempo. ESC-02 sí se corrió a
-duración completa. Ningún número local reemplaza al de GCP; se usan para AISLAR variables, no
-para sustituir la medición formal.
+Se corrió una versión local de ESC-01 contra `docker-compose` para tener un punto de
+comparación sin costo. **Nota de comparabilidad**: se corrió con duración reducida (~2.2min en vez
+de 12min) para esta iteración puntual — las tasas objetivo (RPS pico) son las mismas, solo se
+sostiene el pico menos tiempo. Ningún número local reemplaza al de GCP; se usa para AISLAR
+variables, no para sustituir la medición formal.
 
 **Primer intento de ESC-01 local — un hallazgo, no un resultado real**: la primera corrida dio
 98.7% de fallo con p95 en el techo de 60s. Investigado con `docker logs`/`docker stats`: el
@@ -164,9 +259,13 @@ control fino).*
    ESC-01**: pasar de llamadas síncronas bloqueantes a `asyncio.to_thread` bajó el p95 en 32% y
    la tasa de fallo en 40% sin cambiar NADA de infraestructura (mismo `max_instance_count=10`,
    mismo tier de Cloud SQL) — un solo patrón de código explica una fracción enorme de la
-   capacidad observada. La fracción restante (todavía fuera del umbral) sugiere que hay un
-   *segundo* punto de sensibilidad sin aislar todavía (candidato más probable: el pool de
-   conexiones de SQLAlchemy hacia Cloud SQL, o el tier `db-custom-1-3840` en sí).
+   capacidad observada. **[Cerrado, 2026-09-17]** El segundo punto de sensibilidad sospechado acá
+   (pool de conexiones / tier de Cloud SQL) se aisló y se resolvió: ver sección 1.1.1 — eran en
+   realidad 3 problemas apilados (sobresuscripción de conexiones por `containerConcurrency`
+   desincronizado del pool, cold-start del autoscaler bajo baja concurrencia, y 1 sola vCPU por
+   instancia compitiendo con el GIL de Python), los 3 corregidos y confirmados con corridas
+   replicadas. Sigue habiendo una duda sin resolver (punto 6, abajo) sobre variación entre corridas
+   con la misma config, que no bloquea el resultado final.
 2. **`vpc_egress` (`PRIVATE_RANGES_ONLY` vs `ALL_TRAFFIC`) en el módulo Cloud Run es sensible
    para la disponibilidad de la integración con Pulsar**: sin Direct VPC egress habilitado
    explícitamente, cualquier servicio que necesite hablarle a la VM de Pulsar por IP interna
@@ -187,6 +286,17 @@ control fino).*
    de integración entre bounded contexts construidos por personas distintas**: un cambio
    unilateral de formato en el productor (como el que ya rompió esto una vez, con Avro) rompe al
    consumidor sin que ninguno de los dos servicios, probados por separado, lo detecte.
+6. **[Nuevo, 2026-09-17, sin resolver]** ESC-01 contra GCP real tiene **variación significativa
+   entre corridas con la misma configuración exacta** — la corrida 4 dio 0% de fallo/5,646ms y su
+   replicación (corrida 8, mismo tier, misma config, instancia igual de estable) dio 0.6%
+   fallo/7,455ms. Esa variación es casi tan grande como la diferencia que se le atribuyó al tier de
+   Cloud SQL (corridas 5-7, tier grande, 3.7-5.9% fallo) — así que no está confirmado si subir el
+   tier realmente empeora el resultado, o si ambos grupos de corridas caen dentro del ruido normal
+   del experimento. Candidatos sin confirmar: contención en la VM generadora de carga
+   (`k6-runner-poc-vm`), variabilidad de "vecino ruidoso" en infraestructura compartida de GCP, o
+   autoscaling no determinístico de Cloud Run (aplanado en 10 instancias activas en TODAS las
+   corridas 3-8, pese a `max_instance_count=20`). Confirmar esto con rigor requiere varias corridas
+   por configuración (estadística), no una corrida puntual — no se hizo por costo.
 
 ## 4. Tradeoffs
 
@@ -209,42 +319,51 @@ ESC-01 en GCP genera una tasa de fallo real (11.9%) que localmente NO aparece (0
 100% de aceptación) — apunta a un costo específico de la plataforma GCP, no a falta de
 capacidad bruta ni a un bug de la aplicación en sí. Por orden de impacto esperado:
 
-1. **Instrumentar y medir el proxy de Cloud SQL directamente** durante una corrida real de
-   ESC-01: `gcloud sql operations list` / métricas nativas de Cloud SQL (conexiones activas,
-   CPU, latencia de queries) en Cloud Monitoring, correlacionadas en el tiempo con la corrida de
-   k6. Es el candidato #1 de la sección 2.7 y el más barato de confirmar o descartar (ya hay
-   observabilidad desplegada — `observabilidad/`, Grafana + Cloud Monitoring).
-2. **Probar `cpu_idle = false` y/o `startup_cpu_boost` ajustado** en el módulo
-   `infra-modules/cloud-run-service` para `gestion-de-trabajos`, y re-correr ESC-01 completo
-   contra GCP para ver si cambia el resultado — descarta o confirma el candidato #2.
-3. **Repetir ESC-01 completo (12 min, no la versión corta) contra GCP** con `min_instance_count`
-   elevado desde el inicio (evita cold starts a mitad de ráfaga, candidato #3) — comparar contra
-   el resultado ya documentado con `min_instance_count=0`.
-4. **Terminar una corrida de ESC-03 completa (16 min) contra GCP real** — la única corrida
-   post-fix de concurrencia se interrumpió antes de terminar; localmente sí pasó limpio
-   (sección 1.2), pero eso no reemplaza la medición formal contra GCP.
-5. **Corregir `advertisedListeners` en `pulsar-infra/docker-compose.yml`** para que cualquier
+1. **[Hecho, 2026-09-17]** ~~Instrumentar y medir el proxy de Cloud SQL directamente~~ — se hizo
+   vía Cloud Monitoring API (CPU, conexiones activas, `backends_in_wait`, deadlocks) correlacionado
+   con 5 corridas reales. Confirmó el candidato: CPU de Cloud SQL al 99.5% con el tier chico
+   (sección 1.1.1, corrida 4). Ver sección 3, punto 6 para la anomalía nueva que esto destapó.
+2. **[Descartado, 2026-09-17]** El candidato de `cpu_idle`/`startup_cpu_boost` no se probó
+   directamente, pero quedó subsumido por hallazgos más concretos y confirmados (sobresuscripción
+   de conexiones y cold-start del autoscaler, sección 1.1.1) que explican la brecha sin necesidad
+   de este candidato.
+3. **[Hecho, 2026-09-17]** ~~Repetir ESC-01 completo con `min_instance_count` elevado~~ — hecho,
+   es la corrida 4 de la sección 1.1.1: `min_instance_count=10` fue el cambio que más impacto tuvo
+   de toda la sesión (100% aceptación, 0% fallo, 0 `"no available instance"`).
+4. **[Hecho, 2026-09-17]** ~~Investigar el cuello de botella restante tras resolver sobresuscripción
+   y cold-start~~ — hecho: 1 vCPU/instancia (default silencioso de Cloud Run, nunca ajustado)
+   compitiendo con el GIL de Python. Subido a `cpu=2`/`memory=1Gi`, confirmado con 2 corridas
+   (9 y 10): p95 5,189-5,457ms, 0% fallo, 0 `"no available instance"` en ambas — el fix más
+   consistente de toda la sesión.
+5. **[Sin resolver, no bloqueante]** La duda sobre el tier de Cloud SQL (sección 3, punto 6): la
+   corrida 4 no se replicó limpiamente en la corrida 8 con la misma config — variación entre
+   corridas "iguales" casi tan grande como la diferencia atribuida al tier. No se confirmó si el
+   tier realmente importa o si es ruido del experimento. No bloqueó cerrar la sesión porque el fix
+   de CPU (punto 4) sí se confirmó de forma consistente sobre el tier chico. Requeriría varias
+   repeticiones por configuración (estadística) para resolverlo con confianza — no se hizo por
+   costo (10 corridas reales de ~12min cada una ya consumidas en esta sesión).
+6. **Corregir `advertisedListeners` en `pulsar-infra/docker-compose.yml`** para que cualquier
    contenedor Docker (no solo el host) pueda conectarse — hoy requiere un override manual
    (sección 2.7) para poder correr pruebas locales realistas con Pulsar de verdad arriba. Mismo
    patrón que ya existe para GCP (`pulsar-infra/gcp/templates/docker-compose.override.yml`),
    trasladado a un archivo equivalente para desarrollo local.
-6. **Automatizar la creación del tenant/namespace de Pulsar en Terraform** (hoy es un paso
+7. **Automatizar la creación del tenant/namespace de Pulsar en Terraform** (hoy es un paso
    manual post-`apply`, sin el cual todo el camino de integración falla en silencio tras un
    `destroy`+`apply` limpio).
-7. **Decidir, como equipo, si vale la pena desplegar el consumidor de Reputación** (con uno de
+8. **Decidir, como equipo, si vale la pena desplegar el consumidor de Reputación** (con uno de
   los dos caminos ya documentados) para cerrar el ciclo de integración de punta a punta —
   confirmado que el mensaje llega al tópico, no que Reputación lo procese.
 
 ## Referencias
 
-- `experimento-arquitectura/contexto/escenarios_calidad.md` — definición fuente de ESC-01/02/03.
+- `experimento-arquitectura/contexto/escenarios_calidad.md` — definición fuente de ESC-01.
 - `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`, Regla 3 — exigencia de
   volúmenes reales/compresión temporal documentada.
 - `k6/README.md` — metodología de medición, factor de compresión por escenario, tabla de
   resultados.
-- `k6/results/esc-0{1,2}-summary.json` — JSON completo de k6 de las corridas contra GCP real.
-- `k6/results-local/*.json` — JSON completo de k6 de las corridas locales (sección 1.2/2.7);
-  `esc-01-corto-local.json` y `esc-03-corto-local.json` son las versiones de duración reducida
-  con Pulsar local ya funcionando (no la primera corrida sin Pulsar, descartada como artefacto).
+- `k6/results/esc-01-summary.json` — JSON completo de k6 de la corrida contra GCP real.
+- `k6/results-local/esc-01-corto-local.json` — JSON completo de k6 de la corrida local (sección
+  1.2/2.7), versión de duración reducida con Pulsar local ya funcionando (no la primera corrida
+  sin Pulsar, descartada como artefacto).
 - `DESPLIEGUE-GCP-INTEGRAL.md` — inventario completo de los 7 stacks, orden de apply/destroy, y
   el detalle técnico de cada uno de los 7 bugs reales encontrados.

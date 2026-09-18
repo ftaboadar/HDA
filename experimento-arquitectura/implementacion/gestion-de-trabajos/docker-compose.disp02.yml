@@ -1,0 +1,69 @@
+# Orquestación completa del escenario DISP-02 (Sidecar/Throttler hacia el
+# CRM "Gestión de Agentes", ver ../../contexto/escenarios_calidad.md) para
+# la prueba de carga end-to-end: postgres + api (este servicio) + mock-crm
+# (doble real del CRM, implementacion/mocks-crm/), todos en la misma red por
+# defecto que crea `docker compose` — así `api` alcanza a `mock-crm` por
+# nombre de servicio (`http://mock-crm:8000`) sin depender de
+# `host.docker.internal` (no portable de forma uniforme entre
+# Windows/Mac/Linux). Compose separado de `docker-compose.yml` (el "normal"
+# de este servicio) para no forzar a quien solo quiere levantar la API a
+# tener que construir también el mock del CRM.
+#
+# Uso (ver tests/integracion/test_disp02_throttler.py para la prueba misma):
+#   docker compose -f docker-compose.disp02.yml up -d --build
+#   pytest tests/integracion/test_disp02_throttler.py
+#   docker compose -f docker-compose.disp02.yml down -v
+#
+# Puertos: postgres en 5435 (no 5434, para poder correr en paralelo con
+# docker-compose.yml normal si hiciera falta); api en 8003; mock-crm en 9200
+# (default de `crm_mock_url` en app/common/config.py, aunque aquí se
+# sobreescribe explícitamente para que quede trazable en este archivo).
+#
+# Parámetros del Throttler para esta prueba de carga (ver
+# tests/integracion/test_disp02_throttler.py para la justificación de estos
+# valores finales, ajustados tras iterar sobre la primera corrida): límite
+# de tasa del cliente igual al del mock (CRM_LIMITE_RPS=20 == limite_rps
+# configurado en mock-crm vía POST /_control/config en el propio test), cola
+# de 10_000 (default), reintentos y backoff ajustados para drenar una ráfaga
+# de 4x sin perder novedades.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hda
+      POSTGRES_PASSWORD: hda
+      POSTGRES_DB: gestion_trabajos
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hda -d gestion_trabajos"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  mock-crm:
+    build: ../mocks-crm
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "9200:8000"
+
+  api:
+    build: .
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    restart: on-failure:5
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/gestion_trabajos
+      CRM_MOCK_URL: http://mock-crm:8000
+      CRM_LIMITE_RPS: "20"
+      THROTTLER_COLA_TAMANO: "10000"
+      THROTTLER_MAX_REINTENTOS: "6"
+      THROTTLER_BACKOFF_BASE_S: "0.3"
+      THROTTLER_BACKOFF_MAX_S: "10"
+    ports:
+      - "8003:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-crm:
+        condition: service_started

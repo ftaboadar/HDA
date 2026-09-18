@@ -1,11 +1,14 @@
-# Pruebas de carga k6 — Escenarios de Escalabilidad (ESC-01, ESC-02, ESC-03)
+# Pruebas de carga k6 — Escenario de Escalabilidad (ESC-01)
 
 Hogar de los Alpes (HdA) — Entrega 4, MISO 2026-14.
 
-Fuente de los 3 escenarios: `experimento-arquitectura/contexto/escenarios_calidad.md`, tabla
-"Escalabilidad" (ESC-01/ESC-02/ESC-03). Regla de volúmenes: `REGLAS-DURAS-rubrica-entrega-3.md`,
+Fuente del escenario: `experimento-arquitectura/contexto/escenarios_calidad.md`, tabla
+"Escalabilidad", columna ESC-01. Regla de volúmenes: `REGLAS-DURAS-rubrica-entrega-3.md`,
 Regla 3 (usar el mismo volumen del enunciado o mayor, compresión temporal permitida si se declara
 el factor — mismo criterio ya usado en `DISP-03/plan.md` §5.4 y `DISP-03/RESULTADOS-DISP03.md`).
+
+**Nota de alcance**: ESC-02 y ESC-03 se quitaron del alcance acordado del equipo — solo ESC-01
+forma parte de la entrega. Sus scripts y resultados fueron removidos de este directorio.
 
 **Estado de este documento: código y smoke tests locales verificados; los valores de la tabla de
 resultados al final son placeholders — no se ha corrido ninguna prueba a la escala real contra GCP
@@ -15,65 +18,37 @@ todavía.** Mismo estándar de honestidad que `DISP-03/RESULTADOS-DISP03.md`.
 
 ```
 k6/
-  lib/config.js   URLs base + umbrales/tasas de cada ESC-XX (una sola fuente de verdad)
+  lib/config.js   URLs base + umbrales/tasas de ESC-01 (una sola fuente de verdad)
   esc-01.js       ESC-01 — pico 4x en 48h (Gestión de Trabajos)
-  esc-02.js       ESC-02 — 5x tráfico de un solo partner (DISP-03 / Verificación)
-  esc-03.js       ESC-03 — crecimiento sostenido 3x (Gestión de Trabajos + DISP-03)
-  results/        JSON crudo por corrida (`handleSummary`, uno por script, se sobrescribe)
+  results/        JSON crudo por corrida (`handleSummary`, se sobrescribe)
 ```
 
-## Qué mide cada script (resumen — el detalle completo y las derivaciones numéricas están en
-el comentario de cabecera de cada archivo `.js`, léanlo antes de correr nada)
+## Qué mide el script (resumen — el detalle completo y las derivaciones numéricas están en
+el comentario de cabecera de `esc-01.js`, léanlo antes de correr nada)
 
 | Script | Contra | Mide | Sección fuente en `escenarios_calidad.md` |
 |---|---|---|---|
 | `esc-01.js` | `gestion-de-trabajos` (`POST /trabajos`) + `DISP03_URL/salud` como proxy de "otro dominio" | Latencia de aceptación <2s y ≥99.9% aceptación durante un pico 4x; variación de latencia de "otro dominio" (medida manual post-hoc, ver abajo) | Tabla Escalabilidad, columna ESC-01 |
-| `esc-02.js` | DISP-03 (`POST /verificaciones`) | p95<300ms con 5x de tráfico en un `tipo_verificador` (proxy de "un partner"), sin degradar los otros dos | Tabla Escalabilidad, columna ESC-02 |
-| `esc-03.js` | `gestion-de-trabajos` (`POST /trabajos`) + DISP-03 (`POST /verificaciones`) | p95<300ms sostenido durante un `ramp-up` gradual hasta 3x | Tabla Escalabilidad, columna ESC-03 |
 
-## Factor de compresión temporal y derivación de tasas — por script
+## Factor de compresión temporal y derivación de tasas
 
 - **ESC-01**: escenario real de 48h → prueba de 12 minutos (factor ≈240x). Tasas: 289 req/s base →
   1157 req/s pico (derivadas de "+25M requests/día" → "100M+" = 25M×4, ver cabecera de `esc-01.js`
   para la justificación completa de esa lectura). La tasa NO se reduce, solo el tiempo total de
   exposición al pico.
-- **ESC-02**: sin ventana de tiempo real que comprimir (es un pico "súbito"). Baseline de 10 req/s
-  es un **supuesto explícito, no una cifra del enunciado** (el enunciado no da un volumen absoluto
-  de "tráfico habitual de un partner") — lo fiel al enunciado es el multiplicador ×5 y el umbral
-  p95<300ms. Ver cabecera de `esc-02.js`.
-- **ESC-03**: escenario real de 3 años → prueba de 16 minutos (factor ≈98.550x). El piso literal
-  del enunciado (12.000→36.000 trabajos/día ≈ 0,139→0,417 req/s) es real pero casi inmedible en
-  minutos; se usa una tasa de prueba amplificada (5→15 req/s) que preserva el factor ×3 exacto y
-  siempre queda por ENCIMA del piso (nunca por debajo — Regla 3). El crecimiento de proveedores
-  (+45.000→+100.000 en 3 años) no tiene una tasa de solicitudes/segundo en el enunciado (son
-  totales acumulados); se usa el mismo par 5→15 req/s como supuesto explícito. Ver cabecera de
-  `esc-03.js`.
 
 ## Brechas documentadas (no rellenadas con decisiones de diseño ocultas)
 
-1. **ESC-02 — "partner" no existe en la API de DISP-03.** `VerificacionCreate` solo tiene
-   `proveedor_id` y `tipo_verificador` (`policia`/`rues`/`certificadora`); no hay `partner_id` ni
-   rate limiting por partner en ningún Gateway del repo (DISP-01/DISP-02 en `escenarios_calidad.md`
-   tienen su "Decisión arquitectural" marcada `*Pendiente*`). `esc-02.js` usa `tipo_verificador`
-   como proxy de aislamiento (el mecanismo que sí existe: partición por tipo de verificador), no
-   como una simulación real de rate limiting por partner de un Gateway. Detalle completo en la
-   cabecera de `esc-02.js`.
-2. **"< 5% de variación en latencia de otros dominios/partners durante el pico"** (ESC-01 y ESC-02)
-   no se puede expresar como un `threshold` nativo de k6 — requiere comparar el p95 de una ventana
-   "antes del pico" contra una ventana "durante el pico" en el JSON exportado a `results/`. Los
-   scripts loguean todas las requests con timestamp (`console.log` JSON) y exportan el resumen
-   completo para que ese cálculo se haga después; no es un veredicto automático.
-3. **ESC-02 — "auto-escalamiento activo en <60s"** no se puede medir con k6 solo (k6 no lee el
-   conteo de instancias de Cloud Run). La rampa a 5x en `esc-02.js` dura 45s a propósito (estímulo),
-   pero confirmar el auto-escalamiento real requiere cruzar con métricas/logs de Cloud Run en
-   paralelo a la corrida contra GCP.
-4. **`gestion-de-trabajos` no tiene `docker-compose.yml` todavía** (confirmado en su propio
+1. **"< 5% de variación en latencia de otros dominios durante el pico"** (ESC-01) no se puede
+   expresar como un `threshold` nativo de k6 — requiere comparar el p95 de una ventana "antes del
+   pico" contra una ventana "durante el pico" en el JSON exportado a `results/`. El script loguea
+   todas las requests con timestamp (`console.log` JSON) y exporta el resumen completo para que ese
+   cálculo se haga después; no es un veredicto automático.
+2. **`gestion-de-trabajos` no tiene `docker-compose.yml` todavía** (confirmado en su propio
    README, sección "Cómo correrlo") — por instrucción explícita de este ejercicio, no se creó uno.
-   Esto significa que `esc-01.js` y `esc-03.js` (que dependen de `gestion-de-trabajos`) solo se
-   validaron por **sintaxis/lógica en modo `SMOKE`** (contra un puerto sin servidor arriba,
-   confirmando que el script compila y su lógica de payloads/checks corre sin errores), NO contra
-   una instancia real corriendo. `esc-02.js` sí se validó end-to-end contra DISP-03 real vía
-   `docker-compose` (ver "Qué se validó de verdad" más abajo).
+   Esto significa que `esc-01.js` solo se validó por **sintaxis/lógica en modo `SMOKE`** (contra un
+   puerto sin servidor arriba, confirmando que el script compila y su lógica de payloads/checks
+   corre sin errores), NO contra una instancia real corriendo.
 
 ## Cómo correrlo — local (contra `docker-compose`)
 
@@ -89,13 +64,11 @@ cd experimento-arquitectura/implementacion/k6
 
 # Smoke test (pocos VUs/segundos, valida sintaxis/lógica, NO el escenario real):
 k6 run -e SMOKE=true -e DISP03_URL=http://localhost:8000 -e GESTION_TRABAJOS_URL=http://localhost:8001 \
-  --vus 2 --duration 10s esc-02.js
+  --vus 2 --duration 10s esc-01.js
 
-# Corrida real del escenario completo (usa las tasas/duraciones reales de cada ESC-XX,
+# Corrida real del escenario completo (usa las tasas/duración reales de ESC-01,
 # ignora --vus/--duration porque el script define sus propios `scenarios`):
-k6 run -e DISP03_URL=http://localhost:8000 esc-02.js
 k6 run -e GESTION_TRABAJOS_URL=http://localhost:8001 -e DISP03_URL=http://localhost:8000 esc-01.js
-k6 run -e GESTION_TRABAJOS_URL=http://localhost:8001 -e DISP03_URL=http://localhost:8000 esc-03.js
 ```
 
 ## Cómo correrlo — contra GCP real
@@ -110,60 +83,90 @@ DISP03_URL=$(cd ../DISP-03/infra && terraform output -raw api_url)
 
 k6 run -e DISP03_URL="$DISP03_URL" -e GESTION_TRABAJOS_URL="https://<cloud-run-url-gestion-trabajos>" \
   esc-01.js
-k6 run -e DISP03_URL="$DISP03_URL" esc-02.js
-k6 run -e DISP03_URL="$DISP03_URL" -e GESTION_TRABAJOS_URL="https://<cloud-run-url-gestion-trabajos>" \
-  esc-03.js
 ```
 
-Recomendado: correr con `--out json=results/esc-XX-raw.jsonl` además del `handleSummary` que ya
-exporta cada script, para tener el detalle punto-a-punto de cada request si se necesita
+Recomendado: correr con `--out json=results/esc-01-raw.jsonl` además del `handleSummary` que ya
+exporta el script, para tener el detalle punto-a-punto de cada request si se necesita
 diagnosticar un umbral incumplido.
+
+### Por qué correr k6 desde una VM y no en local
+
+`esc-01.js` usa el executor `ramping-arrival-rate` con `preAllocatedVUs: 200`/`maxVUs: 2000`
+(modelo abierto: sostiene la tasa objetivo, hasta 1157 req/s en el pico, sin importar cuánto
+tarden en responder las requests en vuelo). Con las latencias ya observadas contra GCP real bajo
+el escenario sin corregir (p95 de varios segundos, picos de hasta ~60s), sostener esa tasa exige
+mantener miles de conexiones TCP/TLS concurrentes abiertas. Corrido desde una laptop en una red
+doméstica, ese volumen de conexiones satura la tabla de NAT/conntrack (y la CPU) del router de
+consumo — tumba la conectividad de **toda** la red, no solo la de k6. Confirmado en esta sesión:
+correrlo en local contra las URLs de Cloud Run dejó sin red al resto de dispositivos de la casa.
+
+La corrida **local contra `docker-compose`** (sección de arriba) no tiene este problema — ese
+tráfico nunca sale de la máquina/red Docker interna. El problema es específico de apuntar
+`esc-01.js` a URLs públicas de Cloud Run desde una conexión residencial.
+
+**Solución**: `infra/` en este mismo directorio provisiona una VM de Compute Engine en
+`southamerica-east1` (misma región que el resto de los stacks) con k6 preinstalado y
+`esc-01.js`/`lib/config.js` embebidos tal cual — la carga sale desde la red de Google directo
+hacia Cloud Run, sin pasar por ningún router doméstico, y de paso da una medición más realista
+(sin la latencia/jitter de la conexión del desarrollador metida en el resultado).
+
+```bash
+cd infra
+terraform init
+terraform apply -var project_id=hda-projectt   # recursos facturables — confirmar antes de aplicar
+
+# entrar y correr la prueba:
+$(terraform output -raw ssh_iap_command)
+#   dentro de la VM:
+#   cd /opt/k6-runner
+#   k6 run -e DISP03_URL="..." -e GESTION_TRABAJOS_URL="..." --out json=results/esc-01-raw.jsonl esc-01.js
+
+# traer los resultados de vuelta:
+$(terraform output -raw scp_resultados_command)
+
+terraform destroy -var project_id=hda-projectt   # apagar la VM cuando ya no se necesite
+```
 
 ## Qué se validó de verdad en esta sesión (smoke test local)
 
-- **`esc-02.js` contra DISP-03 real** (`docker compose up -d --build` en `DISP-03/`, API sana en
-  `GET /salud`): corrido con `k6 run -e SMOKE=true --vus 2 --duration 10s -e
-  DISP03_URL=http://localhost:8000 esc-02.js` — 3896 iteraciones completas, **100% `202` en
-  `POST /verificaciones`** para los 3 `tipo_verificador` (`policia`, `rues`, `certificadora`), sin
-  errores de payload ni de ruta. Esto confirma que el contrato HTTP real (`VerificacionCreate`) y
-  la lógica del script coinciden.
-- **`esc-01.js` y `esc-03.js`**: validados solo en modo `SMOKE` contra puertos sin servidor arriba
+- **`esc-01.js`**: validado solo en modo `SMOKE` contra un puerto sin servidor arriba
   (`connection refused` esperado) — confirma que el JS compila, que `handleSummary` genera el JSON
   de salida, y que la lógica de checks/logs no lanza excepciones. **No** se validó su comportamiento
-  contra una instancia real de `gestion-de-trabajos`, por la brecha #4 de arriba.
-- No se corrió ninguna prueba a la escala/tasa real (289–1157 req/s, etc.) contra ningún entorno —
+  contra una instancia real de `gestion-de-trabajos`, por la brecha #2 de arriba.
+- No se corrió ninguna prueba a la escala/tasa real (289–1157 req/s) contra ningún entorno —
   eso es explícitamente trabajo de una corrida real posterior (local a baja escala primero, luego
   GCP), no de este smoke test.
 
-## Plantilla de resultados (placeholders — llenar después de correr de verdad)
+## Resultados (última actualización: 2026-09-17)
 
-> Todos los valores de abajo son `TBD`. No reemplazar por números inventados; dejar `TBD` hasta
-> tener una corrida real registrada, con fecha, entorno y comando exacto usado — mismo estándar que
-> `DISP-03/RESULTADOS-DISP03.md`.
+Mismo estándar que `DISP-03/RESULTADOS-DISP03.md`: solo números de corridas reales, nunca
+inventados. Detalle completo, diagnóstico en cadena y la variación entre corridas sin resolver:
+`../RESULTADOS-ESCALABILIDAD-GCP.md`, sección 1.1.1.
 
 ### ESC-01 — Pico 4x en 48h
 
-| Entorno | Fecha | p95 aceptación medido | Throughput medido (req/s) | % aceptación medido | Variación p95 "otro dominio" | Veredicto cumple/no-cumple |
-|---|---|---|---|---|---|---|
-| Local (docker-compose) | TBD | TBD | TBD | TBD | TBD | *(responsabilidad de `validador-hipotesis`, no de este documento)* |
-| GCP real (2026-09-14, 1ª corrida, antes del fix de concurrencia) | 2026-09-14 | 14208ms | 216 req/s | 79.9% (`esc01_aceptacion_ok`) | no medido | *(no cumple el umbral &lt;2s / ≥99.9% — ver "Qué falta" abajo, atribuido a `_repo.guardar` síncrono bloqueando el event loop)* |
-| GCP real (2026-09-14, 2ª corrida, después del fix de concurrencia) | 2026-09-14 | 9717ms | 326 req/s | 88.1% (`esc01_aceptacion_ok`) | no medido | *(mejoró sustancialmente pero SIGUE sin cumplir el umbral — ver "Qué falta")* |
-
-**Qué falta (ESC-01, honesto a propósito):** el fix de `asyncio.to_thread` (ver commit) resolvió el bloqueo del event loop pero no fue suficiente por sí solo — la causa raíz residual no se investigó más a fondo en esta sesión por tiempo (candidatos sin confirmar: tamaño del pool de conexiones de SQLAlchemy hacia Cloud SQL, `max_instance_count=10`/`containerConcurrency=80` del módulo insuficientes para el pico real, o el propio tier de Cloud SQL `db-custom-1-3840` saturado). Queda para quien retome esto: perfilar con las métricas de Cloud SQL (conexiones activas, CPU) durante una corrida de ESC-01 real.
-
-### ESC-02 — 5x tráfico de un partner
-
-| Entorno | Fecha | p95 partner en pico | p95 otros partners | Auto-scaling medido (s) | % rate limiting a otros | Veredicto cumple/no-cumple |
-|---|---|---|---|---|---|---|
-| Local (docker-compose) | TBD | TBD | TBD | N/A (sin auto-scaling local) | TBD | *(responsabilidad de `validador-hipotesis`)* |
-| GCP real | 2026-09-14 | 260.4ms | 261.7ms | no medido | 0% (0 de 14,789 requests) | *(cumple el umbral &lt;300ms en ambos casos, y el 0% de rate-limiting cruzado — veredicto final formal sigue siendo trabajo de `validador-hipotesis`)* |
-
-### ESC-03 — Crecimiento sostenido 3x
-
-| Entorno | Fecha | p95 trabajos (1x → 3x) | p95 proveedores (1x → 3x) | Throughput sostenido medido | Veredicto cumple/no-cumple |
+| Entorno | Fecha | p95 aceptación medido | Throughput medido (req/s) | % aceptación medido | Veredicto cumple/no-cumple |
 |---|---|---|---|---|---|
-| Local (docker-compose) | TBD | TBD | TBD | TBD | *(responsabilidad de `validador-hipotesis`)* |
-| GCP real | TBD | TBD | TBD | TBD | *(idem)* |
+| Local (docker-compose, duración completa ~10.9min, pool 50/50) | 2026-09-16 | 7869ms | 333 req/s | 97.9% | *(responsabilidad de `validador-hipotesis`, no de este documento)* |
+| GCP real (2026-09-14, 1ª corrida, antes del fix de concurrencia) | 2026-09-14 | 14208ms | 216 req/s | 79.9% | No cumple |
+| GCP real (2026-09-14, 2ª corrida, después del fix `asyncio.to_thread`) | 2026-09-14 | 9717ms | 326 req/s | 88.1% | No cumple |
+| GCP real, corrida desde `k6-runner-poc-vm` (2026-09-16, concurrency=15/15/15 sincronizado, sin `min_instance_count`) | 2026-09-16 | 9991ms | 543 req/s | 85.8% | No cumple |
+| **GCP real, + `min_instance_count=10`** (2026-09-16) | 2026-09-16 | **5646ms** | 544 req/s | **100%** | No cumple, pero es la mejor corrida real — 0% de fallo |
+| GCP real, + Cloud SQL 4 vCPU (2026-09-17) | 2026-09-17 | 7352-8613ms | 656-668 req/s | 94.1-96.3% | No cumple |
+| GCP real, replicación con tier 2 vCPU (2026-09-17) | 2026-09-17 | 7455ms | 550 req/s | 99.4% | No cumple — no reprodujo el 0% de fallo de la corrida 4 |
+| **GCP real, + `cpu=2`/`memory=1Gi` por instancia** (2026-09-17) | 2026-09-17 | **5189ms** | 499 req/s | **100%** | No cumple, pero mejor p95 de toda la sesión — 0% de fallo |
+| **GCP real, replicación del fix de CPU** (2026-09-17) | 2026-09-17 | **5457ms** | 551 req/s | **100%** | No cumple, pero confirma el fix — también 0% de fallo |
+
+**Qué falta (ESC-01, honesto a propósito):** con la sobresuscripción de conexiones, el cold-start
+del autoscaler y (el hallazgo final) 1 sola vCPU por instancia compitiendo con el GIL de Python
+todos resueltos (ver `RESULTADOS-ESCALABILIDAD-GCP.md` sección 1.1.1), la mejor config confirmada
+(2 corridas consistentes, 9 y 10) da p95 ~5.2-5.5s con 0% de fallo — sigue sin pasar el umbral de
+2s, pero es el resultado más limpio y reproducible de toda la sesión. Queda sin resolver, sin
+bloquear el cierre: por qué el tier de Cloud SQL no se comportó de forma consistente entre
+corridas (corrida 4 vs. su replicación, corrida 8) — candidatos sin confirmar: la VM que genera la
+carga, "vecino ruidoso" en GCP, autoscaling no determinístico de Cloud Run. Para llegar a <2s desde
+acá: perfilar qué consume esos ~5s dentro del código mismo (no solo infra) — 2 escrituras
+síncronas + 1 publish a Pulsar por request, todo compartiendo un solo `ThreadPoolExecutor`.
 
 ## Referencias
 

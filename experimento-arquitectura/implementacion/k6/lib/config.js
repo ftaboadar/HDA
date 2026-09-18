@@ -1,9 +1,9 @@
 /**
- * Configuración compartida de las pruebas de carga k6 — Escenarios de Escalabilidad
- * (ESC-01, ESC-02, ESC-03), ver `experimento-arquitectura/contexto/escenarios_calidad.md`.
+ * Configuración compartida de las pruebas de carga k6 — Escenario de Escalabilidad
+ * ESC-01, ver `experimento-arquitectura/contexto/escenarios_calidad.md`.
  *
- * TODAS las URLs y umbrales viven aquí para no repetirlos en cada script (`esc-01.js`,
- * `esc-02.js`, `esc-03.js` solo importan de este módulo).
+ * TODAS las URLs y umbrales viven aquí para no repetirlos en el script (`esc-01.js`
+ * solo importa de este módulo).
  *
  * Convención de modo "smoke" (validación de sintaxis/lógica, NO del escenario real):
  * si se define la variable de entorno k6 `SMOKE=true`, cada script devuelve un objeto
@@ -70,63 +70,4 @@ export const ESC01 = {
   P95_ACEPTACION_MS: 2000,
   TASA_ACEPTACION_MIN: 0.999, // ≥ 99.9%
   VARIACION_OTROS_DOMINIOS_MAX: 0.05, // < 5% — ver limitación documentada en esc-01.js
-};
-
-// ---------------------------------------------------------------------------
-// ESC-02 — 5x tráfico de un solo partner B2B2C (DISP-03 / Verificación)
-// Fuente: escenarios_calidad.md, tabla Escalabilidad, columna ESC-02.
-// Estímulo: "hasta 5x el tráfico habitual de un solo partner" (SIN cifra
-// absoluta de tráfico "habitual" en el enunciado ni en escenarios_calidad.md
-// — a diferencia de ESC-01/ESC-03, que sí traen cifras absolutas).
-//
-// LIMITACIÓN DOCUMENTADA (no rellenada con una decisión de diseño oculta):
-// el baseline de 10 req/s de abajo NO viene del enunciado del proyecto — es
-// un supuesto explícito de esta prueba, necesario porque el enunciado no fija
-// un volumen absoluto para "el tráfico habitual de un solo partner". Lo que
-// SÍ es fiel al enunciado es el multiplicador ×5 (la variable que el
-// escenario realmente mide) y el umbral p95<300ms (medida de la respuesta,
-// textual). Antes de reportar resultados de este escenario como concluyentes,
-// alguien del equipo con datos reales de tráfico por partner debería
-// reemplazar BASE_RPS por la cifra real.
-// ---------------------------------------------------------------------------
-export const ESC02 = {
-  BASE_RPS: 10, // SUPUESTO — no viene del enunciado, ver comentario arriba
-  PEAK_RPS: 50, // 10 × 5
-  AUTOSCALING_MAX_S: 60,
-  P95_MS: 300,
-  RATE_LIMIT_OTROS_PARTNERS_MAX: 0.0, // 0% de rate limiting a partners no involucrados
-  VARIACION_OTROS_PARTNERS_MAX: 0.05, // < 5% de variación en p95 de otros partners
-};
-
-// ---------------------------------------------------------------------------
-// ESC-03 — Crecimiento sostenido 3x (Gestión de Trabajos + Verificación)
-// Fuente: escenarios_calidad.md, tabla Escalabilidad, columna ESC-03.
-// Estímulo: "el volumen total de la plataforma crece de ~12.000 a 36.000
-// trabajos/día (×3) y de +45.000 a +100.000 proveedores registrados en 3
-// años".
-//
-// Derivación de tasas LITERALES del enunciado (piso, Regla 3):
-//   trabajos base: 12.000/día / 86.400 s/día ≈ 0.139 req/s
-//   trabajos pico: 36.000/día / 86.400 s/día ≈ 0.417 req/s  (×3)
-// Estas tasas literales son demasiado bajas para ejercer el sistema de forma
-// medible en una ventana de prueba de minutos (compresión temporal, ver
-// esc-03.js) — por eso el script usa una tasa de prueba AMPLIFICADA que
-// preserva el factor de crecimiento ×3 exacto del enunciado, pero en un
-// orden de magnitud mayor (nunca menor) al piso literal, cumpliendo Regla 3
-// ("igual o mayor", nunca "o menor"). Ambas cifras (piso literal y tasa de
-// prueba amplificada) quedan documentadas explícitamente, ninguna oculta.
-// ---------------------------------------------------------------------------
-export const ESC03 = {
-  TRABAJOS_BASE_RPS_LITERAL: 0.139, // piso real del enunciado — documentado, no usado directo
-  TRABAJOS_PEAK_RPS_LITERAL: 0.417,
-  TRABAJOS_BASE_RPS_PRUEBA: 5, // tasa amplificada usada en el script (> piso literal)
-  TRABAJOS_PEAK_RPS_PRUEBA: 15, // 5 × 3 — mantiene el factor ×3 del enunciado
-  // Proxy de crecimiento de proveedores (+45.000 → +100.000 en 3 años) contra
-  // DISP-03 — no hay una tasa de "verificaciones/segundo" en el enunciado
-  // para ese crecimiento (son totales acumulados, no un flujo diario), así
-  // que se usa el mismo par base/pico amplificado ×3 que trabajos, como
-  // SUPUESTO explícito documentado en esc-03.js, no como cifra derivada.
-  PROVEEDORES_BASE_RPS_PRUEBA: 5,
-  PROVEEDORES_PEAK_RPS_PRUEBA: 15,
-  P95_MS: 300, // "mismo SLA de latencia (p95 < 300ms) que hoy"
 };

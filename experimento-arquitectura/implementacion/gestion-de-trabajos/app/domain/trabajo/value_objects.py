@@ -3,11 +3,13 @@ constructor, igualdad por valor. Distintos (a propósito) de los schemas de
 `app/common/schemas.py`: esos son el contrato de serialización HTTP, estos
 son el vocabulario del dominio — no se mezclan capas.
 
-`Dinero` y `Region` se reutilizan también desde `domain/pagos/` (ver
-`app/domain/pagos/value_objects.py`) — es un préstamo válido *dentro del
-mismo Bounded Context* (Gestión de Trabajos, del cual el módulo ACL de
-Pagos es un submódulo, ver 12-plan-entrega-4.md sección 0.1), no un shared
-kernel entre microservicios distintos."""
+Separación de Pagos: hasta que ese módulo era un submódulo ACL de este
+mismo proceso, `Dinero` y `Region` se reutilizaban también desde
+`domain/pagos/` — préstamo válido *dentro del mismo Bounded Context*. Ahora
+que Pagos es un microservicio independiente
+(`implementacion/pagos/README.md`), tiene sus propias copias locales de
+estos VOs (`implementacion/pagos/app/domain/pagos/value_objects.py`); no
+hay ningún import cruzado entre los dos servicios."""
 
 from __future__ import annotations
 

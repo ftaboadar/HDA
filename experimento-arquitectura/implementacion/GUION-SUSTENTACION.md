@@ -35,8 +35,7 @@ hay números medidos, y hay una causa raíz identificada** para el escenario que
 Abre la consola de GCP o corre esto en vivo para mostrar que es real, no una promesa de diseño:
 
 ```bash
-gcloud run services list --project=hda-projectt \
-  --format="table(metadata.name,status.url,status.conditions[0].status)"
+gcloud run services list --project=hda-projectt --format="table(metadata.name,status.url,status.conditions[0].status)"
 ```
 
 Da 10 servicios Cloud Run + 1 VM de Compute Engine, todos `True` (sanos). Explícalo así:

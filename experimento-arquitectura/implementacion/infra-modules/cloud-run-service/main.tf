@@ -65,6 +65,10 @@ resource "google_cloud_run_v2_service" "this" {
       resources {
         startup_cpu_boost = var.startup_cpu_boost
         cpu_idle          = var.cpu_idle
+        limits = {
+          cpu    = var.cpu
+          memory = var.memory
+        }
       }
 
       dynamic "env" {

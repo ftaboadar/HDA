@@ -1,0 +1,9 @@
+{"ts": 1789524553.8070738, "caso": "DISP-02", "metrica": "pct_sin_perdida_por_rate_limiting", "valor": 1.0, "umbral": 0.999, "cumple": true, "detalle": "entregadas=2000 agotadas=0 sin_estado_terminal_tras_1h=0 total=2000 crm_limite_rps=20 n_novedades=2000"}
+{"ts": 1789524553.8074365, "caso": "DISP-02", "metrica": "pct_entregado_dentro_15min", "valor": 1.0, "umbral": 0.99, "cumple": true, "detalle": ""}
+{"ts": 1789524553.8076537, "caso": "DISP-02", "metrica": "pct_entregado_dentro_1h", "valor": 1.0, "umbral": 1.0, "cumple": true, "detalle": ""}
+{"ts": 1789524553.807847, "caso": "DISP-02", "metrica": "cantidad_agotadas", "valor": 0, "umbral": 0, "cumple": true, "detalle": "idealmente 0 AGOTADA si el diseño del throttler es correcto"}
+{"ts": 1789524553.8080463, "caso": "DISP-02", "metrica": "cantidad_sin_estado_terminal_tras_1h", "valor": 0, "umbral": 0, "cumple": true, "detalle": ""}
+{"ts": 1789524553.8082314, "caso": "DISP-02", "metrica": "duracion_total_drenado_s", "valor": 125.42044162750244, "umbral": 3600, "cumple": true, "detalle": ""}
+{"ts": 1789524553.8084183, "caso": "DISP-02", "metrica": "tiempo_encolado_rafaga_s", "valor": 20.64056420326233, "umbral": null, "cumple": true, "detalle": "tiempo que tomó aceptar (202) las N POST /novedades, no su entrega real al CRM"}
+{"ts": 1789524564.6592023, "caso": "DISP-02", "metrica": "disponibilidad_salud_bajo_crm_saturado", "valor": 1.0, "umbral": 0.999, "cumple": true, "detalle": "20 muestras de GET /salud mientras el CRM está limitado a 1rps"}
+{"ts": 1789524564.659806, "caso": "DISP-02", "metrica": "p95_latencia_salud_bajo_crm_saturado_ms", "valor": 8.14676284790039, "umbral": null, "cumple": true, "detalle": "métrica informativa, sin umbral absoluto declarado en escenarios_calidad.md"}
