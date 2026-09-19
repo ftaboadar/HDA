@@ -40,6 +40,9 @@ resource "google_sql_user" "hda" {
   name     = "hda"
   instance = google_sql_database_instance.verificacion.name
   password = random_password.db_password.result
+  # Postgres no deja borrar un usuario que aún posee objetos (falla el `terraform destroy`).
+  # ABANDON lo omite: al borrar la instancia, el usuario desaparece con ella.
+  deletion_policy = "ABANDON"
 }
 
 resource "google_secret_manager_secret" "db_url" {

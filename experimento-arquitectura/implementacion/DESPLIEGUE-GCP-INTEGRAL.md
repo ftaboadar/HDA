@@ -102,9 +102,28 @@ Problemas conocidos al montar (ver `GUIA-DEMO-ESCENARIOS.md`, sección "Problema
 for s in observabilidad proveedores/infra reputacion/infra pagos/infra gestion-de-trabajos/infra mocks-crm/infra mocks-pagos/infra pulsar-infra/gcp; do
   (cd $IMPL/$s && terraform destroy -auto-approve -var project_id=$PROJECT -var region=$REGION)
 done
+
+# Después de los 8 destroy: el bucket que crea Cloud Build solo (NO está en Terraform) y donde sube el código de cada `gcloud builds submit`
+gcloud storage rm -r gs://${PROJECT}_cloudbuild --quiet
 ```
-(`gestion-de-trabajos` va antes que `pulsar-infra/gcp` porque depende de su IP. Para `destroy` basta `project_id` y `region`: las demás variables tienen valor por defecto.
-Cada `terraform destroy` usa el estado local de ese stack: solo puede apagar lo que esa misma carpeta desplegó.)
+
+Notas del destroy:
+- `gestion-de-trabajos` va antes que `pulsar-infra/gcp` porque depende de su IP. Para `destroy` basta `project_id` y `region`; `gestion-de-trabajos` puede pedir además `-var max_instance_count=9` (su validación de cuota corre también al destruir).
+- Cada `terraform destroy` usa el estado local de ese stack: solo puede apagar lo que esa misma carpeta desplegó.
+- **Usuario de Cloud SQL:** Postgres no deja borrar el usuario `hda` mientras posee objetos y el destroy fallaba con
+  `role "hda" cannot be dropped because some objects depend on it`. Los 4 stacks con Cloud SQL ya llevan `deletion_policy = "ABANDON"` en `google_sql_user.hda`,
+  así que el usuario se omite y desaparece junto con la instancia. Si aun así ves ese error (estado creado con una versión anterior),
+  `terraform state rm google_sql_user.hda` y repite el `destroy`.
+- **Reutilizar nombres:** GCP no permite reutilizar el nombre de una instancia de Cloud SQL durante hasta una semana tras borrarla. En un proyecto
+  nuevo no importa; si vuelves a montar en el MISMO proyecto justo después de un destroy, cambia el prefijo con `-var entorno=<otro>` en cada stack
+  (cambia también los nombres y las URLs) o espera.
+- Comprobación de que no queda nada facturando:
+  `gcloud run services list`, `gcloud sql instances list`, `gcloud compute instances list`, `gcloud pubsub topics list` y
+  `gcloud artifacts repositories list` (todos con `--project $PROJECT`) deben salir vacíos.
+
+**Lo que esta receta garantiza y lo que no:** el orden, las variables y las correcciones salen de la sesión real en `hogaralpes`
+(despliegue completo y destroy completo, con los 8 stacks en 0 recursos). No se ha repetido en un proyecto limpio desde este documento:
+si un paso falla en la primera corrida de otra persona, corrígelo aquí.
 
 ---
 
