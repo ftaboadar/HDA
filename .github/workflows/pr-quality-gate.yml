@@ -35,7 +35,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - servicio: proveedores
+          # La etiqueta `servicio` forma parte del NOMBRE del check requerido por la protección
+          # de la rama ("... (DISP-03)"): no renombrarla sin cambiar también ese check en GitHub.
+          - servicio: DISP-03
             carpeta: experimento-arquitectura/implementacion/proveedores
             opcional: false
             compose_file: docker-compose.yml
