@@ -15,3 +15,17 @@ datasources:
       # (ver grafana.tf), esto falla con 403 al primer query.
       authenticationType: gce
       defaultProject: ${project_id}
+
+  # Cloud Logging: mismas credenciales del metadata server (authenticationType
+  # "gce"), pero requiere roles/logging.viewer aparte -- monitoring.viewer NO
+  # da acceso a logs. El plugin no viene en la imagen oficial de Grafana; se
+  # instala vía GF_INSTALL_PLUGINS en grafana.tf. Esto es lo que permite ver
+  # en Grafana el mismo detalle de log que se ve en Logs Explorer de GCP
+  # (jsonPayload.evento, verificacion_id, trabajo_id, etc.).
+  - name: Google Cloud Logging
+    type: googlecloud-logging-datasource
+    uid: gcl
+    access: proxy
+    jsonData:
+      authenticationType: gce
+      defaultProject: ${project_id}

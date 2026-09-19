@@ -36,6 +36,14 @@ module "api" {
 
   env_vars = [
     {
+      name  = "GCP_PROJECT"
+      value = var.project_id
+    },
+    {
+      name  = "LOG_DETALLE"
+      value = var.log_detalle
+    },
+    {
       name      = "DATABASE_URL"
       secret_id = google_secret_manager_secret.db_url.secret_id
     },
@@ -70,6 +78,30 @@ module "api" {
       name  = "DB_MAX_OVERFLOW"
       value = "5"
     },
+    # DISP-02: Throttler hacia el CRM. Sin CRM_MOCK_URL el throttler apunta a
+    # su default de desarrollo (localhost:9200) y en Cloud Run toda novedad
+    # falla. Los demás valores son los mismos de docker-compose.disp02.yml,
+    # ajustados allí por el equipo para drenar una ráfaga 4x sin pérdida.
+    {
+      name  = "CRM_MOCK_URL"
+      value = var.crm_mock_url
+    },
+    {
+      name  = "CRM_LIMITE_RPS"
+      value = var.crm_limite_rps
+    },
+    {
+      name  = "THROTTLER_MAX_REINTENTOS"
+      value = "6"
+    },
+    {
+      name  = "THROTTLER_BACKOFF_BASE_S"
+      value = "0.3"
+    },
+    {
+      name  = "THROTTLER_BACKOFF_MAX_S"
+      value = "10"
+    },
   ]
 
   # Antes 0: la corrida de ESC-01 con concurrency=15 mostró "The request
@@ -89,8 +121,13 @@ module "api" {
   # garantiza cerrar el umbral por sí sola. Costo: instancias facturando
   # de forma continua, no solo bajo demanda -- apagar (min=0) fuera de
   # una corrida de este experimento.
-  min_instance_count = 10
-  max_instance_count = 20
+  # min=1 por defecto en hogaralpes (cuota de 20 vCPU/región: 10×2vCPU=20
+  # se comía TODA la cuota, sin dejar nada para Proveedores/CRM/Grafana).
+  # Para reproducir la corrida real de ESC-01, pasar
+  # -var min_instance_count=10 explícitamente (y apagarlo de nuevo después,
+  # tal como ya decía este comentario antes de que existiera var.min_instance_count).
+  min_instance_count = var.min_instance_count
+  max_instance_count = var.max_instance_count
   # Antes 200, desincronizado de max_workers (100 fijo en main.py) y del
   # pool de conexiones (50+50) -- generaba cola interna en la instancia Y
   # sobresuscripción de conexiones contra Cloud SQL al mismo tiempo (dos
