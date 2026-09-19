@@ -4,7 +4,7 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Región de GCP — southamerica-east1 (São Paulo) por defecto, misma región que el resto de los stacks (DISP-03/infra, gestion-de-trabajos/infra, pulsar-infra/gcp) para no meter latencia inter-región en la medición de ESC-01"
+  description = "Región de GCP — southamerica-east1 (São Paulo) por defecto, misma región que el resto de los stacks (proveedores/infra, gestion-de-trabajos/infra, pulsar-infra/gcp) para no meter latencia inter-región en la medición de ESC-01"
   type        = string
   default     = "southamerica-east1"
 }

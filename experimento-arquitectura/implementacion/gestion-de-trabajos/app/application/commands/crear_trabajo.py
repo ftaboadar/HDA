@@ -22,18 +22,19 @@ efectivamente todas las requests de una instancia sin importar
 `containerConcurrency`, causando colas de segundos y timeouts (p95 medido:
 14.2s, 20% de requests fallidas). Se envuelve en `asyncio.to_thread`, mismo
 patrón ya establecido y auditado en
-`DISP-03/app/application/commands/registrar_intento.py`."""
+`proveedores/app/application/commands/registrar_intento.py`."""
 
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from decimal import Decimal
 
 from app.application.dispatcher_eventos_dominio import despachar
 from app.application.ports.publicador import IPublicador
 from app.application.ports.registro_trabajos import IRegistroTrabajosRepository
-from app.common.logging_utils import configurar_logging
+from app.common.logging_utils import configurar_logging, log_evento
 from app.domain.trabajo.fabrica import FabricaTrabajo
 from app.domain.trabajo.repository import ITrabajoRepository
 from app.domain.trabajo.value_objects import ProveedorId, Region
@@ -55,6 +56,7 @@ class CrearTrabajo:
     async def ejecutar(
         self, proveedor_id: str, monto: Decimal, region: str
     ) -> uuid.UUID:
+        inicio = time.perf_counter()
         trabajo = FabricaTrabajo.crear(
             proveedor_id=ProveedorId(proveedor_id),
             monto=monto,
@@ -68,11 +70,39 @@ class CrearTrabajo:
         # de punta a punta.
         trabajo.finalizar()
         await asyncio.to_thread(self._repo.guardar, trabajo)
+        t_persistido = time.perf_counter()
+
+        eventos = trabajo.recoger_eventos()
+        for evento in eventos:
+            log_evento(
+                logger,
+                "evento_dominio_trabajo_finalizado_emitido",
+                detalle=True,
+                evento_tipo=type(evento).__name__,
+                agregado="Trabajo",
+                trabajo_id=str(trabajo.id),
+                region=region,
+                ocurrido_en=evento.ocurrido_en.isoformat(),
+            )
 
         await despachar(
-            trabajo.recoger_eventos(),
+            eventos,
             publicador=self._publicador,
             registro_repo=self._registro_repo,
         )
+        fin = time.perf_counter()
 
+        log_evento(
+            logger,
+            "comando_crear_trabajo_ejecutado",
+            detalle=True,
+            comando="CrearTrabajo",
+            agregado="Trabajo",
+            trabajo_id=str(trabajo.id),
+            estado=trabajo.estado.value,
+            eventos_de_dominio=len(eventos),
+            duracion_persistencia_ms=round((t_persistido - inicio) * 1000, 1),
+            duracion_despacho_ms=round((fin - t_persistido) * 1000, 1),
+            duracion_total_ms=round((fin - inicio) * 1000, 1),
+        )
         return trabajo.id

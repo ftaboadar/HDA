@@ -1,5 +1,5 @@
 """Despachador de eventos de dominio (Regla 5, criterio 4) — mismo
-principio que `DISP-03/app/application/dispatcher_eventos_dominio.py`: el
+principio que `proveedores/app/application/dispatcher_eventos_dominio.py`: el
 agregado nunca publica ni notifica nada por su cuenta, solo produce eventos
 de dominio (`registrar_evento`); la capa de aplicación los recoge DESPUÉS
 de persistir el agregado (`recoger_eventos`) y decide qué reacciones
@@ -69,17 +69,32 @@ async def _reaccionar_trabajo_finalizado(
                 region=evento.region,
             ),
         )
+        log_evento(
+            logger,
+            "registro_trabajo_elegible_guardado",
+            detalle=True,
+            trabajo_id=str(evento.trabajo_id),
+            reaccion="intra_servicio_para_modulo_pagos",
+        )
 
     if publicador is None:
         return
 
     try:
         await publicador.publicar_trabajo_finalizado(evento)
+        log_evento(
+            logger,
+            "evento_integracion_trabajo_finalizado_publicado",
+            detalle=True,
+            trabajo_id=str(evento.trabajo_id),
+            evento_tipo="TrabajoFinalizado",
+            destinatarios="ContextoReputacion, ContextoProveedores",
+        )
     except Exception as exc:  # noqa: BLE001
         # El trabajo ya quedó persistido correctamente antes de este punto
         # — una falla al publicar el evento de integración es una falla de
         # notificación, no de escritura, y no debe propagarse (mismo
-        # principio que dispatcher_eventos_dominio.py en DISP-03). Sin DLQ
+        # principio que dispatcher_eventos_dominio.py en Proveedores). Sin DLQ
         # propia todavía en este skeleton — ver README.md, "Qué falta".
         log_evento(
             logger,

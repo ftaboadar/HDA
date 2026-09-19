@@ -1,0 +1,780 @@
+{
+  "info": {
+    "name": "HdA — Escenarios de Calidad (GCP)",
+    "description": "Simulación de tráfico MÍNIMA (no la carga real del escenario, ya corrida en el GCP del equipo) contra el despliegue en GCP (project hogaralpes, southamerica-east1) — sirve para confirmar que cada escenario funciona de punta a punta y para tener tráfico real que ver en Cloud Logging/Grafana.\n\n4 carpetas: ESC-01, DISP-03, DISP-02, MOD-02 — las 4 con implementación real desplegada en este proyecto (a diferencia de una sesión anterior, donde DISP-02 y MOD-02 estaban incompletas). Cada request lleva tests que verifican la MEDIDA DE RESPUESTA del escenario según experimento-arquitectura/contexto/escenarios_calidad.md.\n\nUsar con el environment 'HdA - GCP (hogaralpes)'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "ESC-01 — Escalabilidad (pico 4x)",
+      "description": "Estímulo: pico de hasta 4x en volumen en 48h.\nMedida de respuesta: latencia de aceptación < 2s en pico; ≥ 99.9% de solicitudes aceptadas; < 5% de variación en latencia de los demás dominios.\n\nCÓMO SIMULAR EL PICO: usar el Collection Runner sobre esta carpeta con 100+ iteraciones y delay 0. Los tests acumulan contadores en variables de colección; la request final 'Reporte ESC-01' los imprime.",
+      "item": [
+        {
+          "name": "0. Reset de contadores (solo en la 1ª iteración)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.info.iteration === 0) {",
+                  "  pm.collectionVariables.set('esc01_total', 0);",
+                  "  pm.collectionVariables.set('esc01_aceptadas', 0);",
+                  "  pm.collectionVariables.set('esc01_latencias', JSON.stringify([]));",
+                  "  pm.collectionVariables.set('esc01_otro_dominio_latencias', JSON.stringify([]));",
+                  "  console.log('Contadores ESC-01 reiniciados');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{gestion_trabajos_url}}/salud"
+          }
+        },
+        {
+          "name": "1. Carga — POST /trabajos (medida principal)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const total = (Number(pm.collectionVariables.get('esc01_total')) || 0) + 1;",
+                  "pm.collectionVariables.set('esc01_total', total);",
+                  "",
+                  "const aceptada = pm.response.code === 201;",
+                  "if (aceptada) {",
+                  "    pm.collectionVariables.set('esc01_aceptadas', (Number(pm.collectionVariables.get('esc01_aceptadas')) || 0) + 1);",
+                  "    pm.collectionVariables.set('trabajo_id', pm.response.json().id);",
+                  "}",
+                  "",
+                  "const lat = JSON.parse(pm.collectionVariables.get('esc01_latencias') || '[]');",
+                  "lat.push(pm.response.responseTime);",
+                  "pm.collectionVariables.set('esc01_latencias', JSON.stringify(lat));",
+                  "",
+                  "pm.test('ESC-01: solicitud aceptada (201)', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.test('ESC-01: latencia de aceptación < 2s', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{gestion_trabajos_url}}/trabajos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-esc01-{{$randomInt}}\",\n  \"monto\": \"120.00\",\n  \"region\": \"CO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Otro dominio durante el pico — POST /verificaciones",
+          "description": "Mide la '< 5% de variación en latencia de los demás dominios durante el pico'. DISP-03 (Verificación de Proveedores) es el otro dominio.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const lat = JSON.parse(pm.collectionVariables.get('esc01_otro_dominio_latencias') || '[]');",
+                  "lat.push(pm.response.responseTime);",
+                  "pm.collectionVariables.set('esc01_otro_dominio_latencias', JSON.stringify(lat));",
+                  "pm.test('Otro dominio sigue aceptando (202)', () => pm.expect(pm.response.code).to.eql(202));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{disp03_url}}/verificaciones",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-esc01-otro-{{$randomInt}}\",\n  \"tipo_verificador\": \"policia\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Reporte ESC-01 (solo en la última iteración)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Solo en la ÚLTIMA iteración (el Runner/Newman repite la carpeta -n veces).",
+                  "if (pm.info.iteration === pm.info.iterationCount - 1) {",
+                  "  function p95(arr) {",
+                  "      if (!arr.length) return 0;",
+                  "      const s = [...arr].sort((a, b) => a - b);",
+                  "      return s[Math.min(s.length - 1, Math.floor(s.length * 0.95))];",
+                  "  }",
+                  "  const total = Number(pm.collectionVariables.get('esc01_total')) || 0;",
+                  "  const ok = Number(pm.collectionVariables.get('esc01_aceptadas')) || 0;",
+                  "  const lat = JSON.parse(pm.collectionVariables.get('esc01_latencias') || '[]');",
+                  "  const otro = JSON.parse(pm.collectionVariables.get('esc01_otro_dominio_latencias') || '[]');",
+                  "  const pctAceptacion = total ? (ok / total) * 100 : 0;",
+                  "  ",
+                  "  console.log('===== REPORTE ESC-01 =====');",
+                  "  console.log('Solicitudes totales:      ' + total);",
+                  "  console.log('Aceptadas (201):          ' + ok + ' (' + pctAceptacion.toFixed(2) + '%)');",
+                  "  console.log('p95 aceptación (ms):      ' + p95(lat));",
+                  "  console.log('p95 otro dominio (ms):    ' + p95(otro));",
+                  "  console.log('Umbrales ESC-01: p95 < 2000ms | aceptación >= 99.9%');",
+                  "  ",
+                  "  pm.test('ESC-01: >= 99.9% de solicitudes aceptadas', () => pm.expect(pctAceptacion).to.be.at.least(99.9));",
+                  "  pm.test('ESC-01: p95 de aceptación < 2000ms', () => pm.expect(p95(lat)).to.be.below(2000));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{gestion_trabajos_url}}/salud"
+          }
+        }
+      ]
+    },
+    {
+      "name": "DISP-03 — Disponibilidad ante falla de certificadora",
+      "description": "Estímulo: el sistema externo de verificación (certificadora tipo CONTE) no responde o falla.\nMedida de respuesta: disponibilidad del proceso >= 99.9%; 100% de fallidas trazables en DLQ y reprocesables en < 24h.\n\nCorrer los pasos EN ORDEN (1 → 8). Es el flujo completo: baseline → inyectar caída → observar DLQ → confirmar aislamiento → restaurar → reprocesar.",
+      "item": [
+        {
+          "name": "1. Baseline — certificadora en modo OK",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_certificadora_url}}/_control/config",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modo\": \"ok\",\n  \"latencia_ms\": 100\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Verificación con todo sano (debe COMPLETAR)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Aceptada de inmediato (202) — desacople', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('Latencia de aceptación < 2s (no espera al externo)', () => pm.expect(pm.response.responseTime).to.be.below(2000));",
+                  "pm.collectionVariables.set('verificacion_ok_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{disp03_url}}/verificaciones",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-disp03-baseline\",\n  \"tipo_verificador\": \"certificadora\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Confirmar COMPLETADA (esperar ~5s tras el paso 2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado terminal COMPLETADA', () => pm.expect(pm.response.json().estado).to.eql('COMPLETADA'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{disp03_url}}/verificaciones/{{verificacion_ok_id}}"
+          }
+        },
+        {
+          "name": "4. ESTÍMULO — tumbar la certificadora (modo caido)",
+          "description": "Este es el estímulo literal de DISP-03: 'el sistema externo de verificación no responde'.",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_certificadora_url}}/_control/config",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modo\": \"caido\"\n}"
+            }
+          }
+        },
+        {
+          "name": "5. Verificación contra certificadora CAÍDA (debe ir a DLQ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('API sigue aceptando aunque el externo esté caído (202)', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('Aceptación NO se degrada con el externo caído (< 2s)', () => pm.expect(pm.response.responseTime).to.be.below(2000));",
+                  "pm.collectionVariables.set('verificacion_dlq_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{disp03_url}}/verificaciones",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-disp03-caido\",\n  \"tipo_verificador\": \"certificadora\"\n}"
+            }
+          }
+        },
+        {
+          "name": "6. AISLAMIENTO — policía/RUES no se afectan (certificadora sigue caída)",
+          "description": "Táctica bajo prueba: 'aislamiento por routing key/partición por tipo de verificador'. Con la certificadora caída, una verificación de policía debe completar normal.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Otro verificador acepta normal (202)', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.collectionVariables.set('verificacion_aislada_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{disp03_url}}/verificaciones",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-disp03-aislamiento\",\n  \"tipo_verificador\": \"policia\"\n}"
+            }
+          }
+        },
+        {
+          "name": "7. Ver la DLQ (esperar ~30s tras el paso 5 — hay reintentos con backoff)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const dlq = pm.response.json();",
+                  "pm.test('La verificación fallida quedó trazable en la DLQ', () => {",
+                  "    pm.expect(dlq.some(v => v.id === pm.collectionVariables.get('verificacion_dlq_id'))).to.be.true;",
+                  "});",
+                  "pm.test('Cada entrada de DLQ tiene motivo de falla registrado', () => {",
+                  "    dlq.forEach(v => pm.expect(v.motivo_falla, 'motivo_falla de ' + v.id).to.not.be.null);",
+                  "});",
+                  "console.log('Verificaciones en DLQ: ' + dlq.length);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{disp03_url}}/dlq"
+          }
+        },
+        {
+          "name": "8a. RECUPERACIÓN — restaurar la certificadora",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_certificadora_url}}/_control/config",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modo\": \"ok\",\n  \"latencia_ms\": 100\n}"
+            }
+          }
+        },
+        {
+          "name": "8b. Reprocesar desde la DLQ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Reproceso aceptado', () => pm.expect(pm.response.code).to.be.oneOf([200, 202]));",
+                  "console.log('Reprocesada — consultar con el paso 8c en unos segundos');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{disp03_url}}/dlq/{{verificacion_dlq_id}}/reprocesar"
+          }
+        },
+        {
+          "name": "8c. Confirmar que la reprocesada COMPLETÓ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('100% de las fallidas son reprocesables (COMPLETADA)', () => pm.expect(pm.response.json().estado).to.eql('COMPLETADA'));",
+                  "pm.test('El contador de reprocesos quedó trazado', () => pm.expect(pm.response.json().reprocesos).to.be.at.least(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{disp03_url}}/verificaciones/{{verificacion_dlq_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "DISP-02 — Disponibilidad ante CRM saturado (throttler)",
+      "description": "Estímulo: el submódulo Novedades intenta publicar webhooks hacia el CRM 'Gestión de Agentes', que impone rate limiting (429 + Retry-After).\nMedida de respuesta: disponibilidad de Gestión de Trabajos ≥ 99.9% independiente del estado del CRM; ≥ 99% de los webhooks entregados en < 15 min, 100% en < 1h; 0 pérdida de novedades por rate limiting.\n\nImplementación real: POST /novedades responde 202 de inmediato (Sidecar/Throttler asíncrono, token bucket + reintentos con backoff) — el envío real al mock-crm ocurre después, en segundo plano.\n\nNOTA DE ALCANCE: esta carpeta NO reproduce el volumen real del escenario (ya se corrió la prueba de carga completa en el GCP del equipo, ver tests/integracion/test_disp02_throttler.py y RESULTADOS-DISP02.md) — aquí solo se manda tráfico mínimo para confirmar que el mecanismo funciona de punta a punta en este despliegue y dejar algo real para ver en Grafana/Logs.",
+      "item": [
+        {
+          "name": "1. Configurar el límite del CRM (bajo, para provocar 429 con poco tráfico)",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_crm_url}}/_control/config",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limite_rps\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Crear trabajo (para tener un trabajo_id real)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Trabajo creado', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.collectionVariables.set('disp02_trabajo_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{gestion_trabajos_url}}/trabajos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-disp02\",\n  \"monto\": \"80.00\",\n  \"region\": \"CO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Publicar novedad (202 — encolada, no esperó al CRM)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Novedad aceptada de inmediato (202)', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('Latencia de aceptación estable (< 1s), independiente del CRM', () => pm.expect(pm.response.responseTime).to.be.below(1000));",
+                  "pm.collectionVariables.set('disp02_novedad_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{gestion_trabajos_url}}/novedades",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trabajo_id\": \"{{disp02_trabajo_id}}\",\n  \"descripcion\": \"prueba DISP-02\"\n}"
+            }
+          }
+        },
+        {
+          "name": "4. Ráfaga: 8 novedades en paralelo (con limite_rps=2 el CRM responde 429 y el throttler reintenta)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// 7 novedades extra en paralelo + la de este request = ráfaga de 8 en <1s.",
+                  "const url = pm.variables.get('gestion_trabajos_url') + '/novedades';",
+                  "for (let i = 1; i <= 7; i++) {",
+                  "  pm.sendRequest({url, method: 'POST', header: {'Content-Type': 'application/json'},",
+                  "    body: {mode: 'raw', raw: JSON.stringify({trabajo_id: pm.variables.get('disp02_trabajo_id'), descripcion: 'ráfaga DISP-02 #' + i})}},",
+                  "    () => {});",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sigue aceptando 202 pase lo que pase con el CRM', () => pm.expect(pm.response.code).to.eql(202));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{gestion_trabajos_url}}/novedades",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trabajo_id\": \"{{disp02_trabajo_id}}\",\n  \"descripcion\": \"ráfaga DISP-02 #8\"\n}"
+            }
+          }
+        },
+        {
+          "name": "5. Ver estado de la novedad (esperar unos segundos — el throttler reintenta en segundo plano)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const n = pm.response.json();",
+                  "console.log('novedad -> ' + JSON.stringify(n));",
+                  "pm.test('Estado terminal o en reintento (nunca perdida en silencio)', () => pm.expect(['PENDIENTE','ENTREGADA','AGOTADA']).to.include(n.estado));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{gestion_trabajos_url}}/novedades/{{disp02_novedad_id}}"
+          }
+        },
+        {
+          "name": "6. Restaurar el límite del CRM",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_crm_url}}/_control/config",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limite_rps\": 50\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "MOD-02 — Modificabilidad (Strategy regional + Adapter de pasarela)",
+      "description": "Estímulo: adaptar reglas fiscales/moneda para Brasil sin afectar otros países, y cambiar Stripe→MercadoPago sin tocar el core.\nMedida de respuesta: 0 líneas modificadas en el core; el mismo endpoint procesa ambas regiones.\n\nImplementación real: Pagos es un microservicio independiente — POST /pagos recibe los datos del trabajo directamente en el body (trabajo_id, proveedor_id, monto, moneda, region, pasarela), sin depender de ningún evento ni consumidor. La Strategy (ReglaColombia/ReglaBrasil) valida según la región, y el Adapter (PasarelaStripe: centavos enteros / PasarelaMercadoPago: unidades) cobra.",
+      "item": [
+        {
+          "name": "1. Trabajo en Colombia (para tener datos reales de monto/región)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Región CO aceptada', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.collectionVariables.set('trabajo_co_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{gestion_trabajos_url}}/trabajos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-mod02-co\",\n  \"monto\": \"200.00\",\n  \"region\": \"CO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "2. Trabajo en Brasil (mismo endpoint, sin redespliegue)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Región BR aceptada por el MISMO endpoint', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.collectionVariables.set('trabajo_br_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{gestion_trabajos_url}}/trabajos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"prov-mod02-br\",\n  \"monto\": \"200.00\",\n  \"region\": \"BR\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3. Cobrar en Colombia → ReglaColombia + PasarelaStripe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Pago creado', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.collectionVariables.set('pago_co_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{pagos_url}}/pagos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trabajo_id\": \"{{trabajo_co_id}}\",\n  \"proveedor_id\": \"prov-mod02-co\",\n  \"monto\": \"200.00\",\n  \"moneda\": \"COP\",\n  \"region\": \"CO\",\n  \"pasarela\": \"stripe\"\n}"
+            }
+          }
+        },
+        {
+          "name": "4. Ver pago Colombia (moneda COP, referencia ch_*)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const p = pm.response.json();",
+                  "console.log('CO -> ' + JSON.stringify(p));",
+                  "pm.test('Cobro EXITOSO vía Stripe', () => pm.expect(p.estado).to.eql('EXITOSO'));",
+                  "pm.test('Moneda COP (regla de Colombia)', () => pm.expect(p.moneda).to.eql('COP'));",
+                  "pm.test('Referencia de Stripe (ch_*)', () => pm.expect(p.referencia_externa).to.match(/^ch_/));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{pagos_url}}/pagos/{{pago_co_id}}"
+          }
+        },
+        {
+          "name": "5. Cobrar en Brasil → ReglaBrasil + PasarelaMercadoPago",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Pago creado', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.collectionVariables.set('pago_br_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{pagos_url}}/pagos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trabajo_id\": \"{{trabajo_br_id}}\",\n  \"proveedor_id\": \"prov-mod02-br\",\n  \"monto\": \"200.00\",\n  \"moneda\": \"BRL\",\n  \"region\": \"BR\",\n  \"pasarela\": \"mercadopago\"\n}"
+            }
+          }
+        },
+        {
+          "name": "6. Ver pago Brasil (moneda BRL, otra forma de referencia)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const p = pm.response.json();",
+                  "console.log('BR -> ' + JSON.stringify(p));",
+                  "pm.test('Cobro EXITOSO vía MercadoPago', () => pm.expect(p.estado).to.eql('EXITOSO'));",
+                  "pm.test('Moneda BRL (regla de Brasil)', () => pm.expect(p.moneda).to.eql('BRL'));",
+                  "pm.test('Referencia NO es de Stripe — el Adapter absorbió la diferencia', () => pm.expect(p.referencia_externa).to.not.match(/^ch_/));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{pagos_url}}/pagos/{{pago_br_id}}"
+          }
+        },
+        {
+          "name": "7. Compensación (paso de Saga) sobre el pago de Colombia",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Compensación aceptada', () => pm.expect(pm.response.code).to.eql(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{pagos_url}}/pagos/{{pago_co_id}}/compensar"
+          }
+        },
+        {
+          "name": "8. Invariante: no se puede compensar dos veces",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Segunda compensación rechazada (409)', () => pm.expect(pm.response.code).to.eql(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{pagos_url}}/pagos/{{pago_co_id}}/compensar"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "esc01_total",
+      "value": "0"
+    },
+    {
+      "key": "esc01_aceptadas",
+      "value": "0"
+    },
+    {
+      "key": "esc01_latencias",
+      "value": "[]"
+    },
+    {
+      "key": "esc01_otro_dominio_latencias",
+      "value": "[]"
+    },
+    {
+      "key": "disp02_ids",
+      "value": "[]"
+    },
+    {
+      "key": "verificacion_ok_id",
+      "value": ""
+    },
+    {
+      "key": "verificacion_dlq_id",
+      "value": ""
+    },
+    {
+      "key": "verificacion_aislada_id",
+      "value": ""
+    },
+    {
+      "key": "trabajo_co_id",
+      "value": ""
+    },
+    {
+      "key": "trabajo_br_id",
+      "value": ""
+    },
+    {
+      "key": "pago_co_id",
+      "value": ""
+    },
+    {
+      "key": "pago_br_id",
+      "value": ""
+    },
+    {
+      "key": "disp02_trabajo_id",
+      "value": ""
+    },
+    {
+      "key": "disp02_novedad_id",
+      "value": ""
+    }
+  ]
+}

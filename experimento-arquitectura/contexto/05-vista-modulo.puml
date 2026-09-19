@@ -68,6 +68,14 @@ SUS --> PAG : API REST
 PAG --> CONT : Batch / API
 SCR --> CONT : Batch / API
 
+note right of GT
+  Submódulo **Novedades** (DISP-02): Sidecar/Throttler
+  de salida hacia Gestión de Agentes (CRM SaaS) —
+  cola acotada + token bucket + reintento con
+  Retry-After/backoff. Vive dentro de este módulo,
+  no es un módulo aparte.
+end note
+
 note bottom of GT
   9 dependientes (3 productores que le publican +
   2 consumidores de su evento + 4 ACL externos).

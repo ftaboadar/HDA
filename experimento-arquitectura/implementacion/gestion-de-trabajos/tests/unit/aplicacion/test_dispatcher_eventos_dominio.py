@@ -80,7 +80,7 @@ async def test_trabajo_finalizado_publica_evento_de_integracion():
 @pytest.mark.asyncio
 async def test_fallo_al_publicar_no_impide_que_el_registro_ya_haya_quedado():
     """Defensa en profundidad: el registro intra-servicio no depende de que
-    Pulsar esté arriba — mismo principio que DISP-03 (una falla de
+    Pulsar esté arriba — mismo principio que Proveedores (una falla de
     notificación no debe revertir lo ya persistido)."""
     registro_repo = _RegistroTrabajosRepositorioFalso()
     publicador = _PublicadorFalso(falla=True)

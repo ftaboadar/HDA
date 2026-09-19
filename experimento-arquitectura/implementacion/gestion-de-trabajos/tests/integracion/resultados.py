@@ -1,5 +1,5 @@
 """Registro de datos crudos por caso de prueba de DISP-02 — mismo patrón que
-`DISP-03/tests/resultados.py`: compara valor medido contra umbral y anota
+`proveedores/tests/resultados.py`: compara valor medido contra umbral y anota
 cumple/no cumple de forma mecánica, sin ninguna síntesis global. La síntesis
 (¿se valida o refuta la hipótesis de DISP-02 en conjunto?, ¿qué amenazas a
 la validez aplican?) es responsabilidad exclusiva de `validador-hipotesis`

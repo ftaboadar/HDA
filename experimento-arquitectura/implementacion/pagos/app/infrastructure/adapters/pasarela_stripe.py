@@ -1,7 +1,7 @@
 """Adapter (patrón) concreto de `IPasarelaDePago` hacia el mock de Stripe.
 
 El mock real lo construye Johan en `implementacion/mocks-pagos/` (mismo
-patrón que los dobles de Policía/RUES/CONTE en DISP-03: FastAPI + endpoint
+patrón que los dobles de Policía/RUES/CONTE en Proveedores: FastAPI + endpoint
 de control de fallas/latencia) — este adaptador solo necesita una URL
 configurable (`settings.stripe_mock_url`, default
 `http://localhost:9100`), no bloquea el desarrollo de este servicio
@@ -12,7 +12,15 @@ from __future__ import annotations
 
 from app.application.ports.pasarela_de_pago import IPasarelaDePago, ResultadoCobro
 from app.common.config import settings
+from app.common.logging_utils import (
+    configurar_logging,
+    headers_trace_salientes,
+    log_evento,
+)
 from app.domain.pagos.pago import Pago
+
+
+logger = configurar_logging("infrastructure.adapters.pasarela_stripe")
 
 
 class PasarelaStripe(IPasarelaDePago):
@@ -23,22 +31,63 @@ class PasarelaStripe(IPasarelaDePago):
         self._timeout_s = timeout_s or settings.http_timeout_s
 
     async def cobrar(self, pago: Pago) -> ResultadoCobro:
+        import time
+
         import httpx
 
         payload = {
-            "amount": str(pago.monto.valor),
+            # Stripe cobra en la unidad mínima de la moneda (centavos), como
+            # entero — no en unidades ni como string. Esta conversión es
+            # precisamente lo que este Adapter debe absorber (MOD-02): el
+            # dominio siempre razona en unidades (`Dinero`), MercadoPago
+            # también, Stripe no.
+            "amount": int((pago.monto.valor * 100).to_integral_value()),
             "currency": pago.monto.moneda,
             "metadata": {"pago_id": str(pago.id), "trabajo_id": str(pago.trabajo_id)},
         }
+        log_evento(
+            logger,
+            "pasarela_cobro_solicitado",
+            sistema_externo="stripe",
+            pago_id=str(pago.id),
+            endpoint="/v1/charges",
+            monto_enviado=payload["amount"],
+            unidad_monto="centavos_entero",
+            monto_dominio=str(pago.monto.valor),
+            moneda=pago.monto.moneda,
+        )
+        inicio = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=self._timeout_s) as cliente:
                 respuesta = await cliente.post(
-                    f"{self._base_url}/v1/charges", json=payload
+                    f"{self._base_url}/v1/charges",
+                    json=payload,
+                    headers=headers_trace_salientes(),
                 )
                 respuesta.raise_for_status()
                 datos = respuesta.json()
+                log_evento(
+                    logger,
+                    "pasarela_cobro_respuesta",
+                    sistema_externo="stripe",
+                    pago_id=str(pago.id),
+                    status_http=getattr(respuesta, "status_code", None),
+                    referencia_externa=datos.get("id", ""),
+                    duracion_pasarela_ms=round(
+                        (time.perf_counter() - inicio) * 1000, 1
+                    ),
+                )
                 return ResultadoCobro(
                     exitoso=True, referencia_externa=datos.get("id", "")
                 )
         except httpx.HTTPError as exc:
+            log_evento(
+                logger,
+                "pasarela_cobro_fallido",
+                nivel="error",
+                sistema_externo="stripe",
+                pago_id=str(pago.id),
+                error=str(exc),
+                duracion_pasarela_ms=round((time.perf_counter() - inicio) * 1000, 1),
+            )
             return ResultadoCobro(exitoso=False, motivo_falla=str(exc))

@@ -44,7 +44,7 @@ Gateway/BFF real con noción de partner) o aceptarse formalmente como parte del 
 
 Cada script usa el volumen del enunciado como piso (nunca uno menor), con compresión temporal
 declarada explícitamente cuando el escenario real dura más de lo práctico para una corrida de
-prueba — mismo criterio ya aplicado en `DISP-03/plan.md` §5.4:
+prueba — mismo criterio ya aplicado en `proveedores/plan.md` §5.4:
 
 - ESC-01: 48h reales → 12 min de prueba (factor ≈240x), tasa objetivo sin reducir (289→1157 req/s).
 - ESC-02: sin ventana temporal que comprimir (pico súbito); baseline de tráfico "habitual de un

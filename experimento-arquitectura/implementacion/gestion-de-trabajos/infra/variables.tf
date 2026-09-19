@@ -4,7 +4,7 @@ variable "project_id" {
 }
 
 variable "region" {
-  description = "Región de GCP — southamerica-east1 (São Paulo) por defecto, igual que DISP-03/infra/variables.tf"
+  description = "Región de GCP — southamerica-east1 (São Paulo) por defecto, igual que proveedores/infra/variables.tf"
   type        = string
   default     = "southamerica-east1"
 }
@@ -97,4 +97,52 @@ variable "mercadopago_mock_url" {
   description = "Output \"uri\" del servicio mock-mercadopago del stack mocks-pagos/infra"
   type        = string
   default     = "http://localhost:9100"
+}
+
+variable "crm_mock_url" {
+  description = "Output \"mock_crm_url\" del stack mocks-crm/infra — destino del Throttler de DISP-02"
+  type        = string
+  default     = "http://localhost:9200"
+}
+
+variable "crm_limite_rps" {
+  description = <<-EOT
+    Tasa (req/s) que el token bucket del Throttler respeta hacia el CRM, POR
+    INSTANCIA de este servicio: el throttler vive en memoria de cada réplica.
+    Con N instancias activas, la tasa agregada hacia el CRM es N veces este
+    valor — el CRM responde 429 por el exceso y el throttler lo reintenta con
+    backoff. 20 = mismo valor que docker-compose.disp02.yml (1 réplica local).
+  EOT
+  type        = string
+  default     = "20"
+}
+
+variable "max_instance_count" {
+  description = <<-EOT
+    Tope de instancias de Cloud Run. 20 es la configuración con la que el
+    equipo corrió ESC-01. Con cpu = "2", el total es max × 2 vCPU y debe
+    caber en la cuota de CPU de Cloud Run del proyecto: un proyecto nuevo
+    trae 20 vCPU por servicio, así que ahí el máximo posible es 10.
+  EOT
+  type        = number
+  default     = 20
+}
+
+variable "min_instance_count" {
+  description = <<-EOT
+    Default 1 en hogaralpes: la config real de ESC-01 (10 instancias × 2
+    vCPU = 20 vCPU) agota sola la cuota de CPU/región del proyecto (20
+    vCPU), sin dejar nada para Proveedores/mocks-crm/Grafana (min>0 en esos).
+    Pasar -var min_instance_count=10 solo durante una corrida real de
+    ESC-01, y volver a 1 (o menos) después -- son instancias facturando
+    de forma continua, no bajo demanda.
+  EOT
+  type        = number
+  default     = 1
+}
+
+variable "log_detalle" {
+  description = "\"completo\" (default) emite los logs de trazado fino por request (http_request_completada, comando_*, mensaje_publicado...). \"minimo\" los apaga: usarlo en una corrida real de ESC-01, donde un log extra por request cuesta CPU y dinero en Cloud Logging."
+  type        = string
+  default     = "completo"
 }

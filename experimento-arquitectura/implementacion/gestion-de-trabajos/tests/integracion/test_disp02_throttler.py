@@ -11,7 +11,7 @@ prueba NO levanta nada: asume que
 
     docker compose -f docker-compose.disp02.yml up -d --build
 
-ya corrió — mismo patrón que `DISP-03/tests/test_escenarios_disp03.py`
+ya corrió — mismo patrón que `proveedores/tests/test_escenarios_disp03.py`
 (asume `docker compose up -d` externo, no lo orquesta pytest).
 
 Cada test:
@@ -25,7 +25,7 @@ Cada test:
      MECÁNICA de umbral (pytest pasa/falla), no el veredicto de hipótesis
      global: eso lo hace el agente `validador-hipotesis`, que además revisa
      amenazas a la validez y posibles sesgos (mismo criterio explícito que
-     `DISP-03/tests/test_escenarios_disp03.py`).
+     `proveedores/tests/test_escenarios_disp03.py`).
 
 Factor de sobrecarga (Regla 3 de `REGLAS-DURAS-rubrica-entrega-3.md`: nunca
 reducir el volumen del enunciado por debajo de lo real): el estímulo de
@@ -287,7 +287,7 @@ async def test_disp02_disponibilidad_api_independiente_del_crm_saturado():
     Alcance declarado: esto NO prueba el caso "CRM completamente caído/sin
     responder" (ese modo de falla no está implementado en
     `mocks-crm/app/main.py`, que solo modela rate limiting real, no
-    caída/timeout como sí hacen los mocks de DISP-03/Pagos) -- es una
+    caída/timeout como sí hacen los mocks de Proveedores/Pagos) -- es una
     medida indicativa de desacople bajo saturación por rate limiting, no
     una prueba exhaustiva de disponibilidad ante una caída dura del CRM."""
     async with httpx.AsyncClient(timeout=10) as control:

@@ -2,7 +2,7 @@
 
 Rol: `experto-gcp`. Este documento mapea cada componente construido en `implementacion/` a Terraform
 real contra el proyecto `hda-projectt` (`southamerica-east1`), en el mismo estilo que ya usa
-`DISP-03/infra/` (prefijo `${entorno}` por stack, Service Account propia por servicio, IP pública +
+`proveedores/infra/` (prefijo `${entorno}` por stack, Service Account propia por servicio, IP pública +
 red autorizada abierta en Cloud SQL "solo para PoC", `allUsers` como invoker público).
 
 **ACTUALIZACIÓN: esto SÍ se aplicó contra GCP real** (`hda-projectt`), por pedido explícito del
@@ -26,6 +26,88 @@ a autenticar ni a leer ningún recurso real de `hda-projectt` (confirmado revisa
 del proceso). Se limpiaron los artefactos locales que dejó (`terraform.tfstate` vacío,
 `.terraform.tfstate.lock.info`, un archivo `.tf` de prueba). No se repitió.
 
+## Receta vigente: montar todo desde cero en un proyecto nuevo (desde `main`)
+
+Esta es la receta que se usó para levantar `hogaralpes` y la que debe seguir cualquier compañero. Lo que dice el resto del
+documento es el diseño y la historia (mantiene `hda-projectt` y el estado de 2026-09-14). **Hacer merge del PR a `main` da el código
+y el Terraform; no da la infraestructura**: cada persona levanta la suya en su propio proyecto.
+
+Qué NO viaja con el PR (y por qué):
+- **El estado de Terraform** (`terraform.tfstate`, ignorado por git): cada stack es local; tu compañero parte de cero y no toca lo tuyo.
+- **Las imágenes de contenedor**: Terraform solo crea los servicios; las imágenes se construyen con Cloud Build.
+- **Las URLs**: cada proyecto tiene URLs `*.run.app` distintas; hay que pasarlas entre stacks y actualizar `postman/HdA-GCP.postman_environment.json`.
+- **La API de Cloud Build** (no está en Terraform) y la cuota: un proyecto nuevo suele tener **20 vCPU por región**; por eso `gestion-de-trabajos` (2 vCPU por instancia) se aplica con `max_instance_count=9`.
+
+Prerrequisitos: proyecto con facturación, `gcloud auth login`, `gcloud auth application-default login` y
+`gcloud auth application-default set-quota-project <PROYECTO>`, Terraform >= 1.5.
+
+```bash
+export PROJECT=<tu-proyecto> REGION=southamerica-east1
+IMPL=experimento-arquitectura/implementacion        # ejecutar desde la raíz del repo
+R=$REGION-docker.pkg.dev/$PROJECT
+gcloud services enable cloudbuild.googleapis.com --project $PROJECT
+
+# 0) Por cada servicio con imagen: crear SOLO su repositorio (Terraform habilita las APIs que necesita) y publicar la imagen.
+#    Hay que hacerlo antes del apply completo: Cloud Run falla al crearse si la imagen no existe.
+bootstrap() {  # <stack> <repo-artifact-registry> <imagen> <carpeta-con-Dockerfile>
+  (cd $IMPL/$1 && terraform init -input=false \
+     && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION \
+        -target=google_artifact_registry_repository.hda)
+  gcloud builds submit $IMPL/$4 --tag $R/$2/$3:latest --project $PROJECT --quiet
+}
+bootstrap mocks-pagos/infra          mocks-pagos-poc-hda        hda-mocks-pagos          mocks-pagos
+bootstrap mocks-crm/infra            mocks-crm-poc-hda          hda-mocks-crm            mocks-crm
+bootstrap pagos/infra                pagos-poc-hda              hda-pagos                pagos
+bootstrap gestion-de-trabajos/infra  gestion-trabajos-poc-hda   hda-gestion-de-trabajos  gestion-de-trabajos
+bootstrap reputacion/infra           reputacion-poc-hda         hda-reputacion           reputacion
+bootstrap proveedores/infra          disp03-poc-hda             hda-disp03               proveedores   # el prefijo disp03-poc es el nombre histórico de los recursos
+
+# 1) Pulsar (VM). Esperar 2-3 min a que el broker levante antes de seguir.
+(cd $IMPL/pulsar-infra/gcp && terraform init -input=false \
+   && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
+PULSAR_IP=$(cd $IMPL/pulsar-infra/gcp && terraform output -raw ip_privada)     # IP PRIVADA, no la pública
+
+# 2) Mocks de pagos y del CRM
+(cd $IMPL/mocks-pagos/infra && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
+(cd $IMPL/mocks-crm/infra   && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
+STRIPE=$(cd $IMPL/mocks-pagos/infra && terraform output -raw mock_stripe_url)
+MP=$(cd $IMPL/mocks-pagos/infra && terraform output -raw mock_mercadopago_url)
+CRM=$(cd $IMPL/mocks-crm/infra && terraform output -raw mock_crm_url)
+
+# 3) Servicios de negocio (usan las URLs anteriores; pagos y gestión no dependen entre sí)
+(cd $IMPL/pagos/infra && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION \
+   -var stripe_mock_url=$STRIPE -var mercadopago_mock_url=$MP)
+(cd $IMPL/gestion-de-trabajos/infra && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION \
+   -var max_instance_count=9 -var pulsar_service_url=pulsar://$PULSAR_IP:6650 \
+   -var stripe_mock_url=$STRIPE -var mercadopago_mock_url=$MP -var crm_mock_url=$CRM)
+(cd $IMPL/reputacion/infra  && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
+(cd $IMPL/proveedores/infra && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
+
+# 4) Grafana al final (el dashboard necesita servicios reales que graficar)
+(cd $IMPL/observabilidad && terraform init -input=false \
+   && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
+```
+
+Después del despliegue:
+1. URLs de todo: `gcloud run services list --region $REGION --project $PROJECT --format="value(metadata.name,status.url)"`; pégalas en `postman/HdA-GCP.postman_environment.json`.
+2. Grafana: `terraform output grafana_url` (en `observabilidad/`), usuario `admin`, contraseña en Secret Manager (secreto `observabilidad-poc-grafana-admin-password`).
+3. Correr los escenarios: ver `GUIA-DEMO-ESCENARIOS.md`.
+
+Problemas conocidos al montar (ver `GUIA-DEMO-ESCENARIOS.md`, sección "Problemas frecuentes"): `403` tras recrear un servicio (repetir `terraform apply` en ese stack), imagen vieja
+(`terraform apply -replace=<servicio>`) y cuota de CPU.
+
+**Apagar todo (orden inverso; el `destroy` borra también las bases de Cloud SQL y sus datos):**
+
+```bash
+for s in observabilidad proveedores/infra reputacion/infra pagos/infra gestion-de-trabajos/infra mocks-crm/infra mocks-pagos/infra pulsar-infra/gcp; do
+  (cd $IMPL/$s && terraform destroy -auto-approve -var project_id=$PROJECT -var region=$REGION)
+done
+```
+(`gestion-de-trabajos` va antes que `pulsar-infra/gcp` porque depende de su IP. Para `destroy` basta `project_id` y `region`: las demás variables tienen valor por defecto.
+Cada `terraform destroy` usa el estado local de ese stack: solo puede apagar lo que esa misma carpeta desplegó.)
+
+---
+
 ## Stacks nuevos y su relación
 
 ```
@@ -40,14 +122,14 @@ gestion-de-trabajos/infra/         Cloud SQL + Cloud Run (API) — vía el módu
 reputacion/infra/                  Cloud SQL + Cloud Run (SOLO la API — ver limitación abajo)
 mocks-pagos/infra/                 2x Cloud Run (mock-stripe, mock-mercadopago) — vía el módulo, sin Cloud SQL
 observabilidad/                    Grafana en Cloud Run + APIs de Monitoring/Trace + dashboard.json
-DISP-03/infra/                     YA EXISTÍA — solo se le agregó var.pulsar_service_url (plumbing,
+proveedores/infra/                     YA EXISTÍA — solo se le agregó var.pulsar_service_url (plumbing,
                                     sin cambiar su comportamiento actual con Pub/Sub)
 ```
 
 ## Orden de apply
 
 Cada stack es su propio state local (`terraform init` sin backend remoto configurado — igual que
-`DISP-03/infra/` hoy). Ejecutar desde el directorio de cada stack.
+`proveedores/infra/` hoy). Ejecutar desde el directorio de cada stack.
 
 ### 1. `pulsar-infra/gcp` — primero, para obtener la IP de Pulsar
 
@@ -67,7 +149,7 @@ gcloud compute ssh <entorno>-vm --zone <zona-del-output-vm_zone> --tunnel-throug
   --command "curl -sf http://localhost:8080/admin/v2/brokers/health && echo OK"
 ```
 
-### 2. Los 3 microservicios propios + mocks + DISP-03 (orden entre ellos no importa, salvo que
+### 2. Los 3 microservicios propios + mocks + Proveedores (`proveedores/`, recursos `disp03-poc-*`) (orden entre ellos no importa, salvo que
    `gestion-de-trabajos` necesita las URLs de `mocks-pagos` para su ACL de Pagos)
 
 ```bash
@@ -84,7 +166,7 @@ terraform apply -var project_id=hda-projectt -var region=southamerica-east1 \
   -var "stripe_mock_url=<mock_stripe_url_de_arriba>" \
   -var "mercadopago_mock_url=<mock_mercadopago_url_de_arriba>"
 # Nota: gcloud builds submit / docker push de la imagen de este servicio queda
-# fuera de este Terraform (mismo criterio que DISP-03: infra/ solo aprovisiona,
+# fuera de este Terraform (mismo criterio que Proveedores: infra/ solo aprovisiona,
 # la imagen se construye/sube aparte, ver README.md de DISP-03 sección
 # "Correr en GCP" — aquí no hay CLI equivalente a hda-gcp todavía, sería:
 #   gcloud builds submit --tag <output.imagen_app> experimento-arquitectura/implementacion/gestion-de-trabajos
@@ -95,7 +177,7 @@ terraform init
 terraform apply -var project_id=hda-projectt -var region=southamerica-east1
 # (ver limitación abajo: esto SOLO despliega la API, no el consumidor de Pulsar)
 
-cd ../../DISP-03/infra
+cd ../../proveedores/infra
 terraform init   # ya existía, re-inicializar solo si cambió el lock de providers
 terraform apply -var project_id=hda-projectt -var region=southamerica-east1
 # pulsar_service_url por defecto es "" — no hace falta pasarla salvo que
@@ -117,7 +199,7 @@ gcloud secrets versions access latest --secret "$(terraform output -raw grafana_
 
 ```bash
 cd experimento-arquitectura/implementacion/observabilidad            && terraform destroy -var project_id=hda-projectt
-cd ../DISP-03/infra                                                   && terraform destroy -var project_id=hda-projectt
+cd ../proveedores/infra                                                   && terraform destroy -var project_id=hda-projectt
 cd ../../reputacion/infra                                              && terraform destroy -var project_id=hda-projectt
 cd ../../gestion-de-trabajos/infra                                     && terraform destroy -var project_id=hda-projectt
 cd ../../mocks-pagos/infra                                             && terraform destroy -var project_id=hda-projectt
@@ -221,7 +303,7 @@ importe contra un proyecto con servicios reales corriendo.
 
 ### 6. `mocks-pagos` despliega DOS servicios Cloud Run desde la misma imagen
 
-Igual que `DISP-03/infra/mocks.tf` hace con policía/RUES/certificadora: un solo `Dockerfile`, dos
+Igual que `proveedores/infra/mocks.tf` hace con policía/RUES/certificadora: un solo `Dockerfile`, dos
 módulos FastAPI distintos arrancados por `command`/`args` (`app.stripe_mock:app` vs
 `app.mercadopago_mock:app`), puerto 8000 (no el default 8080 del módulo — así lo expone
 `mocks-pagos/Dockerfile` y así lo arranca su `docker-compose.yml` local, se respetó ese contrato en
@@ -229,7 +311,7 @@ vez de inventar un puerto distinto para GCP).
 
 ## Diferencias RabbitMQ/Pub/Sub/Pulsar — amenazas a la validez
 
-Ya documentadas en detalle en `DISP-03/README.md`, sección "Diferencias local (RabbitMQ) vs. GCP
+Ya documentadas en detalle en `proveedores/README.md`, sección "Diferencias local (RabbitMQ) vs. GCP
 (Pub/Sub) vs. Apache Pulsar" — aplica igual aquí para `gestion-de-trabajos`/`reputacion`, que usan
 Pulsar como único transporte de integración (no hay variante Pub/Sub de esos dos servicios). Se agrega
 un matiz nuevo, específico de correr Pulsar en una VM propia en vez de local: **el hallazgo #2 de este
@@ -269,14 +351,14 @@ Los 6 stacks se aplicaron de verdad contra `hda-projectt` (106 recursos). Todos 
    (`reputacion/app/infrastructure/messaging/consumidor_pulsar.py`) espera JSON plano
    (`json.loads(mensaje.data())`) — dos servicios de equipos distintos, nunca probados juntos contra
    un broker real hasta hoy. Se unificó al mismo contrato JSON que ya usa
-   `DISP-03/app/common/publicador.py`.
+   `proveedores/app/common/publicador.py`.
 6. **Bug de concurrencia real bajo carga (encontrado corriendo k6, no antes)**: todas las llamadas a
    los repositorios de `gestion-de-trabajos` (SQLAlchemy, síncronas) se invocaban directo dentro de
    handlers `async def` — bloqueaban el event loop del worker de Uvicorn en cada escritura/lectura a
    Cloud SQL. Bajo la carga de ESC-01 esto serializaba efectivamente cada instancia (sin importar
    `containerConcurrency=80`), causando p95 de 14.2s y 20% de requests fallidas. Se envolvió cada
    llamada en `asyncio.to_thread` (mismo patrón ya auditado en
-   `DISP-03/app/application/commands/registrar_intento.py`) en los 5 archivos que tocaban un
+   `proveedores/app/application/commands/registrar_intento.py`) en los 5 archivos que tocaban un
    repositorio. **Mejoró sustancialmente pero no resolvió el problema del todo**: una segunda corrida
    de ESC-01 post-fix bajó a p95 9.7s / 11.9% de fallo — sigue sin cumplir el umbral. La causa raíz
    residual (pool de conexiones a Cloud SQL, `max_instance_count`/tier insuficientes, u otra) no se
@@ -301,7 +383,7 @@ publicado por Gestión de Trabajos, solo que el mensaje llega al tópico (confir
 | `mocks-pagos/infra` | OK | OK | OK |
 | `pulsar-infra/gcp` | OK | OK | OK |
 | `observabilidad` | OK | OK | OK |
-| `DISP-03/infra` (con `pulsar_service_url` agregado) | OK | ya inicializado previamente | OK |
+| `proveedores/infra` (con `pulsar_service_url` agregado) | OK | ya inicializado previamente | OK |
 
 `docker build` de `gestion-de-trabajos/Dockerfile` (nuevo): **exitoso**, imagen
 `hda-gestion-de-trabajos:test` construida localmente sin correrla (no se hizo `docker run`, no se probó

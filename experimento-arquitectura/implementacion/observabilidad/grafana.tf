@@ -31,10 +31,19 @@ resource "google_service_account" "grafana" {
 
 # Necesario para que el datasource "Google Cloud Monitoring"
 # (jsonData.authenticationType = gce, ver templates/datasource.yaml)
-# pueda consultar métricas reales de los 3 microservicios + DISP-03.
+# pueda consultar métricas reales de los 3 microservicios + Proveedores.
 resource "google_project_iam_member" "grafana_monitoring_viewer" {
   project = var.project_id
   role    = "roles/monitoring.viewer"
+  member  = "serviceAccount:${google_service_account.grafana.email}"
+}
+
+# roles/monitoring.viewer NO incluye acceso a Cloud Logging — es un permiso
+# aparte. Sin esto, el datasource "Google Cloud Logging" se provisiona pero
+# falla con 403 en la primera consulta.
+resource "google_project_iam_member" "grafana_logging_viewer" {
+  project = var.project_id
+  role    = "roles/logging.viewer"
   member  = "serviceAccount:${google_service_account.grafana.email}"
 }
 
@@ -105,8 +114,17 @@ resource "google_cloud_run_v2_service" "grafana" {
   template {
     service_account = google_service_account.grafana.email
 
+    # session_affinity + min_instance_count=1: Grafana guarda la sesión de
+    # login en su SQLite LOCAL (sin Cloud SQL, ver limitación de
+    # persistencia documentada arriba) -- con min=0 y sin afinidad, cada
+    # request podía caer en una instancia distinta (o una nueva tras
+    # scale-to-zero) que no conoce el token de sesión, y Grafana redirige
+    # al login. Con esto, un mismo navegador siempre vuelve a la misma
+    # instancia y esa instancia no se recicla por inactividad.
+    session_affinity = true
+
     scaling {
-      min_instance_count = 0 # sin escenario de calidad que exija Grafana caliente
+      min_instance_count = 1
       max_instance_count = 2
     }
 
@@ -117,6 +135,20 @@ resource "google_cloud_run_v2_service" "grafana" {
       # prefiere reproducibilidad, fijar un tag concreto (ej. "11.2.0") es
       # un cambio de una sola línea.
       image = "docker.io/grafana/grafana:latest"
+
+      # Sin esto, Cloud Run usa el default de 512Mi -- insuficiente para
+      # Grafana 11.x (el nuevo apiserver/unified-storage + indexado bleve
+      # en memoria de dashboards/folders/playlists). Confirmado en logs
+      # reales: "Out-of-memory event detected in container" repetido cada
+      # pocos minutos, causando que el contenedor se reinicie a media
+      # sesión -- eso es lo que se veía como "me desloguea" y "no data"
+      # (no era un problema de session_affinity ni de las queries).
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "1Gi"
+        }
+      }
 
       ports {
         container_port = 3000 # puerto default de la imagen oficial de Grafana
@@ -138,6 +170,14 @@ resource "google_cloud_run_v2_service" "grafana" {
       env {
         name  = "GF_AUTH_ANONYMOUS_ENABLED"
         value = "false"
+      }
+      env {
+        # El plugin de Cloud Logging no viene en la imagen oficial de
+        # Grafana — se descarga de grafana.com en el arranque del
+        # contenedor. Es lo que habilita ver logs (jsonPayload.evento,
+        # verificacion_id, trabajo_id) dentro de Grafana, no solo métricas.
+        name  = "GF_INSTALL_PLUGINS"
+        value = "googlecloud-logging-datasource"
       }
       env {
         # Explícito, aunque coincide con el default de la imagen oficial
@@ -174,5 +214,5 @@ resource "google_cloud_run_v2_service_iam_member" "grafana_publico" {
   name     = google_cloud_run_v2_service.grafana.name
   location = var.region
   role     = "roles/run.invoker"
-  member   = "allUsers" # PoC — la autenticación real la da el login propio de Grafana (admin/secret de arriba), ver mismo criterio en DISP-03/infra/cloudrun.tf
+  member   = "allUsers" # PoC — la autenticación real la da el login propio de Grafana (admin/secret de arriba), ver mismo criterio en proveedores/infra/cloudrun.tf
 }

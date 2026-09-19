@@ -1,9 +1,9 @@
 # Módulo reusable: un servicio de Cloud Run v2 + su propia Service
 # Account + (opcionalmente) el enganche a una instancia de Cloud SQL ya
 # existente. Extrae el patrón repetido en
-# DISP-03/infra/cloudrun.tf + DISP-03/infra/iam.tf para los 3 servicios
+# proveedores/infra/cloudrun.tf + proveedores/infra/iam.tf para los 3 servicios
 # nuevos (reputacion, gestion-de-trabajos, mocks-pagos) sin forzarlos a
-# compartir un solo archivo gigante como hace DISP-03 (ahí tenía sentido
+# compartir un solo archivo gigante como hace Proveedores (ahí tenía sentido
 # por ser un solo experimento con api+worker+mocks fuertemente acoplados;
 # aquí son 3 microservicios independientes con su propio ciclo de vida).
 
@@ -57,7 +57,7 @@ variable "env_vars" {
       - { name = "X", value = "texto plano" }
       - { name = "X", secret_id = google_secret_manager_secret.foo.secret_id, secret_version = "latest" }
     (secret_version es opcional, default "latest" — mismo patrón que
-    DATABASE_URL en DISP-03/infra/cloudrun.tf).
+    DATABASE_URL en proveedores/infra/cloudrun.tf).
   EOT
   type = list(object({
     name           = string
@@ -69,7 +69,7 @@ variable "env_vars" {
 }
 
 variable "min_instance_count" {
-  description = "Instancias mínimas calientes. 0 es válido para servicios sin escenario de calidad que exija evitar cold start (ver justificación extensa en DISP-03/infra/cloudrun.tf antes de subir esto a 1+ sin razón)."
+  description = "Instancias mínimas calientes. 0 es válido para servicios sin escenario de calidad que exija evitar cold start (ver justificación extensa en proveedores/infra/cloudrun.tf antes de subir esto a 1+ sin razón)."
   type        = number
   default     = 0
 }
@@ -182,7 +182,7 @@ variable "vpc_egress" {
 }
 
 variable "public_access" {
-  description = "true agrega roles/run.invoker para allUsers (PoC — ver mismo criterio ya documentado en DISP-03/infra/cloudrun.tf y mocks.tf). false no agrega ningún invoker adicional: quien llame este módulo es responsable de otorgar roles/run.invoker a la identidad que corresponda (ej. la SA de push de Pub/Sub)."
+  description = "true agrega roles/run.invoker para allUsers (PoC — ver mismo criterio ya documentado en proveedores/infra/cloudrun.tf y mocks.tf). false no agrega ningún invoker adicional: quien llame este módulo es responsable de otorgar roles/run.invoker a la identidad que corresponda (ej. la SA de push de Pub/Sub)."
   type        = bool
   default     = true
 }

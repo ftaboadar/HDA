@@ -46,7 +46,7 @@ from app.domain.trabajo.value_objects import (
 class ErrorTransicionInvalida(Exception):
     """Se lanza cuando se intenta una transición de estado que viola un
     invariante del agregado — nunca un `assert` silencioso (mismo patrón
-    que `Verificacion.ErrorTransicionInvalida` en DISP-03, cada servicio
+    que `Verificacion.ErrorTransicionInvalida` en Proveedores, cada servicio
     con su propia excepción, sin compartir código entre contextos)."""
 
 

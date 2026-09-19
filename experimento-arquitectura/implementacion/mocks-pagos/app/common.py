@@ -1,6 +1,6 @@
 """Utilidades compartidas por los dos mocks de pasarela de pago (Stripe y
 MercadoPago) — mismo patrón de control de fallas/latencia que
-`implementacion/DISP-03/app/mocks/main.py` (endpoint `/_control/config`
+`implementacion/proveedores/app/mocks/main.py` (endpoint `/_control/config`
 consumido en caliente por los casos de prueba de MOD-02), factorizado aquí
 para no duplicar el comportamiento de inyección de fallas entre los dos
 mocks.
@@ -43,9 +43,9 @@ async def simular_latencia_y_fallas(estado: dict, response: Response, nombre: st
     """Devuelve un dict de error (y ya fijó `response.status_code`) si el
     modo actual del mock exige simular una falla; devuelve None si la
     llamada debe seguir su curso normal — mismo comportamiento que
-    `app/mocks/main.py` de DISP-03 (modos ok/error_parcial/caido/timeout),
+    `app/mocks/main.py` de Proveedores (modos ok/error_parcial/caido/timeout),
     para que el módulo ACL de Pagos pueda inyectar fallas exactamente igual
-    que DISP-03 ya lo hace con Policía/RUES/Certificadora."""
+    que Proveedores ya lo hace con Policía/RUES/Certificadora."""
     modo = estado["modo"]
     if modo == "caido":
         response.status_code = 503

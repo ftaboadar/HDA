@@ -12,7 +12,7 @@ on:
 jobs:
   # Matriz sobre los 3 microservicios propios de la Entrega 4 (sección 1 de
   # `experimento-arquitectura/contexto/12-plan-entrega-4.md`): Proveedores
-  # (DISP-03, ya certificado — obligatorio, sección 8: propiedad de Johan),
+  # (escenario DISP-03, ya certificado — obligatorio, sección 8: propiedad de Johan),
   # Gestión de Trabajos y Reputación (propiedad de Frans y Daniel
   # respectivamente, en ramas hermanas — todavía NO existen en esta rama).
   #
@@ -24,22 +24,29 @@ jobs:
   # `reputacion` llevan `opcional: true` -> `continue-on-error`, para que el
   # día que ya existan pero su propio `tests/` todavía no esté 100% verde
   # (ej. mientras se integra su PR), esta rama y las hermanas no queden
-  # bloqueadas por un servicio que no es el propio. DISP-03 se mantiene
+  # bloqueadas por un servicio que no es el propio. Proveedores se mantiene
   # `opcional: false`: es el único de los tres cuya suite ya está probada y
   # no debe degradarse silenciosamente.
   python-lint-y-pruebas:
-    name: Python — lint, formato y suite de pruebas (${{ matrix.servicio }})
+    name: Python — lint, formato y suite de pruebas (${{ matrix.check }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.opcional }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - servicio: DISP-03
-            carpeta: experimento-arquitectura/implementacion/DISP-03
+          # `check` es lo que aparece en el nombre del job y, por tanto, el nombre del check
+          # REQUERIDO por la protección de la rama ("... (DISP-03)"). Está desacoplado de
+          # `servicio`/`carpeta` a propósito: renombrar la carpeta no debe cambiar el check.
+          # Si algún día se cambia `check`, hay que actualizar también la regla en GitHub
+          # (Settings > Branches), o el PR quedará en "Expected — Waiting for status to be reported".
+          - servicio: proveedores
+            check: DISP-03
+            carpeta: experimento-arquitectura/implementacion/proveedores
             opcional: false
             compose_file: docker-compose.yml
           - servicio: gestion-de-trabajos
+            check: gestion-de-trabajos
             carpeta: experimento-arquitectura/implementacion/gestion-de-trabajos
             opcional: true
             # docker-compose.yml "normal" no trae el mock del CRM — los tests
@@ -48,6 +55,7 @@ jobs:
             # postgres + mock-crm), ver ese archivo para el detalle.
             compose_file: docker-compose.disp02.yml
           - servicio: reputacion
+            check: reputacion
             carpeta: experimento-arquitectura/implementacion/reputacion
             opcional: true
             compose_file: docker-compose.yml
@@ -138,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: experimento-arquitectura/implementacion/DISP-03/infra
+        working-directory: experimento-arquitectura/implementacion/proveedores/infra
     steps:
       - uses: actions/checkout@v4
 

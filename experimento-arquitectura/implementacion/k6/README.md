@@ -5,14 +5,14 @@ Hogar de los Alpes (HdA) — Entrega 4, MISO 2026-14.
 Fuente del escenario: `experimento-arquitectura/contexto/escenarios_calidad.md`, tabla
 "Escalabilidad", columna ESC-01. Regla de volúmenes: `REGLAS-DURAS-rubrica-entrega-3.md`,
 Regla 3 (usar el mismo volumen del enunciado o mayor, compresión temporal permitida si se declara
-el factor — mismo criterio ya usado en `DISP-03/plan.md` §5.4 y `DISP-03/RESULTADOS-DISP03.md`).
+el factor — mismo criterio ya usado en `proveedores/plan.md` §5.4 y `proveedores/RESULTADOS-DISP03.md`).
 
 **Nota de alcance**: ESC-02 y ESC-03 se quitaron del alcance acordado del equipo — solo ESC-01
 forma parte de la entrega. Sus scripts y resultados fueron removidos de este directorio.
 
 **Estado de este documento: código y smoke tests locales verificados; los valores de la tabla de
 resultados al final son placeholders — no se ha corrido ninguna prueba a la escala real contra GCP
-todavía.** Mismo estándar de honestidad que `DISP-03/RESULTADOS-DISP03.md`.
+todavía.** Mismo estándar de honestidad que `proveedores/RESULTADOS-DISP03.md`.
 
 ## Estructura
 
@@ -54,7 +54,7 @@ el comentario de cabecera de `esc-01.js`, léanlo antes de correr nada)
 
 ```bash
 # DISP-03 (sí tiene docker-compose.yml — API en :8000):
-cd experimento-arquitectura/implementacion/DISP-03
+cd experimento-arquitectura/implementacion/proveedores
 docker compose up -d --build
 
 # gestion-de-trabajos (NO tiene docker-compose.yml hoy — requiere Postgres/Pulsar
@@ -74,12 +74,12 @@ k6 run -e GESTION_TRABAJOS_URL=http://localhost:8001 -e DISP03_URL=http://localh
 ## Cómo correrlo — contra GCP real
 
 Mismas variables de entorno, apuntando a las URLs de Cloud Run desplegadas (ver
-`DISP-03/infra/outputs.tf` → `terraform output api_url`, y el output equivalente del servicio
+`proveedores/infra/outputs.tf` → `terraform output api_url`, y el output equivalente del servicio
 `gestion-de-trabajos` cuando su infra esté desplegada — gestionada aparte, no forma parte de este
 ejercicio):
 
 ```bash
-DISP03_URL=$(cd ../DISP-03/infra && terraform output -raw api_url)
+DISP03_URL=$(cd ../proveedores/infra && terraform output -raw api_url)
 
 k6 run -e DISP03_URL="$DISP03_URL" -e GESTION_TRABAJOS_URL="https://<cloud-run-url-gestion-trabajos>" \
   esc-01.js
@@ -139,7 +139,7 @@ terraform destroy -var project_id=hda-projectt   # apagar la VM cuando ya no se 
 
 ## Resultados (última actualización: 2026-09-17)
 
-Mismo estándar que `DISP-03/RESULTADOS-DISP03.md`: solo números de corridas reales, nunca
+Mismo estándar que `proveedores/RESULTADOS-DISP03.md`: solo números de corridas reales, nunca
 inventados. Detalle completo, diagnóstico en cadena y la variación entre corridas sin resolver:
 `../RESULTADOS-ESCALABILIDAD-GCP.md`, sección 1.1.1.
 
@@ -172,6 +172,6 @@ síncronas + 1 publish a Pulsar por request, todo compartiendo un solo `ThreadPo
 
 - Escenarios fuente: `experimento-arquitectura/contexto/escenarios_calidad.md`
 - Regla de volúmenes: `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`, Regla 3
-- Precedente de compresión temporal declarada: `experimento-arquitectura/implementacion/DISP-03/plan.md` §5.4
+- Precedente de compresión temporal declarada: `experimento-arquitectura/implementacion/proveedores/plan.md` §5.4
 - Decisión de reincorporar observabilidad (Prometheus/Grafana) a raíz de esta estrategia de pruebas:
   `experimento-arquitectura/contexto/14-estrategia-pruebas-carga-k6.md`

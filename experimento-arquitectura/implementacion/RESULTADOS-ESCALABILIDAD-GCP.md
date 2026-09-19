@@ -5,7 +5,7 @@ Documenta la corrida real (2026-09-14) del escenario de Escalabilidad ESC-01
 desplegada para la ocasión (`hda-projectt`, 106 recursos, 7 stacks Terraform — ver
 `DESPLIEGUE-GCP-INTEGRAL.md`), más las decisiones de arquitectura, puntos de sensibilidad y
 tradeoffs que salieron de esa corrida. Mismo estándar de honestidad que
-`DISP-03/RESULTADOS-DISP03.md`: solo se reporta lo que de verdad se ejecutó y midió.
+`proveedores/RESULTADOS-DISP03.md`: solo se reporta lo que de verdad se ejecutó y midió.
 
 **Alcance de este documento**: complementa (no reemplaza) las 5 columnas ATAM que
 `escenarios_calidad.md` todavía tiene pendientes para ESC-01 — decisión arquitectural,
@@ -149,7 +149,7 @@ Helm/GKE — sigue disponible si el equipo decide escalar esto más adelante.
 
 **Decisión**: el productor de `gestion-de-trabajos` pasó de `pulsar.schema.AvroSchema` a JSON
 plano (`producer.send(json.dumps(mensaje).encode())`), igual que ya usa
-`DISP-03/app/common/publicador.py`.
+`proveedores/app/common/publicador.py`.
 
 **Por qué**: el consumidor real de ese mismo tópico (`reputacion/.../consumidor_pulsar.py`)
 esperaba JSON desde el principio — dos servicios de equipos distintos, diseñados por separado,
@@ -169,7 +169,7 @@ mejora futura si se instrumenta explícitamente.
 
 ### 2.4 Módulo Terraform reusable para los 3 microservicios nuevos
 
-**Decisión**: extraer el patrón repetido de `DISP-03/infra/` (Cloud Run v2 + IAM + Cloud SQL
+**Decisión**: extraer el patrón repetido de `proveedores/infra/` (Cloud Run v2 + IAM + Cloud SQL
 opcional + Direct VPC egress opcional) a `infra-modules/cloud-run-service/`, en vez de copiar y
 pegar el mismo bloque 3 veces.
 

@@ -1,6 +1,6 @@
 """Configuración centralizada, cargada desde variables de entorno — mismo
 patrón que `gestion-de-trabajos/app/common/config.py` y
-`implementacion/DISP-03/app/common/config.py`.
+`implementacion/proveedores/app/common/config.py`.
 
 Los valores por defecto asumen desarrollo local. `stripe_mock_url`/
 `mercadopago_mock_url` apuntan a los mocks de sistemas externos

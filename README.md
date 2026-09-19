@@ -70,24 +70,24 @@ Implementada sobre el mismo servicio de Verificación: agregado `Verificacion` c
 protegidos, arquitectura hexagonal con 2 puertos (repositorio + verificación externa), persistencia
 real (Postgres/Cloud SQL vía SQLAlchemy), eventos de dominio intra-servicio con dispatcher, y CQS
 (comandos vs. queries separados). Detalle completo y evidencia por criterio en
-[`experimento-arquitectura/implementacion/DISP-03/README.md`](experimento-arquitectura/implementacion/DISP-03/README.md).
+[`experimento-arquitectura/implementacion/proveedores/README.md`](experimento-arquitectura/implementacion/proveedores/README.md).
 
 ### Dónde está todo
 
 - **Diseño completo del experimento** (contexto de negocio, arquitectura del PoC, variables,
   compresión de escala temporal, criterios de éxito/fracaso, amenazas a la validez):
-  [`experimento-arquitectura/implementacion/DISP-03/plan.md`](experimento-arquitectura/implementacion/DISP-03/plan.md)
+  [`experimento-arquitectura/implementacion/proveedores/plan.md`](experimento-arquitectura/implementacion/proveedores/plan.md)
 - **Documentación operativa del código** (estructura, cómo correr local/GCP, evidencia de la Regla 5):
-  [`experimento-arquitectura/implementacion/DISP-03/README.md`](experimento-arquitectura/implementacion/DISP-03/README.md)
+  [`experimento-arquitectura/implementacion/proveedores/README.md`](experimento-arquitectura/implementacion/proveedores/README.md)
 - **Código de los casos de prueba**:
-  [`experimento-arquitectura/implementacion/DISP-03/tests/test_escenarios_disp03.py`](experimento-arquitectura/implementacion/DISP-03/tests/test_escenarios_disp03.py)
+  [`experimento-arquitectura/implementacion/proveedores/tests/test_escenarios_disp03.py`](experimento-arquitectura/implementacion/proveedores/tests/test_escenarios_disp03.py)
 - **Los 9 escenarios de calidad del proyecto** (DISP-03 es uno de 3 de Disponibilidad):
   [`experimento-arquitectura/contexto/escenarios_calidad.md`](experimento-arquitectura/contexto/escenarios_calidad.md)
 
 ### Correr el experimento localmente
 
 ```bash
-cd experimento-arquitectura/implementacion/DISP-03
+cd experimento-arquitectura/implementacion/proveedores
 make local-run          # docker compose up + espera salud + pytest + reporte
 ```
 

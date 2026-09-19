@@ -14,7 +14,7 @@
 > **Decisión de equipo confirmada al integrar este plan**: migrar **todo** el transporte de eventos a
 > Apache Pulsar, incluyendo el publicador de Proveedores — aunque ese publicador ya está **validado
 > contra GCP real con Pub/Sub** (despliegue del 2026-09-06 contra el proyecto `hda-projectt`, 3 bugs
-> de producción corregidos, H1 de DISP-03 validada — ver `implementacion/DISP-03/README.md` y los
+> de producción corregidos, H1 de DISP-03 validada — ver `implementacion/proveedores/README.md` y los
 > commits `ca76f60`..`ef391c5`). Esto implica dos consecuencias explícitas que este documento no
 > tenía originalmente y que el equipo debe tener presentes (detalladas en la sección 2 y la sección 3):
 > 1. La evidencia de disponibilidad de DISP-03 ya documentada en `escenarios_calidad.md` (fila
@@ -210,7 +210,7 @@ No hace falta lógica de negocio rica (1-2 tablas bastan, la guía lo dice expl�
 
 **No se toca, bajo ninguna circunstancia:** el flujo de eventos de dominio intra-servicio (`Verificacion` → `IntentoRegistrado`/`VerificacionCompletada`/`VerificacionAgotoReintentos` → `dispatcher_eventos_dominio.py` → `ServicioDeElegibilidad`, sección 4.0-A). Es el ejemplo concreto de comunicación entre módulos del mismo microservicio — si se simplifica o se salta al migrar el publicador, se pierde justo lo que el profe quiere ver evidenciado.
 
-**Riesgo nuevo, explícito, por la migración a Pulsar:** los CP-1..CP-7 de `implementacion/DISP-03/plan.md` (sección 6) y el veredicto H1 ya registrado en `escenarios_calidad.md` fueron validados con Pub/Sub contra GCP real. Cambiar el transporte no es solo un cambio de librería de cliente — Pulsar es *at-least-once* con semánticas de entrega, particionado y DLQ distintas a las de Pub/Sub (que a su vez ya difieren de RabbitMQ, ver `README.md` §"Diferencias local vs. GCP"). **No se puede asumir que el veredicto H1 se mantiene igual solo por analogía** — hay que re-ejecutar al menos CP-4 (falla dura + DLQ) y CP-7 (carga concurrente) contra el nuevo transporte antes de reclamarlo en la sustentación.
+**Riesgo nuevo, explícito, por la migración a Pulsar:** los CP-1..CP-7 de `implementacion/proveedores/plan.md` (sección 6) y el veredicto H1 ya registrado en `escenarios_calidad.md` fueron validados con Pub/Sub contra GCP real. Cambiar el transporte no es solo un cambio de librería de cliente — Pulsar es *at-least-once* con semánticas de entrega, particionado y DLQ distintas a las de Pub/Sub (que a su vez ya difieren de RabbitMQ, ver `README.md` §"Diferencias local vs. GCP"). **No se puede asumir que el veredicto H1 se mantiene igual solo por analogía** — hay que re-ejecutar al menos CP-4 (falla dura + DLQ) y CP-7 (carga concurrente) contra el nuevo transporte antes de reclamarlo en la sustentación.
 
 ---
 
@@ -238,7 +238,7 @@ Todo esto **ya existe y está probado** (13/13 pruebas unitarias de dominio, ent
 ## 2.2 Migración técnica de Proveedores a Pulsar — checklist concreto, archivo por archivo
 
 La sección 2 dice "migrar el publicador a Pulsar" en una línea. Esto es lo mismo bajado al código real de
-`implementacion/DISP-03/`, siguiendo el mismo patrón puerto/adaptador que ya existe para RabbitMQ↔Pub/Sub
+`implementacion/proveedores/`, siguiendo el mismo patrón puerto/adaptador que ya existe para RabbitMQ↔Pub/Sub
 (no se inventa una estructura nueva, se extiende la que ya está probada):
 
 | # | Archivo | Qué existe hoy | Qué cambia |
@@ -252,7 +252,7 @@ La sección 2 dice "migrar el publicador a Pulsar" en una línea. Esto es lo mis
 | 7 | `app/worker/core.py` | Docstring dice explícito "la usan tanto el consumidor pull de RabbitMQ como el handler push de Pub/Sub" — la función `procesar_verificacion()` en sí es agnóstica de transporte | Sin cambios de lógica — solo actualizar el docstring para listar también al consumidor de Pulsar (punto 5). Este archivo es la prueba de que el diseño hexagonal ya pagó: cero cambios de negocio por cambiar de broker |
 | 8 | `requirements.txt` | `aio-pika==9.4.3`, `google-cloud-pubsub==2.23.0` | Agregar `pulsar-client==<versión fijada>`. Decidir si `aio-pika`/`google-cloud-pubsub` se quitan (si Proveedores deja de soportar RabbitMQ/Pub/Sub del todo) o se mantienen para no perder la comparación histórica documentada en el README — es una decisión de equipo, no técnica |
 | 9 | `infra/pubsub.tf`, `infra/cloudrun.tf` | Terraform que aprovisiona los topics de Pub/Sub y el servicio Cloud Run con push subscription | Pulsar en GKE no se aprovisiona igual que un servicio gestionado: nuevo `infra/pulsar/` con el Helm chart oficial (`values.yaml` del cluster: Zookeeper+BookKeeper+Broker) + manifiestos o Terraform (`helm_release` resource) para los namespaces/tópicos/políticas de retención. `infra/cloudrun.tf` se mantiene si el worker/API siguen en Cloud Run (solo cambia qué broker consumen); si el equipo decide mover el worker a GKE junto al cluster, es un cambio de infraestructura más grande, a evaluar aparte |
-| 10 | `implementacion/DISP-03/README.md` §"Diferencias local vs. GCP" | Documenta RabbitMQ↔Pub/Sub (orden FIFO, filtrado por routing key, at-least-once) | Agregar una tercera columna Pulsar: orden garantizado por **partición** (no global, similar a Kafka), `DeadLetterPolicy` nativa por suscripción, *at-least-once* con posibilidad de *effectively-once* si se usa deduplicación de productor — para que la comparación de 3 transportes quede tan explícita como la de 2 hoy |
+| 10 | `implementacion/proveedores/README.md` §"Diferencias local vs. GCP" | Documenta RabbitMQ↔Pub/Sub (orden FIFO, filtrado por routing key, at-least-once) | Agregar una tercera columna Pulsar: orden garantizado por **partición** (no global, similar a Kafka), `DeadLetterPolicy` nativa por suscripción, *at-least-once* con posibilidad de *effectively-once* si se usa deduplicación de productor — para que la comparación de 3 transportes quede tan explícita como la de 2 hoy |
 | 11 | `tests/test_escenarios_disp03.py` | CP-1..CP-7 corren contra RabbitMQ local (Docker) o Pub/Sub (GCP real), seleccionado por `settings.transporte` | Añadir el caso `transporte=pulsar` a la matriz de ejecución (local vía el `docker-compose` del cluster, después contra GKE) — sin esto, "migrar a Pulsar" es un cambio de infraestructura sin prueba, exactamente el tipo de brecha que el ciclo `experimento-runner`→`validador-hipotesis` existe para atrapar |
 
 **Orden recomendado para ejecutar esta migración (evita quedar con el sistema roto a medio camino):**
@@ -404,7 +404,7 @@ piezas más livianas), no una simple división por conteo de tareas:
 | Persona | Carpetas de las que es dueño único | Peso relativo |
 |---|---|---|
 | **Frans** | `implementacion/gestion-de-trabajos/` completo (núcleo + módulo ACL de Pagos) | 1 microservicio nuevo + 1 submódulo (Strategy+Adapter) |
-| **Johan** | `implementacion/DISP-03/` (ajustes) + `implementacion/mocks-pagos/` (nuevo) + `.github/workflows/pr-quality-gate.yml` | 1 migración sobre servicio ya certificado (requiere más cuidado, no más código) + mocks + CI |
+| **Johan** | `implementacion/proveedores/` (ajustes) + `implementacion/mocks-pagos/` (nuevo) + `.github/workflows/pr-quality-gate.yml` | 1 migración sobre servicio ya certificado (requiere más cuidado, no más código) + mocks + CI |
 | **Daniel** | `implementacion/reputacion/` (nuevo) + `implementacion/pulsar-infra/` (cluster local + Helm/GKE) | 1 microservicio nuevo (Event Sourcing) + infraestructura del cluster |
 
 **Antes de empezar, cada quien corre esto una sola vez, con sus datos reales:**
@@ -460,8 +460,8 @@ git checkout -b feature/proveedores-pulsar-y-ci
 **Prompt para el agente:**
 > Lee `experimento-arquitectura/contexto/12-plan-entrega-4.md` (secciones 0.1, 2, 2.2, 3, 3.1) y `.claude/agents/implementador-ddd.md`. Necesito:
 >
-> 1. Sobre `Proveedores` (`implementacion/DISP-03/`) ya existente: (a) migra el publicador de Pub/Sub a Apache Pulsar siguiendo el checklist archivo por archivo de la sección 2.2, (b) agrega un consumidor **liviano** de `trabajos.finalizado` — solo recibe y registra el evento, no completes la cadena de verificación automáticamente (ver sección 1.1: eso es de la Entrega 5), (c) agrega un job programado que use la API de estadísticas de Pulsar para reprocesar la DLQ automáticamente cuando el backlog supere un umbral, llamando a `ReprocesarDesdeDLQ`.
-> 2. Los dobles (mocks) de **Stripe** y **MercadoPago** para MOD-02, en `implementacion/mocks-pagos/` — mismo patrón que los mocks existentes de Policía/RUES/CONTE en `implementacion/DISP-03/app/mocks/` (FastAPI + endpoint de control de fallas/latencia). **No** son un microservicio de dominio — son sistemas externos simulados que consume el módulo ACL de Pagos que construye Frans dentro de Gestión de Trabajos.
+> 1. Sobre `Proveedores` (`implementacion/proveedores/`) ya existente: (a) migra el publicador de Pub/Sub a Apache Pulsar siguiendo el checklist archivo por archivo de la sección 2.2, (b) agrega un consumidor **liviano** de `trabajos.finalizado` — solo recibe y registra el evento, no completes la cadena de verificación automáticamente (ver sección 1.1: eso es de la Entrega 5), (c) agrega un job programado que use la API de estadísticas de Pulsar para reprocesar la DLQ automáticamente cuando el backlog supere un umbral, llamando a `ReprocesarDesdeDLQ`.
+> 2. Los dobles (mocks) de **Stripe** y **MercadoPago** para MOD-02, en `implementacion/mocks-pagos/` — mismo patrón que los mocks existentes de Policía/RUES/CONTE en `implementacion/proveedores/app/mocks/` (FastAPI + endpoint de control de fallas/latencia). **No** son un microservicio de dominio — son sistemas externos simulados que consume el módulo ACL de Pagos que construye Frans dentro de Gestión de Trabajos.
 > 3. Extiende `.github/workflows/pr-quality-gate.yml` a matriz, cubriendo los 3 microservicios propios en `experimento-arquitectura/implementacion/*/` (Gestión de Trabajos, Proveedores, Reputación), no solo DISP-03.
 >
 > **No toques el flujo de eventos de dominio intra-servicio** (`Verificacion` → `IntentoRegistrado`/`VerificacionCompletada`/`VerificacionAgotoReintentos` → `dispatcher_eventos_dominio.py` → `ServicioDeElegibilidad`) — es el ejemplo de comunicación entre módulos del mismo microservicio, y debe seguir intacto. Solo cambia el transporte del evento que sí sale hacia afuera (`ProveedorHabilitado`), de Pub/Sub a Pulsar. No toques el agregado `Verificacion` ni sus invariantes.

@@ -33,6 +33,8 @@ class ResultadoEnvioWebhook:
     exitoso: bool
     motivo_falla: str | None = None
     reintentar_despues_s: float | None = None
+    status_http: int | None = None
+    duracion_ms: float | None = None
 
 
 class IGestionAgentesPort(abc.ABC):

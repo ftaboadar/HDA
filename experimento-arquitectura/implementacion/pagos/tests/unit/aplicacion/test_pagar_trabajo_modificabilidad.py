@@ -157,7 +157,9 @@ class _ClienteHttpFalso:
     async def __aexit__(self, *args, **kwargs) -> bool:
         return False
 
-    async def post(self, url: str, json: dict | None = None) -> _RespuestaHttpFalsa:
+    async def post(
+        self, url: str, json: dict | None = None, **_
+    ) -> _RespuestaHttpFalsa:
         if "charges" in url:
             return _RespuestaHttpFalsa({"id": "ch_test_123"})
         return _RespuestaHttpFalsa({"id": "mp_test_456"})

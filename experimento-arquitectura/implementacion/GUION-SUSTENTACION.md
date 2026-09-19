@@ -42,7 +42,7 @@ Da 10 servicios Cloud Run + 1 VM de Compute Engine, todos `True` (sanos). Explí
 
 | Capa | Qué hay | Dónde está el código/infra |
 |---|---|---|
-| **4 microservicios de negocio** | `gestion-de-trabajos` (API), `reputacion` (API), DISP-03 (API + worker + 3 mocks de externos), `mocks-pagos` (Stripe + MercadoPago) | `implementacion/{gestion-de-trabajos,reputacion,DISP-03,mocks-pagos}/` |
+| **4 microservicios de negocio** | `gestion-de-trabajos` (API), `reputacion` (API), `proveedores` (API + worker + 3 mocks de externos; escenario DISP-03), `mocks-pagos` (Stripe + MercadoPago) | `implementacion/{gestion-de-trabajos,reputacion,DISP-03,mocks-pagos}/` |
 | **Mensajería** | 1 VM de Compute Engine corriendo el `docker-compose.yml` de Pulsar (Zookeeper + BookKeeper + Broker) — el mismo compose que ya tenía el equipo, sin reescribirlo, solo llevado a una VM | `implementacion/pulsar-infra/` (compose original) + `pulsar-infra/gcp/` (VM + startup script, nuevo) |
 | **Persistencia** | Cloud SQL (Postgres) — una instancia por microservicio con estado (gestión de trabajos, reputación, DISP-03) | `<servicio>/infra/*.tf` |
 | **Observabilidad** | Google Managed Prometheus (métricas nativas de Cloud Run/Cloud SQL, sin agente) + Grafana real desplegado en Cloud Run | `implementacion/observabilidad/` |

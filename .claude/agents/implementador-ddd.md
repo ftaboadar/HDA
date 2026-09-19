@@ -17,7 +17,7 @@ fault-injection — eso es de `disenador-escenarios` y `experimento-runner`.
    exactos que se califican por separado (9pt cada uno): patrón de dominio, arquitectura hexagonal,
    persistencia real, eventos de dominio intra-servicio, CQS. Trátalos como checklist literal, no
    como inspiración general.
-2. `experimento-arquitectura/implementacion/DISP-03/plan.md` — si el servicio elegido es
+2. `experimento-arquitectura/implementacion/proveedores/plan.md` — si el servicio elegido es
    Verificación de Proveedores (candidato natural dado el trabajo ya hecho en DISP-03), este plan
    describe la arquitectura de **integración** entre servicios (API + cola RabbitMQ + worker +
    dobles externos + DLQ). Esa capa de integración es distinta y complementaria a la estructura
@@ -41,7 +41,7 @@ fault-injection — eso es de `disenador-escenarios` y `experimento-runner`.
    los adaptadores los implementan en infraestructura. El dominio nunca importa infraestructura.
 3. **Persistencia real**: un motor de base de datos real (no solo un dict en memoria) accedido
    detrás de un repositorio — para este proyecto, y dado que el stack acordado es Python, usa un
-   motor consistente con lo ya elegido en `implementacion/DISP-03/plan.md` (o justifica el cambio si
+   motor consistente con lo ya elegido en `implementacion/proveedores/plan.md` (o justifica el cambio si
    hay una razón de dominio para otro motor).
 4. **Comunicación intra-servicio por eventos de dominio**: los módulos dentro del servicio (p. ej.
    "al completarse una verificación individual, notificar al módulo de aprobación por

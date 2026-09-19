@@ -25,10 +25,11 @@ background, `ThrottlerCrm`, arrancado en `startup` y cancelado limpio en
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 
 from app.application.commands.crear_trabajo import CrearTrabajo
 from app.application.commands.publicar_novedad import PublicarNovedad
@@ -36,7 +37,11 @@ from app.application.queries.consultar_novedad import ConsultarNovedad
 from app.application.queries.consultar_trabajo import ConsultarTrabajo
 from app.common.config import settings
 from app.common.db import Base, engine
-from app.common.logging_utils import configurar_logging, log_evento
+from app.common.logging_utils import (
+    configurar_logging,
+    establecer_trace,
+    log_evento,
+)
 from app.common.schemas import (
     NovedadCreate,
     NovedadIdOut,
@@ -61,6 +66,53 @@ from app.infrastructure.persistence.trabajo_repository_sqlalchemy import (
 
 logger = configurar_logging("api.main")
 app = FastAPI(title="Gestión de Trabajos — API (Entrega 4 PoC, skeleton)")
+
+_en_vuelo = 0
+
+
+def _estado_pool_db() -> dict:
+    try:
+        return {
+            "pool_db_en_uso": engine.pool.checkedout(),
+            "pool_db_tamano": engine.pool.size(),
+            "pool_db_overflow": engine.pool.overflow(),
+        }
+    except Exception:  # noqa: BLE001 -- pool no-QueuePool (tests/sqlite): sin dato
+        return {}
+
+
+@app.middleware("http")
+async def _telemetria_http(request: Request, call_next):
+    """Una línea por request con lo que ESC-01 necesita ver de la
+    infraestructura: latencia real, requests concurrentes en esta instancia
+    (contra `max_instance_request_concurrency`) y ocupación del pool de
+    conexiones a Cloud SQL. Se omite con LOG_DETALLE=minimo (carga real)."""
+    global _en_vuelo
+    establecer_trace(request.headers.get("x-cloud-trace-context"))
+    _en_vuelo += 1
+    inicio = time.perf_counter()
+    status = 500
+    try:
+        respuesta = await call_next(request)
+        status = respuesta.status_code
+        return respuesta
+    finally:
+        concurrentes = _en_vuelo
+        _en_vuelo -= 1
+        if request.url.path != "/salud":
+            ruta = getattr(request.scope.get("route"), "path", request.url.path)
+            log_evento(
+                logger,
+                "http_request_completada",
+                detalle=True,
+                metodo=request.method,
+                ruta=ruta,
+                status=status,
+                duracion_ms=round((time.perf_counter() - inicio) * 1000, 1),
+                requests_concurrentes=concurrentes,
+                **_estado_pool_db(),
+            )
+
 
 _trabajo_repo = TrabajoRepositorySQLAlchemy()
 _registro_repo = RegistroTrabajosRepositorySQLAlchemy()
@@ -103,7 +155,14 @@ async def startup() -> None:
         ThreadPoolExecutor(max_workers=settings.db_pool_size + settings.db_max_overflow)
     )
     _throttler.iniciar()
-    log_evento(logger, "api_iniciada")
+    log_evento(
+        logger,
+        "api_iniciada",
+        db_pool_size=settings.db_pool_size,
+        db_max_overflow=settings.db_max_overflow,
+        executor_max_workers=settings.db_pool_size + settings.db_max_overflow,
+        crm_limite_rps=settings.crm_limite_rps,
+    )
 
 
 @app.on_event("shutdown")
@@ -123,7 +182,15 @@ async def crear_trabajo(payload: TrabajoCreate):
     trabajo_id = await comando.ejecutar(
         payload.proveedor_id, payload.monto, payload.region
     )
-    log_evento(logger, "trabajo_creado", trabajo_id=str(trabajo_id))
+    log_evento(
+        logger,
+        "trabajo_creado",
+        trabajo_id=str(trabajo_id),
+        proveedor_id=payload.proveedor_id,
+        region=payload.region,
+        monto=str(payload.monto),
+        agregado="Trabajo",
+    )
     return TrabajoIdOut(id=trabajo_id)
 
 
@@ -147,7 +214,14 @@ async def publicar_novedad(payload: NovedadCreate):
     explícito que la petición fue aceptada para proceso, no completada."""
     comando = PublicarNovedad(_novedad_repo, _throttler)
     novedad_id = await comando.ejecutar(payload.trabajo_id, payload.descripcion)
-    log_evento(logger, "novedad_publicada", novedad_id=str(novedad_id))
+    log_evento(
+        logger,
+        "novedad_publicada",
+        novedad_id=str(novedad_id),
+        trabajo_id=payload.trabajo_id,
+        agregado="Novedad",
+        estado_respuesta="202_accepted_entrega_asincrona",
+    )
     return NovedadIdOut(id=novedad_id)
 
 

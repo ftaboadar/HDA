@@ -2,7 +2,7 @@
 de ValueObject. Sin dependencias de framework, sin imports de otro
 microservicio: cada Bounded Context (ver 03-contextos-acotados-TO-BE.cml)
 tiene su propio seedwork independiente, aunque el patrón se parezca al de
-`implementacion/DISP-03/app/domain/seedwork/` — es deliberado no compartir
+`implementacion/proveedores/app/domain/seedwork/` — es deliberado no compartir
 código entre servicios, cada uno es su propio contexto acotado."""
 
 from __future__ import annotations

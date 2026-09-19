@@ -5,7 +5,7 @@
 # Pulsar por su cuenta.
 #
 # Puerto de Postgres publicado en 5433 (no 5432) para poder correr este
-# servicio en paralelo con el Postgres de DISP-03 en la misma máquina de
+# servicio en paralelo con el Postgres de Proveedores en la misma máquina de
 # desarrollo, sin choque de puertos.
 
 networks:

@@ -15,16 +15,17 @@ Trabajos)."""
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 
 from app.application.commands.compensar import Compensar, PagoNoEncontrado
 from app.application.commands.pagar_trabajo import PagarTrabajo, TrabajoNoEncontrado
 from app.application.ports.registro_trabajos import RegistroTrabajoElegible
 from app.application.queries.consultar_pago import ConsultarPago
 from app.common.db import Base, engine
-from app.common.logging_utils import configurar_logging, log_evento
+from app.common.logging_utils import configurar_logging, establecer_trace, log_evento
 from app.common.schemas import PagoCreate, PagoIdOut, PagoOut
 from app.domain.pagos.pago import Pago
 from app.domain.pagos.regla_regional import ReglaRegional
@@ -42,6 +43,30 @@ from app.infrastructure.persistence.registro_trabajos_repository_sqlalchemy impo
 
 logger = configurar_logging("api.main")
 app = FastAPI(title="Pagos — API (Entrega 4 PoC, microservicio independiente)")
+
+
+@app.middleware("http")
+async def _telemetria_http(request: Request, call_next):
+    establecer_trace(request.headers.get("x-cloud-trace-context"))
+    inicio = time.perf_counter()
+    status = 500
+    try:
+        respuesta = await call_next(request)
+        status = respuesta.status_code
+        return respuesta
+    finally:
+        if request.url.path != "/salud":
+            ruta = getattr(request.scope.get("route"), "path", request.url.path)
+            log_evento(
+                logger,
+                "http_request_completada",
+                detalle=True,
+                metodo=request.method,
+                ruta=ruta,
+                status=status,
+                duracion_ms=round((time.perf_counter() - inicio) * 1000, 1),
+            )
+
 
 _pago_repo = PagoRepositorySQLAlchemy()
 _registro_repo = RegistroTrabajosRepositorySQLAlchemy()
@@ -73,7 +98,12 @@ def _pago_a_schema(p: Pago) -> PagoOut:
 @app.on_event("startup")
 async def startup() -> None:
     Base.metadata.create_all(bind=engine)
-    log_evento(logger, "api_iniciada")
+    log_evento(
+        logger,
+        "api_iniciada",
+        reglas_regionales=sorted(r.value for r in _reglas_regionales),
+        pasarelas=sorted(_pasarelas),
+    )
 
 
 @app.get("/salud")
@@ -87,6 +117,17 @@ async def crear_pago(payload: PagoCreate):
     # comando — reemplaza al dispatcher intra-proceso que poblaba esto al
     # reaccionar a TrabajoFinalizado cuando Pagos vivía en el mismo proceso
     # que Gestión de Trabajos (ver README.md, "Frontera del API").
+    log_evento(
+        logger,
+        "comando_pagar_trabajo_recibido",
+        detalle=True,
+        comando="PagarTrabajo",
+        trabajo_id=str(payload.trabajo_id),
+        region=payload.region,
+        moneda=payload.moneda,
+        monto=str(payload.monto),
+        pasarela_solicitada=payload.pasarela,
+    )
     await asyncio.to_thread(
         _registro_repo.guardar,
         RegistroTrabajoElegible(
@@ -105,7 +146,13 @@ async def crear_pago(payload: PagoCreate):
         raise HTTPException(status_code=404, detail="trabajo no encontrado") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    log_evento(logger, "pago_creado", pago_id=str(pago_id))
+    log_evento(
+        logger,
+        "pago_creado",
+        pago_id=str(pago_id),
+        trabajo_id=str(payload.trabajo_id),
+        agregado="Pago",
+    )
     return PagoIdOut(id=pago_id)
 
 

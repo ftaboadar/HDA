@@ -1,0 +1,140 @@
+asyncapi: 2.6.0
+info:
+  title: Hogar de los Alpes — API asíncrona (PoC)
+  version: 1.0.0
+  description: >
+    Contratos de los mensajes que cruzan Bounded Contexts en la PoC. Todos son
+    JSON (application/json). La versión del contrato (`version_esquema`) viaja
+    como metadata del mensaje (propiedad Pulsar / atributo Pub/Sub), no en el
+    cuerpo. Fuente de verdad del código: gestion-de-trabajos/app/infrastructure/
+    messaging/publicador_pulsar.py y proveedores/app/common/publicador.py.
+servers:
+  pulsar-gcp:
+    url: pulsar://10.158.0.2:6650
+    protocol: pulsar
+    description: Apache Pulsar en la VM pulsar-poc-vm (IP privada de la VPC; accesible por Direct VPC egress).
+  pubsub-gcp:
+    url: pubsub.googleapis.com
+    protocol: googlepubsub
+    description: Cloud Pub/Sub del proyecto hogaralpes.
+
+channels:
+  persistent://hda/gestion-trabajos/trabajos.finalizado:
+    description: >
+      Evento de INTEGRACIÓN TrabajoFinalizado. Propiedad de ContextoGestionDeTrabajos.
+      Nace como evento de dominio dentro del agregado Trabajo y se traduce a
+      integración en application/dispatcher_eventos_dominio.py.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarTrabajoFinalizado
+      summary: Gestión de Trabajos publica al finalizar un trabajo (POST /trabajos).
+      message: { $ref: '#/components/messages/TrabajoFinalizado' }
+    subscribe:
+      operationId: consumirTrabajoFinalizado
+      summary: >
+        Suscriptores previstos (suscripción Shared): ContextoReputacion
+        ("reputacion-trabajos-finalizado") y ContextoProveedores
+        ("proveedores-trabajos-finalizado"). NO desplegados en Cloud Run
+        (loop de consumo pull no encaja con Cloud Run sin HTTP).
+      message: { $ref: '#/components/messages/TrabajoFinalizado' }
+
+  disp03-poc-verificacion-solicitudes:
+    description: Comando/solicitud de verificación de proveedor (cola de trabajo, DISP-03).
+    servers: [pubsub-gcp]
+    publish:
+      operationId: publicarSolicitudVerificacion
+      summary: disp03-poc-api publica al aceptar POST /verificaciones (202).
+      message: { $ref: '#/components/messages/SolicitudVerificacion' }
+    subscribe:
+      operationId: consumirSolicitudVerificacion
+      summary: >
+        Suscripción PUSH disp03-poc-verificacion-solicitudes-push -> POST /pubsub/push
+        del worker (OIDC). ack_deadline 30s, retry 1s-20s, dead_letter tras 5 entregas.
+      message: { $ref: '#/components/messages/SolicitudVerificacion' }
+
+  disp03-poc-verificacion-fallidas:
+    description: DLQ — verificaciones que agotaron reintentos. Suscripción pull para reproceso.
+    servers: [pubsub-gcp]
+    publish:
+      operationId: publicarVerificacionFallida
+      message: { $ref: '#/components/messages/VerificacionFallida' }
+
+  disp03-poc-verificacion-eventos-integracion:
+    description: >
+      Evento de integración ProveedorHabilitado. Topic físicamente separado del de
+      solicitudes (bug de producción 2026-09-06: compartirlos hacía llegar el evento
+      al handler push como si fuera una solicitud). Sin suscriptores hoy.
+    servers: [pubsub-gcp]
+    publish:
+      operationId: publicarProveedorHabilitado
+      message: { $ref: '#/components/messages/ProveedorHabilitado' }
+
+components:
+  messages:
+    TrabajoFinalizado:
+      name: TrabajoFinalizado
+      contentType: application/json
+      headers:
+        type: object
+        properties:
+          tipo_evento: { type: string, const: TrabajoFinalizado }
+          version_esquema: { type: string, example: "1" }
+          content_type: { type: string, const: application/json }
+          productor: { type: string, example: gestion-de-trabajos }
+      payload: { $ref: '#/components/schemas/TrabajoFinalizado' }
+    SolicitudVerificacion:
+      name: SolicitudVerificacion
+      contentType: application/json
+      headers: { $ref: '#/components/schemas/AtributosPubSub' }
+      payload: { $ref: '#/components/schemas/SolicitudVerificacion' }
+    VerificacionFallida:
+      name: VerificacionFallida
+      contentType: application/json
+      headers: { $ref: '#/components/schemas/AtributosPubSub' }
+      payload: { $ref: '#/components/schemas/VerificacionFallida' }
+    ProveedorHabilitado:
+      name: ProveedorHabilitado
+      contentType: application/json
+      headers: { $ref: '#/components/schemas/AtributosPubSub' }
+      payload: { $ref: '#/components/schemas/ProveedorHabilitado' }
+
+  schemas:
+    AtributosPubSub:
+      type: object
+      properties:
+        tipo_evento: { type: string }
+        version_esquema: { type: string, example: "1" }
+        content_type: { type: string, const: application/json }
+        productor: { type: string, example: disp03-poc-api }
+    TrabajoFinalizado:
+      type: object
+      required: [trabajo_id, proveedor_id, monto, moneda, region, ocurrido_en]
+      properties:
+        trabajo_id: { type: string, format: uuid }
+        proveedor_id: { type: string }
+        monto: { type: string, description: "Decimal como string (no float) para no perder precisión.", example: "200.00" }
+        moneda: { type: string, example: COP }
+        region: { type: string, enum: [CO, BR] }
+        ocurrido_en: { type: string, format: date-time }
+    SolicitudVerificacion:
+      type: object
+      required: [verificacion_id, proveedor_id, tipo_verificador]
+      properties:
+        verificacion_id: { type: string, format: uuid }
+        proveedor_id: { type: string }
+        tipo_verificador: { type: string, enum: [policia, rues, certificadora] }
+        solicitado_en: { type: string, format: date-time }
+    VerificacionFallida:
+      type: object
+      required: [verificacion_id, proveedor_id, motivo_falla]
+      properties:
+        verificacion_id: { type: string, format: uuid }
+        proveedor_id: { type: string }
+        motivo_falla: { type: string }
+    ProveedorHabilitado:
+      type: object
+      required: [proveedor_id, evento, routing_key]
+      properties:
+        proveedor_id: { type: string }
+        evento: { type: string, const: ProveedorHabilitado }
+        routing_key: { type: string, const: proveedor.habilitado }

@@ -5,7 +5,7 @@
 # GET /salud.
 #
 # Puerto de Postgres publicado en 5435 (no 5432/5433/5434, ya usados por
-# DISP-03/reputación/gestión-de-trabajos respectivamente) para poder correr
+# Proveedores/reputación/gestión-de-trabajos respectivamente) para poder correr
 # los 4 en paralelo sin choque. API en el puerto host 8003.
 
 services:

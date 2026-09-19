@@ -1,7 +1,7 @@
 """Persistencia real (Regla 5, criterio 3): tabla `trabajos` en Postgres.
 Sin migraciones formales (Alembic) en este PoC: `Base.metadata.create_all()`
 en el arranque de la API crea las tablas si no existen (mismo patrón que
-DISP-03).
+Proveedores).
 
 Separación de Pagos (ver `implementacion/pagos/README.md`): la tabla
 `pagos` (agregado `Pago`) se movió a la base de datos propia de ese

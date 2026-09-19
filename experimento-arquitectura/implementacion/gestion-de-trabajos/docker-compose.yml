@@ -7,7 +7,7 @@
 # es parte de este servicio — ver implementacion/pagos/docker-compose.yml.
 #
 # Puerto de Postgres publicado en 5434 (no 5432/5433, ya usados por
-# DISP-03/reputación) para poder correr los 3 en paralelo sin choque.
+# Proveedores/reputación) para poder correr los 3 en paralelo sin choque.
 
 services:
   postgres:

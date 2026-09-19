@@ -4,7 +4,7 @@ microservicio (`hda_pagos`), separada de la de Gestión de Trabajos desde
 que Pagos dejó de ser un submódulo ACL dentro de ese proceso. Sin
 migraciones formales (Alembic) en este PoC: `Base.metadata.create_all()` en
 el arranque de la API crea las tablas si no existen (mismo patrón que
-DISP-03/reputación/gestión-de-trabajos).
+Proveedores/reputación/gestión-de-trabajos).
 
 `PagoORM.trabajo_id` ya NO es un `ForeignKey` hacia una tabla `trabajos`
 local (esa tabla vive en la base de datos de Gestión de Trabajos, otro

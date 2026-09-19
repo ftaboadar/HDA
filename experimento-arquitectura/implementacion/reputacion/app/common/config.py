@@ -1,5 +1,5 @@
 """Configuración centralizada, cargada desde variables de entorno. Mismo
-patrón que `DISP-03/app/common/config.py` (pydantic-settings), copiado a
+patrón que `proveedores/app/common/config.py` (pydantic-settings), copiado a
 propósito -- no importado -- porque cada microservicio es su propio
 despliegue independiente (ver docstring de domain/seedwork/value_object.py
 sobre por qué no se comparte código entre Bounded Contexts)."""

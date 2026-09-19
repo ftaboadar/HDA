@@ -3,7 +3,7 @@
 Dobles HTTP de los dos proveedores de pagos que consumiría el módulo ACL de Pagos dentro de
 **Gestión de Trabajos** (ver `../../contexto/12-plan-entrega-4.md`, sección 0.1: Pagos es un
 `GENERIC_SUBDOMAIN` externo — no un microservicio propio de Hogar de los Alpes — y este mock cumple
-el mismo rol que los mocks de Policía/RUES/CONTE en `../DISP-03/app/mocks/`).
+el mismo rol que los mocks de Policía/RUES/CONTE en `../proveedores/app/mocks/`).
 
 **No son un microservicio de dominio.** Son sistemas externos simulados, consumidos vía HTTP
 síncrono por el Adapter `PasarelaDePago` que construye Gestión de Trabajos — la única excepción
@@ -32,7 +32,7 @@ no habría ninguna diferencia real que el Adapter estuviera absorbiendo.
 ```
 app/
   common.py             estado + endpoint de control compartido (/_control/config), mismo patrón
-                         que implementacion/DISP-03/app/mocks/main.py
+                         que implementacion/proveedores/app/mocks/main.py
   stripe_mock.py         FastAPI — POST /charges
   mercadopago_mock.py     FastAPI — POST /payments
 ```

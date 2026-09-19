@@ -15,7 +15,7 @@ Esa evaluación es responsabilidad exclusiva de `validador-hipotesis`.
 
 1. El `plan.md` del experimento correspondiente dentro de
    `experimento-arquitectura/implementacion/*/` (p. ej.
-   `experimento-arquitectura/implementacion/DISP-03/plan.md`) — es tu especificación. Sigue
+   `experimento-arquitectura/implementacion/proveedores/plan.md`) — es tu especificación. Sigue
    exactamente: arquitectura del PoC (sección 5), casos de prueba (sección 6), stack tecnológico
    acordado (sección 8), y la compresión de escala temporal declarada (sección 5.4 en el caso de
    DISP-03) — no improvises un stack ni una escala de tiempo distinta sin dejarlo registrado y

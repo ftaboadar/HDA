@@ -1,4 +1,4 @@
-# Mismo patrón que DISP-03/infra/cloudsql.tf — IP pública + red autorizada
+# Mismo patrón que proveedores/infra/cloudsql.tf — IP pública + red autorizada
 # abierta, aceptable solo por ser un PoC (ver nota allá sobre alcance).
 
 resource "google_sql_database_instance" "gestion_trabajos" {
