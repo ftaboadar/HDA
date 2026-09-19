@@ -5,14 +5,14 @@
 > documento vive en `experimento-arquitectura/contexto/`, junto a `escenarios_calidad.md`,
 > `REGLAS-DURAS-rubrica-entrega-3.md`, `03-contextos-acotados-TO-BE.cml` y
 > `07-vista-informacion.puml` (referenciados abajo por nombre simple, como siblings). El código del
-> experimento vive en `experimento-arquitectura/implementacion/DISP-03/` — todas las rutas `app/...`
+> experimento vive en `experimento-arquitectura/implementacion/proveedores/` — todas las rutas `app/...`
 > de este documento (`app/domain/`, `app/api/main.py`, `app/common/models_db.py`, etc.) son
 > relativas a esa carpeta, no a este archivo.
 
-Complementa a `../implementacion/DISP-03/plan.md` (que resuelve el experimento de **resiliencia**) y
+Complementa a `../implementacion/proveedores/plan.md` (que resuelve el experimento de **resiliencia**) y
 a `escenarios_calidad.md` (DISP-03). Este documento resuelve específicamente la Regla 5 de
 `REGLAS-DURAS-rubrica-entrega-3.md`: la capa de **dominio (DDD) + hexagonal + eventos internos + CQS**
-que hoy no existe en `../implementacion/DISP-03/app/`. Ver también
+que hoy no existe en `../implementacion/proveedores/app/`. Ver también
 `.claude/agents/implementador-ddd.md` (raíz del repo) para el rol que debe ejecutar esto.
 
 **Regla de oro de este documento:** no se reemplaza nada del código de integración/resiliencia que ya
@@ -382,4 +382,4 @@ tópico `verificacion.fallidas` (ya definido arriba), poblado por la propia apli
 7. `PublicadorKafka` + Redpanda en docker-compose + settings nuevos.
 8. Observabilidad (`prometheus_client` + dashboard).
 9. Postman/Newman + JMeter.
-10. Actualizar `README.md` de `../implementacion/DISP-03/` quitando la sección "Servicio DDD — todavía no implementado aquí".
+10. Actualizar `README.md` de `../implementacion/proveedores/` quitando la sección "Servicio DDD — todavía no implementado aquí".

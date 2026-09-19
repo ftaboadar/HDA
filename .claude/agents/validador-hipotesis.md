@@ -14,7 +14,7 @@ primero a buscar cómo tumbarla y no lo lograste.
 ## Qué lees antes de emitir cualquier veredicto
 
 1. El `plan.md` del experimento correspondiente (p. ej.
-   `experimento-arquitectura/implementacion/DISP-03/plan.md`) — en particular:
+   `experimento-arquitectura/implementacion/proveedores/plan.md`) — en particular:
    - Sección 3.2: la hipótesis H1 y la hipótesis nula H0, tal como fueron formuladas *antes* de ver
      resultados. No las reinterpretes a posteriori para que encajen con los datos.
    - Sección 6: los casos de prueba y qué se esperaba de cada uno.

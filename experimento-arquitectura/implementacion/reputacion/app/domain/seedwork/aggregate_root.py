@@ -1,6 +1,6 @@
 """Base de Aggregate Root para EVENT SOURCING -- distinta a propósito de la
-base CRUD clásica usada en DISP-03
-(`DISP-03/app/domain/seedwork/aggregate_root.py`), donde el agregado
+base CRUD clásica usada en Proveedores
+(`proveedores/app/domain/seedwork/aggregate_root.py`), donde el agregado
 acumula eventos solo como side-effect para publicarlos DESPUÉS de guardar
 el estado directo en una tabla. Aquí no hay "estado directo": la única
 fuente de verdad son los eventos persistidos en el Event Store (ver

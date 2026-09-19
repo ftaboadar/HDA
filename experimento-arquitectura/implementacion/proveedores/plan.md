@@ -350,7 +350,7 @@ ajuste de diseño se necesita antes de trasladar el patrón a la Vista C&C defin
 
 1. Este documento de planificación (`plan.md`).
 2. Código fuente del PoC (API, worker, dobles de externos, CLI de reproceso, scripts de escenarios) —
-   en `implementacion/DISP-03/src/` (a implementar).
+   en `implementacion/proveedores/src/` (a implementar).
 3. `docker-compose.yml` reproducible.
 4. Suite de pruebas automatizadas (`pytest`) que ejecuta los 7 casos de prueba de la sección 6.
 5. Informe de resultados con métricas obtenidas vs. umbrales de DISP-03, y veredicto H1/H0.

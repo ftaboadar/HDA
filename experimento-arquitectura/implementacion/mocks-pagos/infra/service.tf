@@ -1,5 +1,5 @@
 # Dos mocks HTTP sin estado (sin Cloud SQL) sobre la MISMA imagen — igual
-# que DISP-03/infra/mocks.tf hace con policia/rues/certificadora: un solo
+# que proveedores/infra/mocks.tf hace con policia/rues/certificadora: un solo
 # Dockerfile, distinto módulo FastAPI arrancado por `command`/`args` (ver
 # ../docker-compose.yml para el comando uvicorn exacto de cada uno).
 #

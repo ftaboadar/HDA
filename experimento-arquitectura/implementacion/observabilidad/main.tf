@@ -1,4 +1,4 @@
-# Observabilidad transversal a los 3 microservicios nuevos + DISP-03 —
+# Observabilidad transversal a los 3 microservicios nuevos + Proveedores —
 # Cloud Monitoring/Cloud Trace/Cloud Logging ya recolectan métricas y logs
 # de Cloud Run SIN ningún agente ni configuración adicional (request
 # count, latencias, uso de CPU/memoria, todo bajo el prefijo de métrica
@@ -11,7 +11,7 @@
 # tiene una API propia distinta de monitoring.googleapis.com — se activa
 # habilitando esa misma API; el componente adicional de GMP es un
 # COLECTOR (self-deployed u operado) que hace scraping de endpoints
-# Prometheus nativos. Ninguno de los 3 microservicios nuevos ni DISP-03
+# Prometheus nativos. Ninguno de los 3 microservicios nuevos ni Proveedores
 # expone un endpoint /metrics Prometheus propio hoy (todos son FastAPI
 # simple, sin instrumentación `prometheus_client`) — así que desplegar un
 # colector GMP en este momento no tendría nada real que scrapear más allá

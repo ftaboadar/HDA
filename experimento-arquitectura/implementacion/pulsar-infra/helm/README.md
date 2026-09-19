@@ -6,7 +6,7 @@ No se escribe un chart propio: se usa el chart **oficial** de Apache Pulsar
 ## Prerrequisitos
 
 - Un cluster de GKE ya creado (fuera del alcance de este archivo — ver
-  `experimento-arquitectura/implementacion/DISP-03/infra/` para cómo el equipo ya aprovisiona GCP).
+  `experimento-arquitectura/implementacion/proveedores/infra/` para cómo el equipo ya aprovisiona GCP).
 - `helm` v3 y `kubectl` apuntando al cluster de GKE correcto (`kubectl config current-context`).
 
 ## Comando esperado

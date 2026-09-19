@@ -6,7 +6,7 @@ Es un adaptador de infraestructura de ENTRADA: recibe el mensaje, lo
 traduce a argumentos primitivos, y llama al comando de aplicación
 `RegistrarEventoTrabajoFinalizado` -- NUNCA toca el agregado
 `PerfilReputacion` ni el ORM directamente (misma regla que ya se auditó en
-DISP-03, plan sección 4.0.1: el consumidor es un adaptador que llama a
+Proveedores, plan sección 4.0.1: el consumidor es un adaptador que llama a
 `application/`, no una vía alterna hacia el dominio o la BD).
 
 Alcance de esta entrega (plan, sección 1.1): solo "oír" y registrar la
@@ -41,7 +41,7 @@ def _procesar_mensaje(payload: dict, registro: IRegistroAuditoria) -> None:
 def correr_consumidor(registro: IRegistroAuditoria) -> None:
     """Loop pull bloqueante -- pensado para correr como proceso/contenedor
     separado (`python -m app.infrastructure.messaging.consumidor_pulsar`),
-    análogo a `DISP-03/app/worker/main.py` (consumidor pull de RabbitMQ)."""
+    análogo a `proveedores/app/worker/main.py` (consumidor pull de RabbitMQ)."""
     cliente = pulsar.Client(settings.pulsar_service_url)
     consumidor = cliente.subscribe(
         settings.pulsar_topic_trabajos_finalizado,

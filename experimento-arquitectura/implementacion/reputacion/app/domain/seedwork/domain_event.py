@@ -1,5 +1,5 @@
 """Evento de DOMINIO: en este microservicio los eventos de dominio cumplen
-un rol distinto al de DISP-03 -- aquí SON la fuente de verdad del agregado
+un rol distinto al de Proveedores -- aquí SON la fuente de verdad del agregado
 (Event Sourcing, ver perfil_reputacion.py), no un simple side-effect que se
 despacha a otro módulo. Aun así, la distinción dominio/integración sigue
 aplicando igual (Regla 4 de la rúbrica):

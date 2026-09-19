@@ -26,8 +26,8 @@ experimento-arquitectura/
 │                       event storming, la estructura de equipo multiagéntica, y los PDFs/pptx
 │                       fuente del curso (en contexto/utils/). Nada de código ejecutable vive aquí.
 │
-└── implementacion/    Todo lo que hay que CORRER: un subdirectorio por experimento (ej. DISP-03/),
-    └── DISP-03/        cada uno con su propio plan.md/README.md (el contexto específico de ESE
+└── implementacion/    Todo lo que hay que CORRER: un subdirectorio por experimento (ej. proveedores/),
+    └── proveedores/    cada uno con su propio plan.md/README.md (el contexto específico de ESE
                          experimento — no del proyecto general) junto al código real: app/, tests/,
                          infra/ (Terraform), cli/ (herramientas de aprovisionamiento GCP).
 ```
@@ -44,7 +44,7 @@ documentación operativa de ESE experimento, no contexto general del proyecto.
    reinterpretar.
 2. `experimento-arquitectura/contexto/10-estructura-multiagente.md` — los 6 roles de equipo (ver
    abajo) y por qué el flujo de trabajo está separado como está.
-3. `experimento-arquitectura/implementacion/DISP-03/plan.md` y `.../README.md` — el experimento de
+3. `experimento-arquitectura/implementacion/proveedores/plan.md` y `.../README.md` — el experimento de
    Entrega 3: qué se planeó, qué se implementó, qué se validó de verdad (7/7 pruebas pasando contra
    el stack real, incluida una corrida contra GCP real) y qué falta.
 4. `experimento-arquitectura/contexto/12-plan-entrega-4.md` y `13-guia-entrega-4-pasos.md` — plan y
@@ -106,7 +106,7 @@ contexto de la conversación original en la que se compartió.
   cerrar esa sesión (costo detenido); el código quedó commiteado en `main`.
 - Regla 5 de la rúbrica (45pt, implementación DDD del servicio elegido — Verificación de Proveedores):
   implementada y verificada (13/13 pruebas de dominio, hexagonal confirmado por imports, CQS
-  explícito). Ver `implementacion/DISP-03/README.md`.
+  explícito). Ver `implementacion/proveedores/README.md`.
 - Falta conseguir el template oficial de presentación de la Entrega 3 (no está en el repo) — único
   punto de Entrega 3 aún sin cerrar aparte de los campos 7-11 de los 8 escenarios restantes.
 - **Entrega 4 (siguiente):** plan y runbook recién integrados en `12-plan-entrega-4.md` /

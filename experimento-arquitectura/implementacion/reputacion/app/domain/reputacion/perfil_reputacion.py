@@ -25,7 +25,7 @@ PUNTAJE_MAX = 5
 class PuntajeFueraDeRango(Exception):
     """Invariante de dominio: toda calificación debe estar en [1, 5]. Se
     valida DENTRO del agregado (en `calificar()`), nunca desde afuera --
-    misma filosofía que las invariantes de `Verificacion` en DISP-03
+    misma filosofía que las invariantes de `Verificacion` en Proveedores
     (`ErrorTransicionInvalida`): un ORM anémico no puede dar esta garantía,
     solo el agregado."""
 

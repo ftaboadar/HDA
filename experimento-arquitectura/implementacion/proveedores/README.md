@@ -1,6 +1,8 @@
-# Experimento DISP-03 — implementación
+# Proveedores (escenario DISP-03) — implementación
 
-PoC ejecutable del experimento planificado en `../implementacion/DISP-03/plan.md`. Valida si
+> **Nombres:** esta carpeta es el servicio **Proveedores** (`ContextoProveedores`), antes llamada `DISP-03` por el escenario de calidad que valida. `DISP-03` sigue siendo el ID del escenario; los recursos ya desplegados en GCP conservan el prefijo histórico `disp03-poc-*` (variable `entorno` en `infra/variables.tf`).
+
+PoC ejecutable del experimento planificado en `../implementacion/proveedores/plan.md`. Valida si
 desacople + reintentos con backoff + DLQ + reproceso permite que la Verificación de Proveedores
 cumpla DISP-03 cuando una entidad certificadora externa falla, se degrada o cae.
 

@@ -44,7 +44,7 @@ del formato ATAM clásico:
 > en el enunciado" — sin estos 5 campos, un escenario no está completo según la rúbrica.
 - **Acción derivada**: antes de dar la Entrega 3 por completa, `escenarios_calidad.md` (o un
   documento derivado) debe extenderse para que **los 9 escenarios**, no solo DISP-03, tengan los 11
-  campos. El experimento DISP-03 (`implementacion/DISP-03/plan.md`) ya cubre varios de estos campos
+  campos. El experimento DISP-03 (`implementacion/proveedores/plan.md`) ya cubre varios de estos campos
   en prosa (secciones 2.2, 4, 8, 10) pero deben quedar también como campos explícitos y trazables
   del escenario mismo, con el mismo formato que los otros 8.
 
@@ -63,7 +63,7 @@ del formato ATAM clásico:
   - Picos de hasta 4x el volumen en 48h por eventos climáticos.
   - Integraciones de siniestros de Seguros de los Alpes: crecimiento de 4–5x en peticiones diarias.
   - Entidad certificadora (relevante para DISP-03): SLA real documentado de 24–48h.
-- **Chequeo específico para DISP-03**: el plan (`implementacion/DISP-03/plan.md`) ya referencia el
+- **Chequeo específico para DISP-03**: el plan (`implementacion/proveedores/plan.md`) ya referencia el
   SLA de 24–48h como el valor real a respetar en la simulación (con compresión temporal declarada
   explícitamente, sección 5.4) — esto es consistente con la regla. Cualquier caso de prueba futuro
   que reduzca artificialmente ese SLA sin declarar el factor de compresión violaría esta regla.
@@ -80,7 +80,7 @@ del formato ATAM clásico:
   Bounded Context de Proveedores hacia fuera) o de **dominio** (interno al contexto), y si en algún
   punto se opta por un evento "gordo" (con todo el payload necesario para evitar consultas
   adicionales) vs. uno delgado (solo el identificador + tipo de evento). Esto hoy no está resuelto
-  explícitamente en `implementacion/DISP-03/plan.md` y debe añadirse antes de implementar.
+  explícitamente en `implementacion/proveedores/plan.md` y debe añadirse antes de implementar.
 
 ## Regla 5 — Implementación de un servicio con DDD + arquitectura basada en eventos (45pt)
 
@@ -97,7 +97,7 @@ del formato ATAM clásico:
 
 - **Implicación para DISP-03**: si el servicio elegido para esta implementación obligatoria es el de
   **Verificación de Proveedores** (candidato natural, dado que ya es el foco del experimento DISP-03
-  en curso), su diseño interno en `implementacion/DISP-03/` deberá ampliarse más allá de lo
+  en curso), su diseño interno en `implementacion/proveedores/` deberá ampliarse más allá de lo
   planificado hasta ahora (que hoy describe una arquitectura de *integración* entre servicios vía
   RabbitMQ) para exhibir también: agregados/entidades/VOs del dominio Verificación, *seedwork*,
   repositorios, puertos/adaptadores hexagonales, persistencia real, eventos de dominio *internos*
@@ -125,10 +125,10 @@ del formato ATAM clásico:
 |---|---|---|
 | 9 escenarios de calidad (Regla 1 + 2) | 54pt | ⚠️ Cobertura cuantitativa OK (9/9); **faltan campos 7–11 en los 9 escenarios** |
 | Consistencia de volúmenes (Regla 3) | Transversal a las 54pt anteriores | ✅ Cumplido en las cifras usadas hasta ahora |
-| Claridad de medios de comunicación por eventos (Regla 4) | Transversal a las 54pt | ⚠️ Resuelto en código (`implementacion/DISP-03/`: eventos de dominio en `domain/verificacion/eventos.py`, evento de integración "gordo" en `common/mq.py`, clasificación completa en `11-implementacion-ddd-verificacion.md` sección 5) y en `03-contextos-acotados-TO-BE.cml` (corregido el mislabel "Eventos de dominio" → "Eventos de integración" en las 6 relaciones cross-context). **Sigue faltando** que esa clasificación se traslade como campo explícito a los 9 escenarios de `escenarios_calidad.md` |
-| Implementación de un servicio DDD + eventos (Regla 5) | 45pt | ✅ Implementado y verificado funcionando (no solo escrito): agregado `Verificacion` con 2 invariantes protegidos, entidad hija `IntentoVerificacion`, VOs, servicio de dominio, fábrica, repositorio como puerto (13 pruebas unitarias de dominio puro); 2 puertos hexagonales (persistencia + verificación externa) con adaptadores; persistencia real vía repositorio (ya no hay `SessionLocal`/`VerificacionORM` en las rutas HTTP); eventos de dominio intra-servicio confirmados en logs reales (`IntentoRegistrado` → `VerificacionCompletada` → evento de integración `ProveedorHabilitado`); CQS explícito (`application/commands/` vs `application/queries/`). Los 7 casos de prueba de integración (CP-1..CP-7) siguen pasando sobre la nueva capa. Ver `implementacion/DISP-03/README.md`, sección "Servicio DDD (Regla 5) — implementado". Kafka/Prometheus/Postman/JMeter de la propuesta original quedaron fuera de alcance a propósito (no los exige la rúbrica) |
+| Claridad de medios de comunicación por eventos (Regla 4) | Transversal a las 54pt | ⚠️ Resuelto en código (`implementacion/proveedores/`: eventos de dominio en `domain/verificacion/eventos.py`, evento de integración "gordo" en `common/mq.py`, clasificación completa en `11-implementacion-ddd-verificacion.md` sección 5) y en `03-contextos-acotados-TO-BE.cml` (corregido el mislabel "Eventos de dominio" → "Eventos de integración" en las 6 relaciones cross-context). **Sigue faltando** que esa clasificación se traslade como campo explícito a los 9 escenarios de `escenarios_calidad.md` |
+| Implementación de un servicio DDD + eventos (Regla 5) | 45pt | ✅ Implementado y verificado funcionando (no solo escrito): agregado `Verificacion` con 2 invariantes protegidos, entidad hija `IntentoVerificacion`, VOs, servicio de dominio, fábrica, repositorio como puerto (13 pruebas unitarias de dominio puro); 2 puertos hexagonales (persistencia + verificación externa) con adaptadores; persistencia real vía repositorio (ya no hay `SessionLocal`/`VerificacionORM` en las rutas HTTP); eventos de dominio intra-servicio confirmados en logs reales (`IntentoRegistrado` → `VerificacionCompletada` → evento de integración `ProveedorHabilitado`); CQS explícito (`application/commands/` vs `application/queries/`). Los 7 casos de prueba de integración (CP-1..CP-7) siguen pasando sobre la nueva capa. Ver `implementacion/proveedores/README.md`, sección "Servicio DDD (Regla 5) — implementado". Kafka/Prometheus/Postman/JMeter de la propuesta original quedaron fuera de alcance a propósito (no los exige la rúbrica) |
 | Template de presentación (Regla 6) | 1pt | ❌ Template no disponible en el proyecto todavía |
 
 **Mayor riesgo de puntos hoy**: los 5 campos faltantes de la Regla 2 (54pt) afectan a los 9
 escenarios por igual, no solo a DISP-03 — es un trabajo transversal a `escenarios_calidad.md` completo, no algo que
-se resuelva únicamente dentro de la carpeta `implementacion/DISP-03/`.
+se resuelva únicamente dentro de la carpeta `implementacion/proveedores/`.

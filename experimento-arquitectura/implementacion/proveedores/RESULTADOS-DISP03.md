@@ -121,8 +121,8 @@ Para destruir: `cd infra && terraform destroy -var=project_id=hda-projectt -var=
 
 ## Referencias
 
-- Plan del experimento: `experimento-arquitectura/implementacion/DISP-03/plan.md`
-- Casos de prueba (implementación): `experimento-arquitectura/implementacion/DISP-03/tests/test_escenarios_disp03.py`
-- Datos crudos: `experimento-arquitectura/implementacion/DISP-03/tests/results/resultados_disp03.jsonl`
+- Plan del experimento: `experimento-arquitectura/implementacion/proveedores/plan.md`
+- Casos de prueba (implementación): `experimento-arquitectura/implementacion/proveedores/tests/test_escenarios_disp03.py`
+- Datos crudos: `experimento-arquitectura/implementacion/proveedores/tests/results/resultados_disp03.jsonl`
 - Fix de los 2 bugs de GCP: PR #3, `fix/gcp-pubsub-iam-e-idempotencia`
 - Reporte visual: https://claude.ai/code/artifact/bb9ff636-2ae1-4384-b1a1-7fd26ac35b89

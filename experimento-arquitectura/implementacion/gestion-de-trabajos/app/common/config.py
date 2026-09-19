@@ -1,5 +1,5 @@
 """Configuración centralizada, cargada desde variables de entorno — mismo
-patrón que implementacion/DISP-03/app/common/config.py.
+patrón que implementacion/proveedores/app/common/config.py.
 
 Los valores por defecto asumen desarrollo local. `pulsar_service_url`
 apunta al cluster local que construye Daniel en

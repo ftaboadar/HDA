@@ -11,7 +11,7 @@
 # laptop en una red doméstica, esas conexiones saturan la tabla de
 # NAT/conntrack (y la CPU) del router de consumo — tumba la conectividad de
 # TODA la red, no solo la del propio k6. Una VM en la misma región que los
-# servicios (southamerica-east1, igual que DISP-03/infra, gestion-de-trabajos/
+# servicios (southamerica-east1, igual que proveedores/infra, gestion-de-trabajos/
 # infra y pulsar-infra/gcp) evita el problema por completo: la carga sale
 # directo desde la red de Google hacia Cloud Run, sin tocar ningún router
 # doméstico, y de paso da una medición más realista (sin la latencia/jitter

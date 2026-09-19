@@ -1,5 +1,5 @@
 variable "project_id" {
-  description = "ID del proyecto de GCP donde se aprovisiona el experimento DISP-03"
+  description = "ID del proyecto de GCP donde se aprovisiona el servicio Proveedores (escenario DISP-03)"
   type        = string
 }
 
@@ -37,7 +37,7 @@ variable "pulsar_service_url" {
   description = <<-EOT
     URL del broker de Apache Pulsar (pulsar://host:6650), del stack
     pulsar-infra/gcp (ver ../../DESPLIEGUE-GCP-INTEGRAL.md). Default
-    vacío: el transporte real de DISP-03 sigue siendo Pub/Sub
+    vacío: el transporte real de Proveedores sigue siendo Pub/Sub
     (TRANSPORTE=pubsub, ver pubsub.tf) — esta variable NO cambia ese
     comportamiento, solo deja la env var disponible por si algún día
     DISP-03 migra de transporte (igual que ya existe

@@ -1,4 +1,4 @@
-"""hda-gcp — CLI para aprovisionar y operar el experimento DISP-03 en GCP y
+"""hda-gcp — CLI para aprovisionar y operar el servicio Proveedores (escenario DISP-03) en GCP y
 localmente, desde la máquina del desarrollador.
 
 Ejemplos:
@@ -29,7 +29,7 @@ import sys
 
 import typer
 
-app = typer.Typer(help="Herramientas CLI para el experimento de arquitectura DISP-03 (HdA)")
+app = typer.Typer(help="Herramientas CLI para el servicio Proveedores (escenario DISP-03, HdA)")
 infra_app = typer.Typer(help="Aprovisionamiento de infraestructura GCP vía Terraform")
 images_app = typer.Typer(help="Construcción y publicación de la imagen de contenedor")
 app.add_typer(infra_app, name="infra")

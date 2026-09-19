@@ -108,12 +108,12 @@ después de la corrida (no se dejó un volumen persistente de logs en este PoC; 
 
 1. **Escala del PoC**: 2.000 novedades y CRM limitado a 20 rps son órdenes de magnitud menores que "el
    camino a 100M+ requests/día" del enunciado agregado de la plataforma — mismo tipo de brecha de
-   escala ya aceptado explícitamente en `DISP-03/plan.md` §5.4/§10 y `k6/README.md` para ESC-01. Lo
+   escala ya aceptado explícitamente en `proveedores/plan.md` §5.4/§10 y `k6/README.md` para ESC-01. Lo
    que se validó es el *mecanismo* (cola + token bucket + backoff + `Retry-After`) bajo una ráfaga que
    excede ampliamente su propio límite de diseño (>4x), no la escala de producción completa.
 2. **No se probó "CRM completamente caído"** (ver alcance declarado del Caso 2 arriba) — solo rate
    limiting real. Extender `mocks-crm` con modos `caido`/`timeout` (mismo patrón que
-   `DISP-03/app/mocks/main.py`) sería la extensión natural para cubrir esa parte del umbral con más
+   `proveedores/app/mocks/main.py`) sería la extensión natural para cubrir esa parte del umbral con más
    rigor.
 3. **No se corrió esta prueba contra GCP real** — solo local (`docker-compose.disp02.yml`), a
    diferencia de DISP-03 que sí tiene una corrida validada contra `hda-projectt`. No hay
@@ -248,7 +248,7 @@ severidad):**
    quien lea solo la tabla, sin cruzar contra el docker-compose.yml, se lleva una descripcion
    incorrecta de que se configuro realmente.
 8. **Ausencia de plan.md formal para DISP-02** (a diferencia de DISP-03,
-   implementacion/DISP-03/plan.md, con H1/H0 explicitas, casos de prueba pre-registrados y amenazas
+   implementacion/proveedores/plan.md, con H1/H0 explicitas, casos de prueba pre-registrados y amenazas
    a la validez declaradas antes de correr el experimento): en escenarios_calidad.md, los campos
    7-11 de la fila DISP-02 (Decision arquitectural, Puntos de sensibilidad, Tradeoffs, Riesgos,
    Rationale) estan explicitamente marcados "Pendiente", y la tabla de "Estado de cumplimiento" al
@@ -282,7 +282,7 @@ evitado por falta de carga real.
    clausula de disponibilidad del umbral quede respaldada por evidencia menos tautologica
    (brecha #6).
 3. Extender mocks-crm/app/main.py con un modo caido/timeout (mismo patron ya usado en
-   DISP-03/app/mocks/main.py) para cubrir la parte de "independiente del estado" del umbral que hoy
+   proveedores/app/mocks/main.py) para cubrir la parte de "independiente del estado" del umbral que hoy
    solo cubre rate limiting, no caida dura (brecha #2).
 4. Corregir la tabla de parametros de este documento para que refleje los valores reales de
    docker-compose.disp02.yml (THROTTLER_MAX_REINTENTOS=6, THROTTLER_BACKOFF_BASE_S=0.3,
@@ -307,4 +307,4 @@ evitado por falta de carga real.
 - Orquestación docker-compose de este escenario: `experimento-arquitectura/implementacion/gestion-de-trabajos/docker-compose.disp02.yml`
 - Caso de prueba: `experimento-arquitectura/implementacion/gestion-de-trabajos/tests/integracion/test_disp02_throttler.py`
 - Datos crudos JSONL: `experimento-arquitectura/implementacion/gestion-de-trabajos/tests/integracion/results/resultados_disp02.jsonl`
-- Precedente de formato: `experimento-arquitectura/implementacion/DISP-03/RESULTADOS-DISP03.md`
+- Precedente de formato: `experimento-arquitectura/implementacion/proveedores/RESULTADOS-DISP03.md`

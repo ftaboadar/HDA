@@ -191,7 +191,7 @@ resource "google_cloud_run_v2_service" "worker" {
       env {
         # Ver var.pulsar_service_url — plumbing por simetría, sin uso
         # real hoy (TRANSPORTE=pubsub sigue siendo el único transporte
-        # que el worker de DISP-03 implementa).
+        # que el worker de Proveedores implementa).
         name  = "PULSAR_SERVICE_URL"
         value = var.pulsar_service_url
       }

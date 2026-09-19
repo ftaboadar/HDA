@@ -112,7 +112,7 @@ resource "google_cloud_run_v2_service" "this" {
 
 # El propio runtime necesita permiso para conectarse a Cloud SQL vía el
 # Cloud SQL Auth Proxy embebido de Cloud Run (mismo rol que
-# DISP-03/infra/iam.tf otorga a su SA de runtime).
+# proveedores/infra/iam.tf otorga a su SA de runtime).
 resource "google_project_iam_member" "cloudsql_client" {
   count   = var.enable_cloudsql ? 1 : 0
   project = var.project_id
@@ -125,5 +125,5 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   name     = google_cloud_run_v2_service.this.name
   location = var.region
   role     = "roles/run.invoker"
-  member   = "allUsers" # PoC — ver mismo criterio en DISP-03/infra/cloudrun.tf
+  member   = "allUsers" # PoC — ver mismo criterio en proveedores/infra/cloudrun.tf
 }

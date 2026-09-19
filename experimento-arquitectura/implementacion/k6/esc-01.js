@@ -53,7 +53,7 @@
  *   representatividad documentada, no oculta.
  *
  * LIMITACIÓN DE ESCALA DEL POC (análoga a la ya aceptada en
- * `DISP-03/RESULTADOS-DISP03.md`): 1157 req/s sostenidos requiere
+ * `proveedores/RESULTADOS-DISP03.md`): 1157 req/s sostenidos requiere
  * infraestructura con auto-scaling real (Cloud Run) y una base de datos que
  * soporte esa concurrencia; contra un solo contenedor de `uvicorn` en
  * docker-compose local, es esperable que el PoC no sostenga esa tasa y que

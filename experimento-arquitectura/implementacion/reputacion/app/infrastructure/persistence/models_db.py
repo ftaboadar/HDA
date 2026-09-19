@@ -1,5 +1,5 @@
 """Modelos SQLAlchemy -- vocabulario de PERSISTENCIA, no de dominio (mismo
-principio que `DISP-03/app/common/models_db.py`: el dominio no conoce estas
+principio que `proveedores/app/common/models_db.py`: el dominio no conoce estas
 clases, solo los adaptadores de `infrastructure/persistence/`).
 
 `EventoReputacionORM` es la tabla que hace el Event Sourcing real (Regla 5,

@@ -50,7 +50,7 @@ Para cada uno de los 9 escenarios, además de los 6 campos ATAM ya existentes, a
 - Nunca bajes un volumen o umbral numérico por debajo de lo que ya está documentado en el enunciado
   del proyecto o en el escenario existente — revisa la Regla 3 antes de escribir cualquier medida de
   respuesta nueva o modificada.
-- No dupliques trabajo ya hecho en `implementacion/DISP-03/plan.md` — si un campo ya está bien
+- No dupliques trabajo ya hecho en `implementacion/proveedores/plan.md` — si un campo ya está bien
   desarrollado ahí (p. ej. tácticas, riesgos, amenazas a validez), reutilízalo y referencia el
   archivo en vez de reescribirlo desde cero de forma distinta.
 - Al terminar, deja explícito qué escenarios quedaron completos y cuáles siguen pendientes, para que
