@@ -28,20 +28,25 @@ jobs:
   # `opcional: false`: es el único de los tres cuya suite ya está probada y
   # no debe degradarse silenciosamente.
   python-lint-y-pruebas:
-    name: Python — lint, formato y suite de pruebas (${{ matrix.servicio }})
+    name: Python — lint, formato y suite de pruebas (${{ matrix.check }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.opcional }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # La etiqueta `servicio` forma parte del NOMBRE del check requerido por la protección
-          # de la rama ("... (DISP-03)"): no renombrarla sin cambiar también ese check en GitHub.
-          - servicio: DISP-03
+          # `check` es lo que aparece en el nombre del job y, por tanto, el nombre del check
+          # REQUERIDO por la protección de la rama ("... (DISP-03)"). Está desacoplado de
+          # `servicio`/`carpeta` a propósito: renombrar la carpeta no debe cambiar el check.
+          # Si algún día se cambia `check`, hay que actualizar también la regla en GitHub
+          # (Settings > Branches), o el PR quedará en "Expected — Waiting for status to be reported".
+          - servicio: proveedores
+            check: DISP-03
             carpeta: experimento-arquitectura/implementacion/proveedores
             opcional: false
             compose_file: docker-compose.yml
           - servicio: gestion-de-trabajos
+            check: gestion-de-trabajos
             carpeta: experimento-arquitectura/implementacion/gestion-de-trabajos
             opcional: true
             # docker-compose.yml "normal" no trae el mock del CRM — los tests
@@ -50,6 +55,7 @@ jobs:
             # postgres + mock-crm), ver ese archivo para el detalle.
             compose_file: docker-compose.disp02.yml
           - servicio: reputacion
+            check: reputacion
             carpeta: experimento-arquitectura/implementacion/reputacion
             opcional: true
             compose_file: docker-compose.yml
