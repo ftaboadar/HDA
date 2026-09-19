@@ -2,10 +2,13 @@
   "title": "HdA — Cloud Run: p95 / throughput / tasa de error",
   "uid": "hda-cloud-run-overview",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "timezone": "browser",
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -13,25 +16,97 @@
         "type": "textbox",
         "label": "Servicio Cloud Run",
         "query": "disp03-poc-api",
-        "current": { "text": "disp03-poc-api", "value": "disp03-poc-api" },
+        "current": {
+          "text": "disp03-poc-api",
+          "value": "disp03-poc-api"
+        },
         "description": "Nombre exacto del recurso google_cloud_run_v2_service (ej. disp03-poc-api, gestion-trabajos-poc-api, reputacion-poc-api, mocks-pagos-poc-mock-stripe). Textbox y no un query variable a propósito: no se validó contra un proyecto con servicios reales corriendo — un query variable fallaría en silencio en un proyecto vacío."
+      },
+      {
+        "name": "traza_filtro",
+        "type": "textbox",
+        "label": "Filtro de traza (opcional)",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "description": "Línea extra de filtro para los paneles de logs, en sintaxis de Logs Explorer. Vacío = todo. Ejemplos: jsonPayload.trace_id=\"4c2e6f22...\" (todos los logs de UNA petición, entre capas), jsonPayload.trabajo_id=\"...\", jsonPayload.verificacion_id=\"...\", jsonPayload.novedad_id=\"...\", jsonPayload.pago_id=\"...\", jsonPayload.message_id=\"...\" (publicación y recepción del mismo mensaje), jsonPayload.bounded_context=\"ContextoPagos\"."
       }
     ]
   },
   "panels": [
     {
+      "id": 4,
+      "title": "Tráfico (req/s) — todos los servicios",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${datasource_uid}"
+      },
+      "description": "Una línea por servicio Cloud Run, sin depender de $service_name — se ve de una vez todo el flujo: gestión-de-trabajos (trabajos + novedades), DISP-03 api+worker y sus 3 mocks, reputación, pagos, mocks de pasarelas y mock del CRM. Usa MQL (timeSeriesQuery) porque el filtro clásico no soporta one_of(...) con groupBys.",
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "timeSeriesQuery",
+          "timeSeriesQuery": {
+            "projectName": "${project_id}",
+            "query": "fetch cloud_run_revision | metric 'run.googleapis.com/request_count' | filter (resource.service_name == 'gestion-trabajos-poc-api' || resource.service_name == 'disp03-poc-api' || resource.service_name == 'disp03-poc-worker' || resource.service_name == 'disp03-poc-mock-policia' || resource.service_name == 'disp03-poc-mock-rues' || resource.service_name == 'disp03-poc-mock-certificadora' || resource.service_name == 'reputacion-poc-api' || resource.service_name == 'mocks-crm-poc-mock-crm' || resource.service_name == 'pagos-poc-api' || resource.service_name == 'mocks-pagos-poc-mock-stripe' || resource.service_name == 'mocks-pagos-poc-mock-mercadopago') | align rate(1m) | every 1m | group_by [resource.service_name], [value_request_count_aggregate: aggregate(value.request_count)]"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      }
+    },
+    {
       "id": 1,
       "title": "Latencia p95 (ms) — $service_name",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "stackdriver", "uid": "${datasource_uid}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${datasource_uid}"
+      },
       "targets": [
         {
           "refId": "A",
           "queryType": "timeSeriesList",
           "timeSeriesList": {
-            "projectName": "projects/${project_id}",
-            "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\"",
+            "projectName": "${project_id}",
+            "filters": [
+              "metric.type",
+              "=",
+              "run.googleapis.com/request_latencies",
+              "AND",
+              "resource.label.service_name",
+              "=",
+              "$service_name"
+            ],
             "crossSeriesReducer": "REDUCE_PERCENTILE_95",
             "perSeriesAligner": "ALIGN_DELTA",
             "alignmentPeriod": "60s"
@@ -39,7 +114,9 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "ms" },
+        "defaults": {
+          "unit": "ms"
+        },
         "overrides": []
       }
     },
@@ -47,15 +124,31 @@
       "id": 2,
       "title": "Throughput (req/s) — $service_name",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "stackdriver", "uid": "${datasource_uid}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${datasource_uid}"
+      },
       "targets": [
         {
           "refId": "A",
           "queryType": "timeSeriesList",
           "timeSeriesList": {
-            "projectName": "projects/${project_id}",
-            "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\"",
+            "projectName": "${project_id}",
+            "filters": [
+              "metric.type",
+              "=",
+              "run.googleapis.com/request_count",
+              "AND",
+              "resource.label.service_name",
+              "=",
+              "$service_name"
+            ],
             "crossSeriesReducer": "REDUCE_SUM",
             "perSeriesAligner": "ALIGN_RATE",
             "alignmentPeriod": "60s"
@@ -63,7 +156,9 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "reqps" },
+        "defaults": {
+          "unit": "reqps"
+        },
         "overrides": []
       }
     },
@@ -71,16 +166,36 @@
       "id": 3,
       "title": "Tasa de error 5xx (%) — $service_name",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
-      "datasource": { "type": "stackdriver", "uid": "${datasource_uid}" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "stackdriver",
+        "uid": "${datasource_uid}"
+      },
       "description": "Cociente de dos queries (A: requests 5xx, B: requests totales) combinado con una transformación 'Add field from calculation' (A/B*100) del lado de Grafana — no una sola query nativa de Cloud Monitoring, porque response_code_class no admite un filtro '!=\"2xx\"' combinado con un ratio en una sola timeSeriesList.",
       "targets": [
         {
           "refId": "A",
           "queryType": "timeSeriesList",
           "timeSeriesList": {
-            "projectName": "projects/${project_id}",
-            "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\" AND metric.label.response_code_class=\"5xx\"",
+            "projectName": "${project_id}",
+            "filters": [
+              "metric.type",
+              "=",
+              "run.googleapis.com/request_count",
+              "AND",
+              "resource.label.service_name",
+              "=",
+              "$service_name",
+              "AND",
+              "metric.label.response_code_class",
+              "=",
+              "5xx"
+            ],
             "crossSeriesReducer": "REDUCE_SUM",
             "perSeriesAligner": "ALIGN_RATE",
             "alignmentPeriod": "60s"
@@ -90,8 +205,16 @@
           "refId": "B",
           "queryType": "timeSeriesList",
           "timeSeriesList": {
-            "projectName": "projects/${project_id}",
-            "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.label.service_name=\"$service_name\"",
+            "projectName": "${project_id}",
+            "filters": [
+              "metric.type",
+              "=",
+              "run.googleapis.com/request_count",
+              "AND",
+              "resource.label.service_name",
+              "=",
+              "$service_name"
+            ],
             "crossSeriesReducer": "REDUCE_SUM",
             "perSeriesAligner": "ALIGN_RATE",
             "alignmentPeriod": "60s"
@@ -103,16 +226,254 @@
           "id": "calculateField",
           "options": {
             "mode": "binary",
-            "binary": { "left": "A", "operator": "/", "right": "B", "reducer": "sum" },
+            "binary": {
+              "left": "A",
+              "operator": "/",
+              "right": "B",
+              "reducer": "sum"
+            },
             "alias": "tasa_error_pct",
             "replaceFields": false
           }
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "percentunit" },
+        "defaults": {
+          "unit": "percentunit"
+        },
         "overrides": []
       }
+    },
+    {
+      "id": 5,
+      "title": "Logs de negocio — todos los servicios (jsonPayload.evento)",
+      "type": "logs",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcl"
+      },
+      "description": "El mismo detalle que Logs Explorer de GCP: cada línea es un log_evento estructurado (evento, verificacion_id/trabajo_id, intento, duracion_ms, motivo_falla). Filtra por $traza_id para seguir un flujo de punta a punta.",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcl"
+          },
+          "projectId": "${project_id}",
+          "queryText": "resource.type=\"cloud_run_revision\"\njsonPayload.evento:*\n$traza_filtro"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Logs de ERROR — todos los servicios",
+      "type": "logs",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcl"
+      },
+      "description": "Severity >= ERROR en cualquier servicio Cloud Run del proyecto: incluye trazas de excepción de Python (500 de la API), fallos de publicación a Pulsar y errores de infraestructura de Cloud Run.",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcl"
+          },
+          "projectId": "${project_id}",
+          "queryText": "resource.type=\"cloud_run_revision\"\nseverity>=ERROR"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "ESC-01 — flujo POST /trabajos (comando → evento de dominio → evento de integración → Pulsar)",
+      "type": "logs",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcl"
+      },
+      "description": "Por request: http_request_completada (latencia, requests_concurrentes vs concurrency, pool_db_en_uso), comando_crear_trabajo_ejecutado (duración de persistencia vs despacho), evento_dominio_trabajo_finalizado_emitido, registro_trabajo_elegible_guardado, mensaje_publicado (topico, message_id, tamano_bytes, version_esquema) y evento_integracion_trabajo_finalizado_publicado. Se ve dónde se va el tiempo: en la publicación a Pulsar, no en la base de datos.",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcl"
+          },
+          "projectId": "${project_id}",
+          "queryText": "resource.type=\"cloud_run_revision\"\nresource.labels.service_name=\"gestion-trabajos-poc-api\"\njsonPayload.evento=~\"trabajo_creado|comando_crear_trabajo|evento_dominio_trabajo|registro_trabajo|mensaje_publicado|evento_integracion_trabajo|http_request_completada\"\n$traza_filtro"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "DISP-03 — cola: solicitud → Pub/Sub → worker → reintentos → DLQ (api + worker + mocks)",
+      "type": "logs",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      },
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcl"
+      },
+      "description": "verificacion_aceptada (comando IniciarVerificacion) → mensaje_publicado (topico solicitudes) → mensaje_recibido (suscripcion push, intento_entrega_pubsub, mismo message_id) → verificacion_intento_fallido/exitoso (intento/max_intentos, adaptador) → mock_verificacion_recibida (modo_inyectado) → verificacion_reintentos_agotados → mensaje_publicado (topico DLQ) o evento de integración proveedor.habilitado.",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcl"
+          },
+          "projectId": "${project_id}",
+          "queryText": "resource.type=\"cloud_run_revision\"\nresource.labels.service_name=~\"disp03-poc-(api|worker|mock-.*)\"\njsonPayload.evento:*\n$traza_filtro"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "DISP-02 — throttler: novedad → cola → token bucket → CRM (429 / reintento / entrega)",
+      "type": "logs",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcl"
+      },
+      "description": "mensaje_novedad_encolada (cola_pendiente) → crm_respuesta_recibida (status_http, retry_after_s, espera_token_bucket_ms) → lado servidor crm_webhook_rechazado_429 / crm_webhook_aceptado (requests_en_ventana vs limite_rps) → novedad_reintento_programado (origen_espera) → novedad_entregada (latencia_extremo_a_extremo_ms).",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcl"
+          },
+          "projectId": "${project_id}",
+          "queryText": "resource.type=\"cloud_run_revision\"\njsonPayload.evento=~\"novedad_|crm_|mensaje_novedad|throttler\"\n$traza_filtro"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "MOD-02 — pagos: regla regional (Strategy) → pasarela (Adapter) → cobro → compensación",
+      "type": "logs",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 83
+      },
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcl"
+      },
+      "description": "comando_pagar_trabajo_recibido → regla_regional_aplicada (ReglaColombia/ReglaBrasil) → pasarela_seleccionada (PasarelaStripe/PasarelaMercadoPago) → pasarela_cobro_solicitado (monto_enviado en centavos enteros vs unidades decimales) → pasarela_cobro_respuesta (status_http, referencia_externa, duracion_pasarela_ms) → pago_procesado → pago_compensado.",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcl"
+          },
+          "projectId": "${project_id}",
+          "queryText": "resource.type=\"cloud_run_revision\"\nresource.labels.service_name=\"pagos-poc-api\"\njsonPayload.evento:*\nNOT jsonPayload.evento=\"http_request_completada\"\n$traza_filtro"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Mensajería y DDD — comandos, eventos de dominio, eventos de integración, publicación/recepción (todos los servicios)",
+      "type": "logs",
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 95
+      },
+      "datasource": {
+        "type": "googlecloud-logging-datasource",
+        "uid": "gcl"
+      },
+      "description": "Filtra por tipo_mensaje: comando | evento_de_dominio | evento_de_integracion | mensajeria. Cada línea trae dominio, subdominio, tipo_subdominio (CORE/GENERIC), bounded_context, capa hexagonal, y en mensajería: canal (pubsub/pulsar), topico, suscripcion, message_id, formato_serializacion (json), version_esquema, tamano_bytes. Pega un message_id en el filtro de traza para ver publicación y recepción del mismo mensaje.",
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Ascending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "googlecloud-logging-datasource",
+            "uid": "gcl"
+          },
+          "projectId": "${project_id}",
+          "queryText": "resource.type=\"cloud_run_revision\"\njsonPayload.tipo_mensaje=~\"comando|evento_de_dominio|evento_de_integracion|mensajeria\"\n$traza_filtro"
+        }
+      ]
     }
   ]
 }

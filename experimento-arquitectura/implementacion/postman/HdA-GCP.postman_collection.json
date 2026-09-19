@@ -1,0 +1,243 @@
+{
+  "info": {
+    "name": "Hogar de los Alpes - GCP (hogaralpes)",
+    "description": "Endpoints reales de los 4 servicios desplegados en GCP (project hogaralpes, southamerica-east1). Usar junto con el environment 'HdA - GCP (hogaralpes)'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Gestión de Trabajos",
+      "item": [
+        {
+          "name": "Salud",
+          "request": { "method": "GET", "url": "{{gestion_trabajos_url}}/salud" }
+        },
+        {
+          "name": "Crear trabajo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.environment.set('trabajo_id', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{gestion_trabajos_url}}/trabajos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"{{proveedor_id}}\",\n  \"monto\": \"100.00\",\n  \"region\": \"CO\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Consultar trabajo",
+          "request": { "method": "GET", "url": "{{gestion_trabajos_url}}/trabajos/{{trabajo_id}}" }
+        }
+      ]
+    },
+    {
+      "name": "DISP-03 - Verificación de Proveedores",
+      "item": [
+        {
+          "name": "Salud",
+          "request": { "method": "GET", "url": "{{disp03_url}}/salud" }
+        },
+        {
+          "name": "Crear verificación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const body = pm.response.json();",
+                  "    pm.environment.set('verificacion_id', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{disp03_url}}/verificaciones",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"{{proveedor_id}}\",\n  \"tipo_verificador\": \"policia\"\n}"
+            }
+          },
+          "description": "tipo_verificador: policia | rues | certificadora"
+        },
+        {
+          "name": "Consultar verificación",
+          "request": { "method": "GET", "url": "{{disp03_url}}/verificaciones/{{verificacion_id}}" }
+        },
+        {
+          "name": "Listar verificaciones",
+          "request": { "method": "GET", "url": "{{disp03_url}}/verificaciones" }
+        },
+        {
+          "name": "Listar DLQ",
+          "request": { "method": "GET", "url": "{{disp03_url}}/dlq" }
+        },
+        {
+          "name": "Reprocesar desde DLQ",
+          "request": { "method": "POST", "url": "{{disp03_url}}/dlq/{{verificacion_id}}/reprocesar" }
+        },
+        {
+          "name": "Revalidar proveedor",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{disp03_url}}/proveedores/{{proveedor_id}}/revalidar?tipo_verificador=certificadora&motivo=PROGRAMADA",
+              "host": ["{{disp03_url}}"],
+              "path": ["proveedores", "{{proveedor_id}}", "revalidar"],
+              "query": [
+                { "key": "tipo_verificador", "value": "certificadora" },
+                { "key": "motivo", "value": "PROGRAMADA", "description": "VENCIMIENTO_CERTIFICADO | TECNICO_NUEVO | PROGRAMADA" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reputación",
+      "item": [
+        {
+          "name": "Salud",
+          "request": { "method": "GET", "url": "{{reputacion_url}}/salud" }
+        },
+        {
+          "name": "Calificar proveedor",
+          "request": {
+            "method": "POST",
+            "url": "{{reputacion_url}}/calificaciones",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proveedor_id\": \"{{proveedor_id}}\",\n  \"trabajo_id\": \"{{trabajo_id}}\",\n  \"puntaje\": 5,\n  \"comentario\": \"prueba postman\",\n  \"garantia_dias\": 30\n}"
+            }
+          }
+        },
+        {
+          "name": "Consultar reputación",
+          "request": { "method": "GET", "url": "{{reputacion_url}}/reputacion/{{proveedor_id}}" }
+        }
+      ]
+    },
+    {
+      "name": "Mocks de Pagos",
+      "item": [
+        {
+          "name": "Stripe - Salud",
+          "request": { "method": "GET", "url": "{{mock_stripe_url}}/salud" }
+        },
+        {
+          "name": "Stripe - Estado",
+          "request": { "method": "GET", "url": "{{mock_stripe_url}}/_control/estado" }
+        },
+        {
+          "name": "Stripe - Configurar falla",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_stripe_url}}/_control/config",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modo\": \"ok\",\n  \"latencia_ms\": 100,\n  \"tasa_error\": 0.0\n}"
+            },
+            "description": "modo: ok | error_parcial | caido | timeout"
+          }
+        },
+        {
+          "name": "Stripe - Crear cobro",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_stripe_url}}/v1/charges",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 10000,\n  \"currency\": \"cop\",\n  \"proveedor_id\": \"{{proveedor_id}}\"\n}"
+            },
+            "description": "amount en CENTAVOS (10000 = $100.00)"
+          }
+        },
+        {
+          "name": "MercadoPago - Salud",
+          "request": { "method": "GET", "url": "{{mock_mercadopago_url}}/salud" }
+        },
+        {
+          "name": "MercadoPago - Estado",
+          "request": { "method": "GET", "url": "{{mock_mercadopago_url}}/_control/estado" }
+        },
+        {
+          "name": "MercadoPago - Configurar falla",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_mercadopago_url}}/_control/config",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modo\": \"ok\",\n  \"latencia_ms\": 100,\n  \"tasa_error\": 0.0\n}"
+            }
+          }
+        },
+        {
+          "name": "MercadoPago - Crear pago",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_mercadopago_url}}/v1/payments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_amount\": 100.0,\n  \"description\": \"pago de prueba\",\n  \"proveedor_id\": \"{{proveedor_id}}\"\n}"
+            },
+            "description": "transaction_amount en UNIDADES completas (no centavos)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mocks de Verificación (DISP-03)",
+      "item": [
+        {
+          "name": "Policía - Configurar falla",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_policia_url}}/_control/config",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"modo\": \"ok\"\n}" }
+          }
+        },
+        {
+          "name": "RUES - Configurar falla",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_rues_url}}/_control/config",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"modo\": \"ok\"\n}" }
+          }
+        },
+        {
+          "name": "Certificadora - Configurar falla (caido)",
+          "request": {
+            "method": "POST",
+            "url": "{{mock_certificadora_url}}/_control/config",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"modo\": \"caido\"\n}" },
+            "description": "modo: ok | error_parcial | caido | timeout — usalo para reproducir CP-4/CP-5 manualmente"
+          }
+        }
+      ]
+    }
+  ]
+}
