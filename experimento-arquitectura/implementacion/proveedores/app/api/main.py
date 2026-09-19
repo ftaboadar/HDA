@@ -10,12 +10,13 @@ violación de hexagonal que la Regla 5, criterio 2, exige cerrar) — llaman a
 puerto `IVerificacionRepository`, implementado por
 `infrastructure/persistence/verificacion_repository_sqlalchemy.py`."""
 
+import time
 import uuid
 from datetime import datetime, timezone
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 
 from app.application.commands.iniciar_verificacion import IniciarVerificacion
 from app.application.commands.reprocesar_desde_dlq import ReprocesarDesdeDLQ
@@ -26,7 +27,7 @@ from app.application.queries.listar_dlq import ListarDLQ
 from app.application.queries.listar_verificaciones import ListarVerificaciones
 from app.common.config import settings
 from app.common.db import Base, engine
-from app.common.logging_utils import configurar_logging, log_evento
+from app.common.logging_utils import configurar_logging, establecer_trace, log_evento
 from app.common.mq import conectar, declarar_topologia
 from app.common.publicador import Publicador, PublicadorPubSub, PublicadorPulsar, PublicadorRabbitMQ
 from app.common.schemas import VerificacionCreate, VerificacionOut
@@ -96,7 +97,14 @@ async def lifespan(app: FastAPI):
         exchange_sol, exchange_dlx, _, _ = await declarar_topologia(canal)
         _publicador = PublicadorRabbitMQ(exchange_sol, exchange_dlx)
 
-    log_evento(logger, "api_iniciada", transporte=settings.transporte)
+    log_evento(
+        logger,
+        "api_iniciada",
+        transporte=settings.transporte,
+        topico_solicitudes=settings.pubsub_topic_solicitudes,
+        topico_dlq=settings.pubsub_topic_fallidas,
+        topico_eventos_integracion=settings.pubsub_topic_eventos,
+    )
     yield
     if _conexion:
         await _conexion.close()
@@ -104,7 +112,32 @@ async def lifespan(app: FastAPI):
         _publicador.cerrar()
 
 
-app = FastAPI(title="Verificación de Proveedores — API (DISP-03 PoC)", lifespan=lifespan)
+app = FastAPI(
+    title="Proveedores — Verificación de Proveedores (API, PoC DISP-03)", lifespan=lifespan
+)
+
+
+@app.middleware("http")
+async def _telemetria_http(request: Request, call_next):
+    establecer_trace(request.headers.get("x-cloud-trace-context"))
+    inicio = time.perf_counter()
+    status = 500
+    try:
+        respuesta = await call_next(request)
+        status = respuesta.status_code
+        return respuesta
+    finally:
+        if request.url.path != "/salud":
+            ruta = getattr(request.scope.get("route"), "path", request.url.path)
+            log_evento(
+                logger,
+                "http_request_completada",
+                detalle=True,
+                metodo=request.method,
+                ruta=ruta,
+                status=status,
+                duracion_ms=round((time.perf_counter() - inicio) * 1000, 1),
+            )
 
 
 @app.get("/salud")
@@ -123,8 +156,13 @@ async def crear_verificacion(payload: VerificacionCreate):
     log_evento(
         logger,
         "verificacion_aceptada",
+        comando="IniciarVerificacion",
+        agregado="Verificacion",
+        estado=verificacion.estado.value,
+        proveedor_id=payload.proveedor_id,
         verificacion_id=str(verificacion.id),
         tipo_verificador=payload.tipo_verificador,
+        encolado_en=settings.pubsub_topic_solicitudes or settings.pulsar_topic_solicitudes,
         latencia_aceptacion_ms=int((datetime.now(timezone.utc) - inicio).total_seconds() * 1000),
     )
     return _a_schema(verificacion)

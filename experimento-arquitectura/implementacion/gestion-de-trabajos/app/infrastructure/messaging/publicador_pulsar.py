@@ -22,7 +22,7 @@ tests): la versión anterior de este archivo serializaba con
    servicios son de equipos distintos y nunca se probaron juntos contra un
    broker real hasta ahora.
 
-Se unifica al mismo contrato que ya usa `DISP-03/app/common/publicador.py`
+Se unifica al mismo contrato que ya usa `proveedores/app/common/publicador.py`
 para Pulsar (JSON plano vía `producer.send(json.dumps(mensaje).encode())`,
 despachado con `run_in_executor` porque el cliente de `pulsar-client` es
 síncrono/bloqueante) — un solo formato de mensaje entre los tres servicios
@@ -41,11 +41,26 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any
 
 from app.application.ports.publicador import IPublicador
 from app.common.config import settings
+from app.common.logging_utils import (
+    configurar_logging,
+    describir_mensaje,
+    log_evento,
+)
 from app.domain.trabajo.eventos import TrabajoFinalizado
+
+
+logger = configurar_logging("infrastructure.messaging.publicador_pulsar")
+
+# Versión del contrato JSON del evento `trabajos.finalizado`. Viaja como
+# PROPIEDAD del mensaje Pulsar (metadata), no dentro del cuerpo: los
+# consumidores actuales (json.loads + acceso por clave) toleran campos
+# nuevos, así que evolucionar el contrato de forma aditiva no rompe a nadie.
+VERSION_ESQUEMA = "1"
 
 
 class PublicadorPulsar(IPublicador):
@@ -62,7 +77,7 @@ class PublicadorPulsar(IPublicador):
             return self._productor
 
         # Import perezoso (mismo patrón que
-        # implementacion/DISP-03/app/common/publicador.py con aio_pika /
+        # implementacion/proveedores/app/common/publicador.py con aio_pika /
         # google.cloud.pubsub): así `domain/` y `application/` -- e incluso
         # este módulo, si nunca se llega a publicar -- no requieren tener
         # `pulsar-client` instalado para poder importarse en un test.
@@ -82,9 +97,35 @@ class PublicadorPulsar(IPublicador):
             "region": evento.region.value,
             "ocurrido_en": evento.ocurrido_en.isoformat(),
         }
+        propiedades = {
+            "tipo_evento": "TrabajoFinalizado",
+            "version_esquema": VERSION_ESQUEMA,
+            "content_type": "application/json",
+            "productor": "gestion-de-trabajos",
+        }
+        inicio = time.perf_counter()
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None, lambda: productor.send(json.dumps(mensaje).encode())
+        message_id = await loop.run_in_executor(
+            None,
+            lambda: productor.send(
+                json.dumps(mensaje).encode(), properties=propiedades
+            ),
+        )
+        log_evento(
+            logger,
+            "mensaje_publicado",
+            detalle=True,
+            **describir_mensaje(
+                mensaje,
+                canal="pulsar",
+                topico=self._topic,
+                version_esquema=VERSION_ESQUEMA,
+            ),
+            tipo_evento="TrabajoFinalizado",
+            message_id=str(message_id),
+            propiedades_mensaje=propiedades,
+            clave_particion=None,
+            duracion_publicacion_ms=round((time.perf_counter() - inicio) * 1000, 1),
         )
 
     def cerrar(self) -> None:

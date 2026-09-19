@@ -16,6 +16,13 @@ from app.application.ports.verificacion_externa import (
     ResultadoVerificacionExterna,
 )
 from app.common.config import settings
+from app.common.logging_utils import (
+    configurar_logging,
+    headers_trace_salientes,
+    log_evento,
+)
+
+logger = configurar_logging("infrastructure.external.http")
 
 
 class _AdaptadorHttpGenerico(IVerificacionExternaPort):
@@ -27,9 +34,21 @@ class _AdaptadorHttpGenerico(IVerificacionExternaPort):
         try:
             async with httpx.AsyncClient(timeout=settings.timeout_externo_s) as cliente:
                 resp = await cliente.post(
-                    f"{self._base_url}/verificar", json={"proveedor_id": proveedor_id}
+                    f"{self._base_url}/verificar",
+                    json={"proveedor_id": proveedor_id},
+                    headers=headers_trace_salientes(),
                 )
             duracion_ms = int((time.time() - inicio) * 1000)
+            log_evento(
+                logger,
+                "verificador_externo_respuesta",
+                nivel="warning" if resp.status_code >= 500 else "info",
+                adaptador=type(self).__name__,
+                destino=self._base_url,
+                proveedor_id=proveedor_id,
+                status_http=resp.status_code,
+                duracion_ms=duracion_ms,
+            )
             if resp.status_code >= 500:
                 raise FallaVerificacionExterna(f"HTTP {resp.status_code} de {self._base_url}")
             resp.raise_for_status()

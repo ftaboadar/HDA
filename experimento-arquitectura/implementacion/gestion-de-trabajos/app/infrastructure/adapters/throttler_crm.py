@@ -31,6 +31,8 @@ class AdaptadorGestionAgentesHttp(IGestionAgentesPort):
         self._timeout_s = timeout_s
 
     async def enviar_webhook(self, novedad: Novedad) -> ResultadoEnvioWebhook:
+        import time
+
         import httpx
 
         payload = {
@@ -39,11 +41,13 @@ class AdaptadorGestionAgentesHttp(IGestionAgentesPort):
             "descripcion": novedad.descripcion,
             "intentos": novedad.intentos,
         }
+        inicio = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=self._timeout_s) as cliente:
                 respuesta = await cliente.post(
                     f"{self._base_url}/webhooks", json=payload
                 )
+                duracion_ms = round((time.perf_counter() - inicio) * 1000, 1)
 
                 if respuesta.status_code == 429:
                     return ResultadoEnvioWebhook(
@@ -52,16 +56,29 @@ class AdaptadorGestionAgentesHttp(IGestionAgentesPort):
                         reintentar_despues_s=_parsear_retry_after(
                             respuesta.headers.get("Retry-After")
                         ),
+                        status_http=429,
+                        duracion_ms=duracion_ms,
                     )
 
                 respuesta.raise_for_status()
-                return ResultadoEnvioWebhook(exitoso=True)
+                return ResultadoEnvioWebhook(
+                    exitoso=True,
+                    status_http=respuesta.status_code,
+                    duracion_ms=duracion_ms,
+                )
         except httpx.HTTPError as exc:
             # Error transitorio (timeout, conexión rechazada, 5xx vía
             # raise_for_status, etc.) — se reporta como fallo simple, sin
             # Retry-After; el Throttler calcula su propio backoff en este
             # caso (ver infrastructure/messaging/throttler.py).
-            return ResultadoEnvioWebhook(exitoso=False, motivo_falla=str(exc))
+            return ResultadoEnvioWebhook(
+                exitoso=False,
+                motivo_falla=str(exc),
+                status_http=getattr(
+                    getattr(exc, "response", None), "status_code", None
+                ),
+                duracion_ms=round((time.perf_counter() - inicio) * 1000, 1),
+            )
 
 
 def _parsear_retry_after(valor: str | None) -> float | None:

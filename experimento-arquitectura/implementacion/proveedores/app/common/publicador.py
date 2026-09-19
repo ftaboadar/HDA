@@ -7,7 +7,7 @@ contra RabbitMQ, Pub/Sub o Pulsar directamente. Es la razón por la que
 `experto-gcp` puede afirmar que el mecanismo (no solo el resultado) es
 portable — y también, honestamente, dónde puede dejar de serlo: las garantías
 de entrega/orden de RabbitMQ, Pub/Sub y Pulsar no son idénticas, ver
-implementacion/DISP-03/README.md (rutas relativas al repo, no al propio archivo), sección "Diferencias local vs. GCP".
+implementacion/proveedores/README.md (rutas relativas al repo, no al propio archivo), sección "Diferencias local vs. GCP".
 
 `PublicadorPulsar` (sección 2.2, punto 1 del plan de Entrega 4,
 `experimento-arquitectura/contexto/12-plan-entrega-4.md`) migra el transporte
@@ -19,6 +19,18 @@ from __future__ import annotations
 import abc
 import asyncio
 import json
+import os
+import time
+
+
+from app.common.logging_utils import configurar_logging, describir_mensaje, log_evento
+
+logger = configurar_logging("common.publicador")
+
+# Versión del contrato JSON de los mensajes de DISP-03 (solicitud, DLQ,
+# proveedor.habilitado). Cambios ADITIVOS no la suben; un cambio que rompa
+# a un consumidor existente sube a "2" y se publica en paralelo.
+VERSION_ESQUEMA = "1"
 
 
 class Publicador(abc.ABC):
@@ -129,20 +141,43 @@ class PublicadorPubSub(Publicador):
             self._cliente.topic_path(project_id, topic_eventos) if topic_eventos else None
         )
 
-    async def _publicar(self, ruta: str, mensaje: dict) -> None:
+    async def _publicar(self, ruta: str, mensaje: dict, tipo_evento: str) -> None:
+        # Atributos Pub/Sub = metadata del mensaje (equivalente a headers en
+        # AsyncAPI): la versión del contrato viaja aquí, no en el cuerpo.
+        atributos = {
+            "tipo_evento": tipo_evento,
+            "version_esquema": VERSION_ESQUEMA,
+            "content_type": "application/json",
+            "productor": os.environ.get("K_SERVICE", "proveedores"),
+        }
+        inicio = time.perf_counter()
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
+        message_id = await loop.run_in_executor(
             None,
-            lambda: self._cliente.publish(ruta, json.dumps(mensaje).encode()).result(),
+            lambda: self._cliente.publish(ruta, json.dumps(mensaje).encode(), **atributos).result(),
+        )
+        log_evento(
+            logger,
+            "mensaje_publicado",
+            **describir_mensaje(
+                mensaje,
+                canal="pubsub",
+                topico=ruta.rsplit("/", 1)[-1],
+                version_esquema=VERSION_ESQUEMA,
+            ),
+            tipo_evento=tipo_evento,
+            message_id=message_id,
+            atributos_mensaje=atributos,
+            duracion_publicacion_ms=round((time.perf_counter() - inicio) * 1000, 1),
         )
 
     async def publicar_solicitud(self, mensaje: dict) -> None:
         if not self._ruta_sol:
             raise RuntimeError("PUBSUB_TOPIC_SOLICITUDES no configurado")
-        await self._publicar(self._ruta_sol, mensaje)
+        await self._publicar(self._ruta_sol, mensaje, "SolicitudVerificacion")
 
     async def publicar_fallida(self, mensaje: dict) -> None:
-        await self._publicar(self._ruta_dlq, mensaje)
+        await self._publicar(self._ruta_dlq, mensaje, "VerificacionFallida")
 
     async def publicar_evento(self, routing_key: str, mensaje: dict) -> None:
         # Pub/Sub no tiene routing keys tipo AMQP — el routing_key viaja como
@@ -160,7 +195,11 @@ class PublicadorPubSub(Publicador):
         # la interfaz).
         if not self._ruta_eventos:
             raise RuntimeError("PUBSUB_TOPIC_EVENTOS no configurado")
-        await self._publicar(self._ruta_eventos, {**mensaje, "routing_key": routing_key})
+        await self._publicar(
+            self._ruta_eventos,
+            {**mensaje, "routing_key": routing_key},
+            mensaje.get("evento", routing_key),
+        )
 
 
 class PublicadorPulsar(Publicador):

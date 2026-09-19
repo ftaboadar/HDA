@@ -51,5 +51,14 @@ class Compensar:
         await asyncio.to_thread(self._pago_repo.guardar, pago)
         await despachar(pago.recoger_eventos())
 
-        log_evento(logger, "pago_compensado", pago_id=pago_id)
+        log_evento(
+            logger,
+            "pago_compensado",
+            comando="Compensar",
+            agregado="Pago",
+            pago_id=pago_id,
+            trabajo_id=str(pago.trabajo_id),
+            estado=pago.estado.value,
+            paso_de_saga="compensacion",
+        )
         return pago.id

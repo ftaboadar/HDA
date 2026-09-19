@@ -25,10 +25,11 @@ from app.worker import push_handler
 
 
 class _RequestFalso:
-    """Doble mínimo de `fastapi.Request`: solo necesitamos `.json()`."""
+    """Doble mínimo de `fastapi.Request`: `.json()` y `.headers`."""
 
     def __init__(self, envoltura: dict) -> None:
         self._envoltura = envoltura
+        self.headers: dict = {}
 
     async def json(self) -> dict:
         return self._envoltura

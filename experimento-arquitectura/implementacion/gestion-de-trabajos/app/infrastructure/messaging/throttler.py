@@ -46,6 +46,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from tenacity import wait_exponential_jitter
 
@@ -124,7 +125,7 @@ class ThrottlerCrm:
         # no repetir la misma corrutina en un loop cerrado — por eso se usa
         # `wait_exponential_jitter` como calculadora de espera pura en vez
         # de envolver la llamada con `@retry(...)` (comparar con
-        # `DISP-03/app/worker/core.py`, donde sí aplica @retry directo
+        # `proveedores/app/worker/core.py`, donde sí aplica @retry directo
         # porque ahí el reintento SÍ es repetir la misma llamada en el
         # mismo lugar).
         self._estrategia_backoff = wait_exponential_jitter(
@@ -137,6 +138,16 @@ class ThrottlerCrm:
         (ver dimensionamiento en el docstring del módulo) — no ejecuta
         ninguna llamada de red, solo `await queue.put(...)`."""
         await self._cola.put(novedad)
+        log_evento(
+            logger,
+            "mensaje_novedad_encolada",
+            detalle=True,
+            canal="cola_en_memoria_asyncio",
+            novedad_id=str(novedad.id),
+            cola_pendiente=self._cola.qsize(),
+            cola_capacidad=self._cola.maxsize,
+            tasa_rps_bucket=self._bucket._tasa,
+        )
 
     def iniciar(self) -> None:
         if self._tarea_worker is None:
@@ -171,10 +182,30 @@ class ThrottlerCrm:
                 self._cola.task_done()
 
     async def _procesar(self, novedad: Novedad) -> None:
+        t_espera = time.monotonic()
         await self._bucket.adquirir()
+        espera_token_ms = round((time.monotonic() - t_espera) * 1000, 1)
         novedad.registrar_intento()
 
         resultado = await self._puerto_crm.enviar_webhook(novedad)
+
+        log_evento(
+            logger,
+            "crm_respuesta_recibida",
+            nivel="info" if resultado.exitoso else "warning",
+            sistema_externo="ContextoGestionAgentes (CRM SaaS)",
+            novedad_id=str(novedad.id),
+            trabajo_id=str(novedad.trabajo_id),
+            intento=novedad.intentos,
+            status_http=resultado.status_http,
+            exitoso=resultado.exitoso,
+            rate_limited=resultado.status_http == 429,
+            retry_after_s=resultado.reintentar_despues_s,
+            motivo_falla=resultado.motivo_falla,
+            duracion_crm_ms=resultado.duracion_ms,
+            espera_token_bucket_ms=espera_token_ms,
+            cola_pendiente=self._cola.qsize(),
+        )
 
         if resultado.exitoso:
             novedad.marcar_entregada()
@@ -185,6 +216,15 @@ class ThrottlerCrm:
                 novedad_id=str(novedad.id),
                 trabajo_id=str(novedad.trabajo_id),
                 intentos=novedad.intentos,
+                latencia_extremo_a_extremo_ms=round(
+                    (
+                        datetime.now(timezone.utc)
+                        - novedad.creado_en.replace(
+                            tzinfo=novedad.creado_en.tzinfo or timezone.utc
+                        )
+                    ).total_seconds()
+                    * 1000
+                ),
             )
             return
 

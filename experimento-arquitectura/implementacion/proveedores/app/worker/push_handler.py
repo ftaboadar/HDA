@@ -48,6 +48,7 @@ import asyncio
 import base64
 import json
 import os
+import time
 
 from contextlib import asynccontextmanager
 
@@ -56,7 +57,12 @@ from fastapi import FastAPI, Request
 from app.application.commands.registrar_intento import RegistrarIntento
 from app.application.queries.consultar_verificacion import ConsultarVerificacion
 from app.common.db import Base, engine
-from app.common.logging_utils import configurar_logging, log_evento
+from app.common.logging_utils import (
+    configurar_logging,
+    describir_mensaje,
+    establecer_trace,
+    log_evento,
+)
 from app.common.publicador import PublicadorPubSub
 from app.domain.verificacion.value_objects import EstadoVerificacion, ResultadoIntento
 from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
@@ -101,10 +107,32 @@ async def recibir_push(request: Request):
     reintenta de nuevo — pudiendo terminar enviando a la DLQ una
     verificación que en realidad ya se completó bien."""
     assert _publicador is not None
+    inicio = time.perf_counter()
+    establecer_trace(request.headers.get("x-cloud-trace-context"))
     repo = VerificacionRepositorySQLAlchemy()
     envoltura = await request.json()
     datos_b64 = envoltura["message"]["data"]
     payload = json.loads(base64.b64decode(datos_b64))
+    mensaje_pubsub = envoltura["message"]
+    log_evento(
+        logger,
+        "mensaje_recibido",
+        **describir_mensaje(
+            payload,
+            canal="pubsub_push",
+            topico=os.environ.get("PUBSUB_TOPIC_SOLICITUDES", ""),
+            version_esquema=(mensaje_pubsub.get("attributes") or {}).get(
+                "version_esquema", "sin_version"
+            ),
+        ),
+        suscripcion=envoltura.get("subscription", "").rsplit("/", 1)[-1],
+        message_id=mensaje_pubsub.get("messageId"),
+        publish_time=mensaje_pubsub.get("publishTime"),
+        intento_entrega_pubsub=envoltura.get("deliveryAttempt"),
+        atributos_mensaje=mensaje_pubsub.get("attributes"),
+        encoding_transporte="base64",
+        rol="consumidor_suscriptor_push",
+    )
 
     # Defensa en profundidad (no la corrección de raíz — esa es tener un
     # topic físicamente separado para eventos de integración, ver
@@ -156,5 +184,9 @@ async def recibir_push(request: Request):
         "verificacion_procesada_push",
         verificacion_id=verificacion_id,
         exito=resultado.exito,
+        intentos=resultado.intentos,
+        respuesta_ack="200_ack",
+        destino_si_fallo="topico_dlq" if not resultado.exito else None,
+        duracion_procesamiento_ms=round((time.perf_counter() - inicio) * 1000, 1),
     )
     return {"estado": "procesado"}

@@ -1,7 +1,7 @@
 """Doble del CRM SaaS externo "Gestión de Agentes" (DISP-02, ver
 `experimento-arquitectura/contexto/escenarios_calidad.md`, fila DISP-02).
 
-Distinto de los mocks existentes (`DISP-03/app/mocks/main.py`,
+Distinto de los mocks existentes (`proveedores/app/mocks/main.py`,
 `mocks-pagos/app/common.py`), que solo simulan latencia/fallas: este mock
 hace cumplir un **límite de tasa real** (ventana deslizante de 1s) sobre
 `POST /webhooks`, respondiendo `429` + `Retry-After` cuando se supera —
@@ -25,9 +25,12 @@ entre varios procesos/réplicas del mock requeriría un contador compartido
 import asyncio
 import time
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
 
+from app.logging_utils import configurar_logging, establecer_trace, log_evento
+
+logger = configurar_logging("mocks.crm")
 app = FastAPI(title="Mock — CRM Gestión de Agentes")
 
 # Límite de tasa (requests/segundo) que este mock hace cumplir sobre
@@ -78,6 +81,7 @@ async def control_config(cfg: ConfigMock, response: Response):
         response.status_code = 400
         return {"error": "limite_rps debe ser positivo"}
     estado["limite_rps"] = cfg.limite_rps
+    log_evento(logger, "crm_limite_configurado", limite_rps=cfg.limite_rps)
     return {"limite_rps": estado["limite_rps"]}
 
 
@@ -93,21 +97,42 @@ async def control_estado():
 
 
 @app.post("/webhooks")
-async def webhooks(payload: WebhookPayload, response: Response):
+async def webhooks(payload: WebhookPayload, response: Response, request: Request):
     """Endpoint de negocio que llama `AdaptadorGestionAgentesHttp`. Cuenta
     requests en la ventana deslizante de 1s; si se supera `limite_rps`,
     responde 429 con `Retry-After`; si no, 200 con `{"recibido": true}` y
     registra el request en la ventana."""
+    establecer_trace(request.headers.get("x-cloud-trace-context"))
     async with _lock:
         ahora = time.monotonic()
         _purgar_ventana(ahora)
         if len(_ventana) >= estado["limite_rps"]:
             response.status_code = 429
             response.headers["Retry-After"] = str(RETRY_AFTER_S)
+            log_evento(
+                logger,
+                "crm_webhook_rechazado_429",
+                nivel="warning",
+                novedad_id=payload.novedad_id,
+                trabajo_id=payload.trabajo_id,
+                intento_cliente=payload.intentos,
+                limite_rps=estado["limite_rps"],
+                requests_en_ventana=len(_ventana),
+                retry_after_s=RETRY_AFTER_S,
+            )
             return {
                 "error": "rate_limited",
                 "limite_rps": estado["limite_rps"],
                 "novedad_id": payload.novedad_id,
             }
         _ventana.append(ahora)
+        log_evento(
+            logger,
+            "crm_webhook_aceptado",
+            novedad_id=payload.novedad_id,
+            trabajo_id=payload.trabajo_id,
+            intento_cliente=payload.intentos,
+            limite_rps=estado["limite_rps"],
+            requests_en_ventana=len(_ventana),
+        )
         return {"recibido": True, "novedad_id": payload.novedad_id}

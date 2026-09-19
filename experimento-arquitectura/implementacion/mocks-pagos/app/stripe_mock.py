@@ -7,7 +7,7 @@ es exactamente lo que el Adapter `PasarelaDePago` (dentro del módulo ACL de
 Pagos de Gestión de Trabajos) debe hacer.
 
 No es un microservicio de dominio, es un sistema externo simulado — mismo
-trato que Policía/RUES/CONTE en `implementacion/DISP-03/app/mocks/`."""
+trato que Policía/RUES/CONTE en `implementacion/proveedores/app/mocks/`."""
 
 import uuid
 
@@ -25,7 +25,11 @@ estado = estado_inicial()
 class CobroStripe(BaseModel):
     amount: int  # centavos, como la API real de Stripe (100 = $1.00)
     currency: str = "cop"
-    proveedor_id: str
+    metadata: dict | None = None
+    # Opcional: la API real de Stripe no tiene este campo — exigirlo hacía
+    # que el Adapter PasarelaStripe (que habla el contrato real) recibiera
+    # 422 contra este doble.
+    proveedor_id: str | None = None
 
 
 @app.get("/salud")
@@ -43,7 +47,7 @@ async def control_config(cfg: ConfigMock):
     return {"pasarela": PASARELA, **aplicar_config(estado, cfg)}
 
 
-@app.post("/charges")
+@app.post("/v1/charges")
 async def crear_cobro(payload: CobroStripe, response: Response):
     falla = await simular_latencia_y_fallas(estado, response, PASARELA)
     if falla is not None:

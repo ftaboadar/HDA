@@ -7,13 +7,17 @@ objeto de aplicación para ambos casos. La API no toca `SessionLocal` ni el
 ORM directo (Regla 5, criterio 2)."""
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
 
 from app.application.commands.calificar_proveedor import CalificarProveedor
 from app.application.queries.consultar_perfil_reputacion import (
     ConsultarPerfilReputacion,
 )
 from app.common.db import Base, engine
+from app.common.schemas import (
+    CalificacionCreate,
+    CalificacionOut,
+    PerfilReputacionOut,
+)
 from app.domain.reputacion.perfil_reputacion import (
     PerfilReputacion,
     PuntajeFueraDeRango,
@@ -25,31 +29,9 @@ app = FastAPI(title="Reputación — API (Entrega 4 PoC, Event Sourcing)")
 _event_store = EventStoreSQLAlchemy()
 
 
-class CalificacionCreate(BaseModel):
-    proveedor_id: str
-    trabajo_id: str
-    puntaje: int = Field(ge=1, le=5)
-    comentario: str | None = None
-    garantia_dias: int | None = None
-
-
-class CalificacionOut(BaseModel):
-    trabajo_id: str
-    puntaje: int
-    comentario: str | None
-    garantia_dias: int | None
-
-
-class PerfilReputacionOut(BaseModel):
-    proveedor_id: str
-    promedio: float
-    total_calificaciones: int
-    calificaciones: list[CalificacionOut]
-
-
 def _a_schema(perfil: PerfilReputacion) -> PerfilReputacionOut:
     """Único punto de traducción dominio -> contrato HTTP (misma
-    convención que `DISP-03/app/api/main.py::_a_schema`): el dominio no
+    convención que `proveedores/app/api/main.py::_a_schema`): el dominio no
     conoce Pydantic."""
     return PerfilReputacionOut(
         proveedor_id=str(perfil.proveedor_id),

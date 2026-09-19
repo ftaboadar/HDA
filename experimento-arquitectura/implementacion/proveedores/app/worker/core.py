@@ -80,6 +80,8 @@ async def procesar_verificacion(
                 verificacion_id=verificacion_id,
                 tipo_verificador=tipo_verificador,
                 intento=intentos,
+                max_intentos=settings.max_reintentos,
+                adaptador=type(puerto).__name__,
                 duracion_ms=resultado.duracion_ms,
             )
         except Exception as exc:
@@ -93,6 +95,11 @@ async def procesar_verificacion(
                 verificacion_id=verificacion_id,
                 tipo_verificador=tipo_verificador,
                 intento=intentos,
+                max_intentos=settings.max_reintentos,
+                adaptador=type(puerto).__name__,
+                nivel_reintento="se_reintenta_con_backoff_exponencial"
+                if intentos < settings.max_reintentos
+                else "ultimo_intento",
                 error=ultimo_error,
             )
             raise

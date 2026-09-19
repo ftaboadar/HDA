@@ -12,8 +12,21 @@ import os
 import random
 from typing import Literal
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
 from pydantic import BaseModel
+
+from app.common import logging_utils
+from app.common.logging_utils import configurar_logging, establecer_trace, log_evento
+
+logging_utils.CONTEXTO_DDD.update(
+    {
+        "dominio": "SistemaExterno",
+        "subdominio": "VerificadorExterno",
+        "tipo_subdominio": "EXTERNO",
+        "bounded_context": "MockVerificadorExterno",
+    }
+)
+logger = configurar_logging("mocks.verificador")
 
 MOCK_NAME = os.getenv("MOCK_NAME", "generico")
 
@@ -59,9 +72,20 @@ async def control_config(cfg: ConfigMock):
 
 
 @app.post("/verificar")
-async def verificar(payload: SolicitudVerificar, response: Response):
+async def verificar(payload: SolicitudVerificar, response: Response, request: Request):
+    establecer_trace(request.headers.get("x-cloud-trace-context"))
     modo = estado["modo"]
     latencia_ms = estado["latencia_ms"]
+    log_evento(
+        logger,
+        "mock_verificacion_recibida",
+        nivel="warning" if modo != "ok" else "info",
+        mock=MOCK_NAME,
+        proveedor_id=payload.proveedor_id,
+        modo_inyectado=modo,
+        latencia_inyectada_ms=latencia_ms,
+        tasa_error=estado["tasa_error"],
+    )
 
     if modo == "caido":
         response.status_code = 503

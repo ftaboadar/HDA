@@ -28,6 +28,7 @@ llamada, por eso van envueltos en `asyncio.to_thread`."""
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 
 from app.application.dispatcher_eventos_dominio import despachar
@@ -60,6 +61,7 @@ class PagarTrabajo:
         self._pasarelas = pasarelas
 
     async def ejecutar(self, trabajo_id: str, pasarela: str) -> uuid.UUID:
+        inicio = time.perf_counter()
         registro = await asyncio.to_thread(
             self._registro_repo.obtener_por_trabajo, TrabajoId.desde_str(trabajo_id)
         )
@@ -85,11 +87,30 @@ class PagarTrabajo:
 
         # Strategy: valida según la región ANTES de llamar al externo.
         regla.validar(pago)
+        log_evento(
+            logger,
+            "regla_regional_aplicada",
+            patron="Strategy",
+            regla=type(regla).__name__,
+            region=registro.region.value,
+            moneda=registro.moneda,
+            pago_id=str(pago.id),
+            trabajo_id=trabajo_id,
+        )
+        log_evento(
+            logger,
+            "pasarela_seleccionada",
+            patron="Adapter",
+            adaptador=type(pasarela_impl).__name__,
+            pasarela=pasarela,
+            pago_id=str(pago.id),
+            trabajo_id=trabajo_id,
+        )
 
         # Se persiste PENDIENTE antes de la llamada externa — si el proceso
         # cae entre aquí y la respuesta de la pasarela, el registro de
         # intento de cobro ya quedó trazado (mismo principio que
-        # Verificacion en DISP-03: persistir antes de la I/O externa).
+        # Verificacion en Proveedores: persistir antes de la I/O externa).
         await asyncio.to_thread(self._pago_repo.guardar, pago)
 
         resultado = await pasarela_impl.cobrar(pago)
@@ -109,5 +130,13 @@ class PagarTrabajo:
             trabajo_id=trabajo_id,
             pasarela=pasarela,
             estado=pago.estado.value,
+            regla=type(regla).__name__,
+            adaptador=type(pasarela_impl).__name__,
+            region=registro.region.value,
+            moneda=registro.moneda,
+            monto=str(registro.monto),
+            referencia_externa=resultado.referencia_externa,
+            motivo_falla=resultado.motivo_falla,
+            duracion_total_ms=round((time.perf_counter() - inicio) * 1000, 1),
         )
         return pago.id

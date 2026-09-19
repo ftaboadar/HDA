@@ -27,10 +27,10 @@ import sys
 import time
 
 CONTEXTO_DDD = {
-    "dominio": "FintechYPagos",
-    "subdominio": "Pagos",
+    "dominio": "CapacidadesTransversales",
+    "subdominio": "OperacionDeAgentes",
     "tipo_subdominio": "GENERIC_SUBDOMAIN",
-    "bounded_context": "ContextoPagos",
+    "bounded_context": "ContextoGestionAgentes",
 }
 
 _CAPAS = ("api", "application", "domain", "infrastructure", "worker", "mocks", "common")
