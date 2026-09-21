@@ -30,7 +30,9 @@ class ConsumidorComandosSaga:
     async def iniciar(self):
         import pulsar
 
-        self._cliente = pulsar.Client(self._service_url)
+        # pulsar.Client y subscribe son bloqueantes: van a un hilo para no
+        # congelar el event loop de la API (y /salud) mientras conectan.
+        self._cliente = await asyncio.to_thread(pulsar.Client, self._service_url)
         self._corriendo = True
 
         # Suscribirse a los tópicos de los comandos
@@ -41,7 +43,8 @@ class ConsumidorComandosSaga:
         ]
 
         for topic in topics:
-            consumidor = self._cliente.subscribe(
+            consumidor = await asyncio.to_thread(
+                self._cliente.subscribe,
                 topic,
                 subscription_name="pagos-saga-sub",
                 consumer_type=pulsar.ConsumerType.Shared,

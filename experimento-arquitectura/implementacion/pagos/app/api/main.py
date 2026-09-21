@@ -128,7 +128,16 @@ async def startup() -> None:
         liberar_pago=liberar_pago,
         compensar_pago=compensar_pago,
     )
-    await _consumidor_saga.iniciar()
+    # En segundo plano y sin tumbar la API: si Pulsar no está (ej. el
+    # docker-compose de CI, que solo trae Postgres), REST y /salud siguen vivos.
+    asyncio.create_task(_iniciar_consumidor_saga())
+
+
+async def _iniciar_consumidor_saga() -> None:
+    try:
+        await _consumidor_saga.iniciar()
+    except Exception as exc:
+        log_evento(logger, "consumidor_saga_no_disponible", error=str(exc))
 
 
 @app.on_event("shutdown")

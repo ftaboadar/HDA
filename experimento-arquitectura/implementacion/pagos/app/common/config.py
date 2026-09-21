@@ -6,8 +6,9 @@ Los valores por defecto asumen desarrollo local. `stripe_mock_url`/
 `mercadopago_mock_url` apuntan a los mocks de sistemas externos
 (`implementacion/mocks-pagos/`, `GENERIC_SUBDOMAIN` — ver
 `12-plan-entrega-4.md` sección 0.1). Sin `pulsar_service_url`: este
-microservicio no tiene tópico de integración propio (ver README.md, sección
-"Eventos: dominio vs. integración")."""
+microservicio no tenía tópico de integración propio (ver README.md, sección
+"Eventos: dominio vs. integración"). Desde la Entrega 5 (A18/A22) consume los
+comandos de la saga y publica sus respuestas en Pulsar: `pulsar_service_url`."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,6 +24,10 @@ class Settings(BaseSettings):
     stripe_mock_url: str = "http://localhost:9100"
     mercadopago_mock_url: str = "http://localhost:9100"
     http_timeout_s: float = 5.0
+
+    # Comandos de la saga (RetenerPago, LiberarPago, CompensarPago) y sus
+    # respuestas. Mismo valor por defecto que reputacion/app/common/config.py.
+    pulsar_service_url: str = "pulsar://broker:6650"
 
 
 settings = Settings()
