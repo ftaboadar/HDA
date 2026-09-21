@@ -312,8 +312,8 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     piso de latencia real de Cloud Run + Cloud SQL + Pub/Sub con TLS sobre
     red pública, que ya varía por entorno.
 
-    Estadístico elegido: MEDIANA, no p95. Con n=15 por grupo, el p95 cae en
-    la posición ~14 de 15 (prácticamente el máximo de la muestra), así que
+    Estadístico elegido: MEDIANA, no p95. Con n=40 por grupo, el p95 cae en
+    la posición ~38 de 40 (prácticamente el máximo de la muestra), así que
     un solo outlier de red domina la métrica y no representa el
     comportamiento típico de aceptación. La mediana es robusta a ese
     outlier único y es más representativa para decidir "degradación
@@ -336,17 +336,38 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     latencias_baseline_ms: list[float] = []
     latencias_durante_falla_ms: list[float] = []
 
-    async def _crear_y_medir(proveedor_id: str, tipo: str, destino: list[float]):
+    async def _crear_y_medir(proveedor_id: str, tipo: str, destino: list[float] | None = None):
         t0 = time.time()
         resultado = await crear_verificacion(api, proveedor_id, tipo)
-        destino.append((time.time() - t0) * 1000)
+        if destino is not None:
+            destino.append((time.time() - t0) * 1000)
         return resultado
+
+    # Calentamiento (para inicializar conexiones, cachés en frío, etc.)
+    # Se descarta de las métricas.
+    calentamiento = await asyncio.gather(
+        *[_crear_y_medir(f"prov-cp7-warm-{i}", "certificadora") for i in range(5)]
+    )
+    await asyncio.gather(
+        *[
+            esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30)
+            for c in calentamiento
+        ]
+    )
 
     # Baseline: certificadora sana.
     primera_mitad = await asyncio.gather(
         *[
             _crear_y_medir(f"prov-cp7-a-{i}", "certificadora", latencias_baseline_ms)
-            for i in range(15)
+            for i in range(40)
+        ]
+    )
+    # Esperar a que el worker termine de procesar la fase base para que
+    # no compita por CPU con la fase de falla.
+    await asyncio.gather(
+        *[
+            esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30)
+            for c in primera_mitad
         ]
     )
 
@@ -356,7 +377,7 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     segunda_mitad = await asyncio.gather(
         *[
             _crear_y_medir(f"prov-cp7-b-{i}", "certificadora", latencias_durante_falla_ms)
-            for i in range(15)
+            for i in range(40)
         ]
     )
 
@@ -424,9 +445,12 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     )
 
     # Limpieza: dejamos que todo llegue a estado terminal antes de terminar el test
-    todas = primera_mitad + segunda_mitad
+    # (primera_mitad ya se esperó arriba)
     await asyncio.gather(
-        *[esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30) for c in todas]
+        *[
+            esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30)
+            for c in segunda_mitad
+        ]
     )
 
     assert not degradacion_significativa, (
