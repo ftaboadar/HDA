@@ -236,3 +236,28 @@ jobs:
             echo "Posible secreto detectado — revisar antes de mergear"
             exit 1
           fi
+
+  oasdiff:
+    name: Retrocompatibilidad de Contratos REST (oasdiff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          path: pr-branch
+      - name: Checkout Main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-branch
+      - name: Instalar oasdiff
+        run: curl -sSfL https://raw.githubusercontent.com/Tufin/oasdiff/main/install.sh | sh
+      - name: Verificar compatibilidad BACKWARD de openapi.json
+        run: |
+          for file in $(find main-branch/experimento-arquitectura/implementacion -name "openapi.json"); do
+            pr_file="pr-branch/${file#main-branch/}"
+            if [ -f "$pr_file" ]; then
+              echo "Revisando $pr_file contra $file"
+              ./bin/oasdiff breaking "$file" "$pr_file" --fail-on ERR || exit 1
+            fi
+          done

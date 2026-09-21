@@ -14,7 +14,8 @@ for _ in $(seq 1 60); do
 done
 
 docker exec "$BROKER" bin/pulsar-admin tenants create hda --allowed-clusters cluster-hda 2>/dev/null || true
-for ns in gestion-trabajos proveedores reputacion marketplace siniestros suscripciones pagos scoring; do
+for ns in gestion-trabajos proveedores reputacion marketplace siniestros suscripciones pagos scoring bff; do
   docker exec "$BROKER" bin/pulsar-admin namespaces create "hda/${ns}" 2>/dev/null || true
+  docker exec "$BROKER" bin/pulsar-admin namespaces set-schema-compatibility-strategy "hda/${ns}" --compatibility BACKWARD
 done
 docker exec "$BROKER" bin/pulsar-admin namespaces list hda

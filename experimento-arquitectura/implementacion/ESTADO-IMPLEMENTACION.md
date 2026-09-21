@@ -91,3 +91,8 @@ secretos). No despliega nada: desplegar es manual con los scripts.
 - Imágenes de las vistas: ver `../contexto/diagramas/entrega-5/CORRECCIONES.md`.
 - Validar `../contexto/03-contextos-acotados-TO-BE.cml` con Context Mapper.
 - Diseño cerrado (A21-A27) y plan en `../contexto/16-plan-entrega-5.md`: **nada de la Entrega 5 está implementado todavía** (coordinador de saga, Saga Log, BFF, servicios nuevos, esquemas en el registry, cola de DISP-03 en Pulsar, campos de observabilidad).
+
+## 7. Fase 0 de la Entrega 5 (Infra y Contratos) completada
+- **Pulsar Namespace `bff`**: Verificados y agregados `hda/bff` con política `BACKWARD` tanto en GCP (`startup.sh.tpl`) como local (`pulsar-namespaces-local.sh`).
+- **Contratos AsyncAPI**: Incorporados en `asyncapi/hda-asyncapi.yaml` TODOS los canales del catálogo §7 y comandos de la saga §7.1 del diseño.
+- **CI / Quality Gate**: Añadido el job `oasdiff` a `.github/workflows/pr-quality-gate.yml` para garantizar reglas de retrocompatibilidad estricta en contratos REST (`openapi.json`).
