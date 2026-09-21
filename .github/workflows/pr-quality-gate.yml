@@ -10,8 +10,9 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  # Matriz sobre los 3 microservicios propios de la Entrega 4 (sección 1 de
-  # `experimento-arquitectura/contexto/12-plan-entrega-4.md`): Proveedores
+  # Matriz sobre los microservicios propios (Entrega 4: sección 1 de
+  # `experimento-arquitectura/contexto/historico/12-plan-entrega-4.md`; Entrega 5: se suma cada
+  # servicio nuevo, ver CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md §7). Proveedores
   # (escenario DISP-03, ya certificado — obligatorio, sección 8: propiedad de Johan),
   # Gestión de Trabajos y Reputación (propiedad de Frans y Daniel
   # respectivamente, en ramas hermanas — todavía NO existen en esta rama).
@@ -57,6 +58,14 @@ jobs:
           - servicio: reputacion
             check: reputacion
             carpeta: experimento-arquitectura/implementacion/reputacion
+            opcional: true
+            compose_file: docker-compose.yml
+          # Pagos es microservicio propio desde la entrega parcial y no estaba en la matriz.
+          # Lint, formato y unitarias verificados localmente el 2026-09-21; pasar a
+          # opcional: false (igual que gestion y reputacion) tras la primera corrida verde en GitHub.
+          - servicio: pagos
+            check: pagos
+            carpeta: experimento-arquitectura/implementacion/pagos
             opcional: true
             compose_file: docker-compose.yml
     steps:
@@ -141,12 +150,28 @@ jobs:
         working-directory: ${{ matrix.carpeta }}
         run: docker compose -f ${{ matrix.compose_file }} down -v
 
+  # Valida TODOS los stacks (antes solo proveedores/infra). Sin credenciales de GCP: el backend GCS
+  # se omite con -backend=false. Al crear un stack nuevo, agrégalo a esta lista.
   terraform:
-    name: Terraform — formato y validación (infra GCP)
+    name: Terraform — formato y validación (${{ matrix.stack }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack:
+          - infra-modules/cloud-run-service
+          - proveedores/infra
+          - gestion-de-trabajos/infra
+          - pagos/infra
+          - reputacion/infra
+          - mocks-pagos/infra
+          - mocks-crm/infra
+          - pulsar-infra/gcp
+          - observabilidad
+          - k6/infra
     defaults:
       run:
-        working-directory: experimento-arquitectura/implementacion/proveedores/infra
+        working-directory: experimento-arquitectura/implementacion/${{ matrix.stack }}
     steps:
       - uses: actions/checkout@v4
 
@@ -162,6 +187,18 @@ jobs:
 
       - name: terraform validate
         run: terraform validate
+
+  scripts-despliegue:
+    name: Scripts de despliegue — sintaxis bash
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: bash -n y shellcheck de implementacion/scripts
+        run: |
+          cd experimento-arquitectura/implementacion/scripts
+          for f in *.sh; do bash -n "$f"; done
+          shellcheck -x *.sh
 
   higiene-general:
     name: Higiene general del repo
