@@ -4,6 +4,12 @@
  *
  * Migración a un sistema reactivo distribuido basado en eventos.
  * Se incluyen las capacidades genéricas (SaaS comprados) conectadas mediante Capas Anticorrupción (ACL).
+ *
+ * Revisión Entrega 5 (2026-09-21, ver 15-arquitectura-entrega-5.md §3, decisión A1):
+ * ContextoPagos deja de ser un sistema externo comprado entero — HdA construye el
+ * contexto Gestión de Pagos (liberación, compensación, regla regional) y compra solo
+ * la pasarela (ContextoPasarelaDePagos: Stripe, MercadoPago). Las relaciones entre
+ * contextos propios son eventos de integración sobre Apache Pulsar.
  */
 
 import "./01-dominios-subdominios.cml"
@@ -32,6 +38,10 @@ BoundedContext ContextoReputacion implements ReputacionYCalidad {
   domainVisionStatement = "Calcula reputación consumiendo eventos de Gestión de Trabajos."
 }
 
+BoundedContext ContextoPagos implements Pagos {
+  domainVisionStatement = "Gestión de Pagos propia de HdA: libera el pago de un trabajo finalizado aplicando la regla regional (Strategy) y la pasarela del país (Adapter), y compensa ante disputas. Publica el resultado a Gestión de Trabajos."
+}
+
 BoundedContext ContextoScoring implements ScoringYCredito {
   domainVisionStatement = "Calcula score crediticio. Expone API para originación de créditos."
 }
@@ -54,8 +64,8 @@ BoundedContext ContextoNotificaciones implements Notificaciones {
   domainVisionStatement = "SaaS de notificaciones push, SMS y Email."
 }
 
-BoundedContext ContextoPagos implements Pagos {
-  domainVisionStatement = "Pasarela de pagos genérica para marketplace (ej. Stripe Connect)."
+BoundedContext ContextoPasarelaDePagos implements Pagos {
+  domainVisionStatement = "Pasarela de pagos externa para marketplace (ej. Stripe, MercadoPago): cobro, retención y payouts."
 }
 
 ContextMap HogarDeLosAlpesTOBE {
@@ -69,25 +79,26 @@ ContextMap HogarDeLosAlpesTOBE {
   contains ContextoProveedores
   contains ContextoReputacion
   contains ContextoScoring
+  contains ContextoPagos
   
   /* Sistemas Genéricos */
   contains ContextoGestionAgentes
   contains ContextoContabilidad
   contains ContextoGestorDocumental
   contains ContextoNotificaciones
-  contains ContextoPagos
+  contains ContextoPasarelaDePagos
 
   /* Relaciones Core -> Core (Basadas en Eventos) */
-  ContextoMarketplace [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
-  ContextoSiniestros [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
-  ContextoSuscripciones [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos asíncronos" }
+  ContextoMarketplace [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos de integración (Pulsar): SolicitudDiagnosticada, ProveedorSeleccionado" }
+  ContextoSiniestros [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos de integración (Pulsar): SiniestroAprobado" }
+  ContextoSuscripciones [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos de integración (Pulsar): CicloSuscripcion" }
 
-  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de integración" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de integración (Pulsar): ElegiblesPublicados" }
   ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSiniestros { implementationTechnology = "Eventos de integración" }
   ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoSuscripciones { implementationTechnology = "Eventos de integración" }
 
-  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoReputacion { implementationTechnology = "Eventos de integración" }
-  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoScoring { implementationTechnology = "Eventos de integración" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoReputacion { implementationTechnology = "Eventos de integración (Pulsar): TrabajoFinalizado" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoScoring { implementationTechnology = "Eventos de integración (Pulsar): TrabajoFinalizado" }
   ContextoReputacion [U, OHS, PL] -> [D, ACL] ContextoMarketplace { implementationTechnology = "Eventos de integración" }
 
   /* Relaciones con Sistemas Genéricos Externos (Normalmente APIs / REST / ACL) */
@@ -103,11 +114,21 @@ ContextMap HogarDeLosAlpesTOBE {
   ContextoGestorDocumental [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "API REST / S3" }
   ContextoGestorDocumental [U, OHS, PL] -> [D, ACL] ContextoProveedores { implementationTechnology = "API REST / S3" }
 
-  /* Gestión de trabajos y Suscripciones orquestan los cobros vía la plataforma de pagos genérica */
-  ContextoPagos [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "API REST" }
-  ContextoPagos [U, OHS, PL] -> [D, ACL] ContextoSuscripciones { implementationTechnology = "API REST" }
+  /* Entrega 5: Gestión de Trabajos dispara la liberación del pago por evento y Pagos devuelve el resultado */
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoPagos { implementationTechnology = "Eventos de integración (Pulsar): TrabajoFinalizado, NovedadResuelta" }
+  ContextoPagos [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos de integración (Pulsar): PagoLiberado, PagoFallido, PagoCompensado" }
+  ContextoPasarelaDePagos [U, OHS, PL] -> [D, ACL] ContextoPagos { implementationTechnology = "API REST (Adapter por pasarela)" }
+
+  /* Entrega 5: vueltas del journey entre contextos propios (ver 15-arquitectura-entrega-5.md §7) */
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoProveedores { implementationTechnology = "Eventos de integración (Pulsar): TrabajoCreado, TrabajoFinalizado" }
+  ContextoProveedores [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos de integración (Pulsar): ElegiblesPublicados" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoSiniestros { implementationTechnology = "Eventos de integración (Pulsar): TrabajoFinalizado (facturar a partner)" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoSuscripciones { implementationTechnology = "Eventos de integración (Pulsar): TrabajoFinalizado" }
+  ContextoScoring [U, OHS, PL] -> [D, ACL] ContextoReputacion { implementationTechnology = "Eventos de integración (Pulsar): ScoringActualizado" }
+  ContextoReputacion [U, OHS, PL] -> [D, ACL] ContextoProveedores { implementationTechnology = "Eventos de integración (Pulsar): ReputacionPublicada" }
 
   /* La plataforma de pagos y el Scoring se sincronizan con la contabilidad formal */
   ContextoContabilidad [U, OHS, PL] -> [D, ACL] ContextoPagos { implementationTechnology = "Batch / API REST" }
+  ContextoContabilidad [U, OHS, PL] -> [D, ACL] ContextoSiniestros { implementationTechnology = "Batch / API REST (asiento de facturación a partner)" }
   ContextoContabilidad [U, OHS, PL] -> [D, ACL] ContextoScoring { implementationTechnology = "Batch / API REST" }
 }

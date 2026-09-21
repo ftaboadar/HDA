@@ -1,5 +1,8 @@
 # Experimento de Arquitectura — DISP-03
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** Plan **histórico** del experimento DISP-03 (Entrega 3). Sigue siendo la especificación de DISP-03; su lugar dentro del journey de la Entrega 5 está en [`../../contexto/15-arquitectura-entrega-5.md`](../../contexto/15-arquitectura-entrega-5.md) §5.
+
+
 Hogar de los Alpes (HdA) — Validación de disponibilidad en la Verificación de Proveedores
 ante fallas de entidades certificadoras externas
 

@@ -1,7 +1,7 @@
 # Mocks de Pagos — Stripe y MercadoPago
 
 Dobles HTTP de los dos proveedores de pagos que consumiría el módulo ACL de Pagos dentro de
-**Gestión de Trabajos** (ver `../../contexto/12-plan-entrega-4.md`, sección 0.1: Pagos es un
+**Gestión de Trabajos** (ver `../../contexto/historico/12-plan-entrega-4.md`, sección 0.1: Pagos es un
 `GENERIC_SUBDOMAIN` externo — no un microservicio propio de Hogar de los Alpes — y este mock cumple
 el mismo rol que los mocks de Policía/RUES/CONTE en `../proveedores/app/mocks/`).
 

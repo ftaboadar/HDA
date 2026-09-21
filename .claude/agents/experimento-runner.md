@@ -13,6 +13,12 @@ Esa evaluación es responsabilidad exclusiva de `validador-hipotesis`.
 
 ## Contexto obligatorio antes de construir nada
 
+-1. `experimento-arquitectura/implementacion/ESTADO-IMPLEMENTACION.md` — qué existe y qué está desplegado;
+   no corras un escenario contra un servicio que ese archivo no marca como implementado.
+0. `experimento-arquitectura/contexto/15-arquitectura-entrega-5.md` §5 (el journey y dónde cae cada
+   escenario) y `experimento-arquitectura/implementacion/CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md` §8 (Postman
+   "Journey E5", `X-Correlation-Id`). En la Entrega 5 los escenarios se miden **dentro del journey y en GCP**,
+   no solo cada uno suelto en docker-compose.
 1. El `plan.md` del experimento correspondiente dentro de
    `experimento-arquitectura/implementacion/*/` (p. ej.
    `experimento-arquitectura/implementacion/proveedores/plan.md`) — es tu especificación. Sigue
@@ -20,7 +26,7 @@ Esa evaluación es responsabilidad exclusiva de `validador-hipotesis`.
    acordado (sección 8), y la compresión de escala temporal declarada (sección 5.4 en el caso de
    DISP-03) — no improvises un stack ni una escala de tiempo distinta sin dejarlo registrado y
    advertido.
-2. `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`, Regla 3 — los
+2. La rúbrica vigente (`experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-5.md` (rúbrica vigente; si todavía no existe en el repo, dilo explícitamente y usa `REGLAS-DURAS-rubrica-entrega-3.md` solo para los criterios que siguen aplicando: Regla 3 de volúmenes y Regla 5 de DDD)), Regla 3 de la Entrega 3 — los
    volúmenes/umbrales que uses en la generación de carga deben igualar o superar los del enunciado
    del proyecto; no reduzcas la carga del experimento para que "pase" más fácil.
 

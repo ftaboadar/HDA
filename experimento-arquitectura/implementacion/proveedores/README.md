@@ -1,5 +1,8 @@
 # Proveedores (escenario DISP-03) — implementación
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** En la Entrega 5 Proveedores gana el módulo **Elegibilidad** (consume `TrabajoCreado`/`ReputacionPublicada`, publica `ElegiblesPublicados`) y Marketplace/Siniestros/Suscripciones **sí entran al alcance**. Hay un bug conocido de namespace en `app/common/pulsar_topology.py` (`hda/trabajos` → debe ser `hda/gestion-trabajos`). Ver [`../../contexto/15-arquitectura-entrega-5.md`](../../contexto/15-arquitectura-entrega-5.md).
+
+
 > **Nombres:** esta carpeta es el servicio **Proveedores** (`ContextoProveedores`), antes llamada `DISP-03` por el escenario de calidad que valida. `DISP-03` sigue siendo el ID del escenario; los recursos ya desplegados en GCP conservan el prefijo histórico `disp03-poc-*` (variable `entorno` en `infra/variables.tf`).
 
 PoC ejecutable del experimento planificado en `../implementacion/proveedores/plan.md`. Valida si
@@ -179,10 +182,10 @@ de tooling distinto).
 Documentadas aquí para que `validador-hipotesis` las cite explícitamente si el veredicto pretende
 generalizarse al despliegue real, no solo al entorno local. La columna Pulsar corresponde a la
 migración del publicador descrita en la sección 2.2 de
-`../../contexto/12-plan-entrega-4.md` — **el veredicto H1 con RabbitMQ/Pub-Sub NO se traslada
+`../../contexto/historico/12-plan-entrega-4.md` — **el veredicto H1 con RabbitMQ/Pub-Sub NO se traslada
 automáticamente a Pulsar por analogía**: al menos CP-4 (falla dura + DLQ) y CP-7 (carga
 concurrente) deben re-ejecutarse contra un cluster de Pulsar real antes de reclamarlo (ver
-`../../contexto/12-plan-entrega-4.md`, sección 2, "Riesgo nuevo, explícito, por la migración a
+`../../contexto/historico/12-plan-entrega-4.md`, sección 2, "Riesgo nuevo, explícito, por la migración a
 Pulsar").
 
 | Aspecto | RabbitMQ (local) | Pub/Sub (GCP) | Apache Pulsar |
@@ -210,7 +213,7 @@ Los 5 criterios de la Regla 5 (`../../contexto/REGLAS-DURAS-rubrica-entrega-3.md
 | 4 | Eventos de dominio intra-servicio | `domain/verificacion/eventos.py` + `application/dispatcher_eventos_dominio.py` — `IntentoRegistrado`, `VerificacionCompletada`, `VerificacionAgotoReintentos`, todos internos, nunca cruzan a un broker directamente |
 | 5 | CQS | `application/commands/*` (mutan) vs. `application/queries/*` (solo leen) |
 
-**Decisión de diseño respecto a la propuesta original** (`../../contexto/11-implementacion-ddd-verificacion.md`):
+**Decisión de diseño respecto a la propuesta original** (`../../contexto/historico/11-implementacion-ddd-verificacion.md`):
 no existe un comando público `MoverADLQ` separado — exponerlo permitiría forzar la transición a
 FALLIDA_DLQ sin haber agotado los reintentos, violando el invariante que el agregado protege. La
 transición ocurre dentro de `RegistrarIntento`, como efecto del propio agregado.

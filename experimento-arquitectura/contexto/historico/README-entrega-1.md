@@ -1,5 +1,8 @@
 # Hogar de los Alpes (HdA) — Entrega 1: Diseño y Arquitectura de Dominio
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** Este README describe la **Entrega 1**. Su decisión *"Pagos no tiene contexto acotado propio en el TO-BE"* fue revisada: Gestión de Pagos es contexto propio y la pasarela es el externo (ver [`15-arquitectura-entrega-5.md`](../15-arquitectura-entrega-5.md) §3, A1, y `../03-contextos-acotados-TO-BE.cml`).
+
+
 Maestría en Ingeniería de Software (MISO) — Proyecto 2026-14
 
 ## Estructura del proyecto
@@ -93,7 +96,7 @@ la frontera de un contexto acotado.
 |---|---|---|
 | Todos los contextos — AS-IS | 15pt | `02-contextos-acotados-AS-IS.cml` — 6 `BoundedContext`; imagen en `diagramas/02-contextos-acotados-AS-IS_ContextMap.png` |
 | Relaciones y tipos de integración — AS-IS | 7.5pt | Mismo archivo, bloque `ContextMap HogarDeLosAlpesASIS { ... }` — 5 relaciones `[SK]<->[SK]` (Shared Kernel) |
-| Todos los contextos — TO-BE | 15pt | `03-contextos-acotados-TO-BE.cml` — 8 `BoundedContext`; imagen en `diagramas/03-contextos-acotados-TO-BE_ContextMap.png` |
+| Todos los contextos — TO-BE | 15pt | `../03-contextos-acotados-TO-BE.cml` — 8 `BoundedContext`; imagen en `diagramas/03-contextos-acotados-TO-BE_ContextMap.png` |
 | Relaciones y tipos de integración — TO-BE | 7.5pt | Mismo archivo, bloque `ContextMap HogarDeLosAlpesTOBE { ... }` — 11 relaciones `[OHS,PL] -> [ACL]`, cada una con `implementationTechnology` explícita |
 
 ## Decisiones de diseño relevantes (resumen para sustentación)

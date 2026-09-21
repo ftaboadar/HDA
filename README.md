@@ -1,4 +1,10 @@
-# Hogar de los Alpes — Entrega 3: Diseño de Experimentación
+# Hogar de los Alpes — MISO 2026-14
+
+> **Estado: Entrega 5 en curso** (journey/saga entre 8 microservicios en GCP). Empieza por
+> [`AGENTS.md`](AGENTS.md) y [`experimento-arquitectura/contexto/15-arquitectura-entrega-5.md`](experimento-arquitectura/contexto/15-arquitectura-entrega-5.md).
+> Lo que sigue en este README es el ejercicio de la **Entrega 3 (DISP-03)**, que se conserva como referencia.
+
+## Entrega 3: Diseño de Experimentación
 
 Proyecto de curso **Hogar de los Alpes (HdA)**, MISO 2026-14 (Maestría en Ingeniería de Software).
 Este README documenta el **ejercicio de experimentación de arquitectura DISP-03**, la entrega en
