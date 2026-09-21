@@ -6,24 +6,24 @@ from decimal import Decimal
 
 import pytest
 
-from app.domain.trabajo.eventos import TrabajoFinalizado
-from app.domain.trabajo.fabrica import FabricaTrabajo
-from app.domain.trabajo.trabajo import ErrorTransicionInvalida
-from app.domain.trabajo.value_objects import EstadoTrabajo, ProveedorId, Region
+from app.domain.ciclo_vida.eventos import TrabajoFinalizado
+from app.domain.ciclo_vida.fabrica import FabricaTrabajo
+from app.domain.ciclo_vida.trabajo import ErrorTransicionInvalida
+from app.domain.ciclo_vida.value_objects import EstadoTrabajo, ProveedorId, Region
 
 
 def _crear_trabajo():
     return FabricaTrabajo.crear(
-        proveedor_id=ProveedorId(str(uuid.uuid4())),
         monto=Decimal(100000),
         region=Region.COLOMBIA,
+        proveedor_id=ProveedorId(str(uuid.uuid4())),
     )
 
 
-def test_fabrica_crea_trabajo_pendiente_sin_eventos():
+def test_fabrica_crea_trabajo_solicitado_sin_eventos():
     trabajo = _crear_trabajo()
 
-    assert trabajo.estado == EstadoTrabajo.PENDIENTE
+    assert trabajo.estado == EstadoTrabajo.SOLICITADO
     assert trabajo.monto.moneda == "COP"
     assert trabajo.recoger_eventos() == []
 

@@ -4,9 +4,9 @@
 `application/`, ni `domain/` conocen SQLAlchemy."""
 
 from app.common.db import SessionLocal
-from app.domain.trabajo.repository import ITrabajoRepository
-from app.domain.trabajo.trabajo import Trabajo
-from app.domain.trabajo.value_objects import (
+from app.domain.ciclo_vida.repository import ITrabajoRepository
+from app.domain.ciclo_vida.trabajo import Trabajo
+from app.domain.ciclo_vida.value_objects import (
     Dinero,
     EstadoTrabajo,
     ProveedorId,

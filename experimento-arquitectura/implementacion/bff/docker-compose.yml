@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  bff:
+    build: .
+    ports:
+      - "8080:8000"
+    environment:
+      - GESTION_TRABAJOS_URL=http://gestion-de-trabajos:8000
+      - PROVEEDORES_URL=http://proveedores:8000
+      - PAGOS_URL=http://pagos:8000
+      - SAGAS_URL=http://sagas:8000
+    networks:
+      - hda_network
+
+networks:
+  hda_network:
+    external: true

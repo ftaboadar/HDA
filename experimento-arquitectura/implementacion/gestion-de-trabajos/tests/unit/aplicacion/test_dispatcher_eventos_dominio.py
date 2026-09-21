@@ -11,8 +11,8 @@ import pytest
 
 from app.application.dispatcher_eventos_dominio import despachar
 from app.application.ports.registro_trabajos import RegistroTrabajoElegible
-from app.domain.trabajo.eventos import TrabajoFinalizado
-from app.domain.trabajo.value_objects import ProveedorId, Region, TrabajoId
+from app.domain.ciclo_vida.eventos import TrabajoFinalizado
+from app.domain.ciclo_vida.value_objects import ProveedorId, Region, TrabajoId
 
 
 class _PublicadorFalso:

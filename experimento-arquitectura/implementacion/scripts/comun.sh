@@ -12,7 +12,7 @@ set -euo pipefail
 REGION="${REGION:-southamerica-east1}"
 BUCKET_STATE="${BUCKET_STATE:-${PROJECT}-tfstate}"
 # Cuota típica de un proyecto nuevo: 20 vCPU por región. Gestión de Trabajos usa 2 vCPU por instancia.
-GT_MAX_INSTANCIAS="${GT_MAX_INSTANCIAS:-2}"
+GT_MAX_INSTANCIAS="${GT_MAX_INSTANCIAS:-9}"
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMPL="$(cd "$SCRIPTS_DIR/.." && pwd)"

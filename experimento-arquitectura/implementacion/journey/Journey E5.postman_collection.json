@@ -1,0 +1,104 @@
+{
+  "info": {
+    "name": "Journey E5",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Caso de Éxito",
+      "item": [
+        {
+          "name": "1. Crear Trabajo Exitoso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cliente_id\": \"1234\",\n    \"servicio\": \"plomeria\",\n    \"region\": \"CO\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/v1/trabajos",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "v1",
+                "trabajos"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Caso de Compensación",
+      "item": [
+        {
+          "name": "1. Crear Trabajo para Compensar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cliente_id\": \"5678\",\n    \"servicio\": \"electricidad\",\n    \"region\": \"BR\",\n    \"fallar_pago\": true\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/v1/trabajos",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "v1",
+                "trabajos"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Compensar Pago Manualmente (BFF)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"motivo\": \"disputa\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8000/v1/pagos/{{pago_id}}/compensar",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8000",
+              "path": [
+                "v1",
+                "pagos",
+                "{{pago_id}}",
+                "compensar"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

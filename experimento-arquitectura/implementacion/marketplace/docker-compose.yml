@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  marketplace:
+    build: .
+    ports:
+      - "8003:8000"
+    environment:
+      - PULSAR_BROKER_URL=pulsar://pulsar:6650

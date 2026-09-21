@@ -56,7 +56,7 @@ async def test_compensar_despacha_el_evento_pago_compensado():
     comando = Compensar(repo)
 
     with patch(
-        "app.application.commands.compensar.despachar", new_callable=AsyncMock
+        "app.application.dispatcher_eventos_dominio.despachar", new_callable=AsyncMock
     ) as despachar_falso:
         await comando.ejecutar(str(pago.id))
 
@@ -81,7 +81,9 @@ async def test_compensar_transiciona_el_estado():
     repo = _PagoRepositorioFalso(pago)
     comando = Compensar(repo)
 
-    with patch("app.application.commands.compensar.despachar", new_callable=AsyncMock):
+    with patch(
+        "app.application.dispatcher_eventos_dominio.despachar", new_callable=AsyncMock
+    ):
         await comando.ejecutar(str(pago.id))
 
     assert pago.estado == EstadoPago.COMPENSADO

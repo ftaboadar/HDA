@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  scoring-api:
+    build: .
+    ports:
+      - "8005:8000"
+    environment:
+      - PULSAR_URL=pulsar://pulsar:6650
+    depends_on:
+      - pulsar
+
+  pulsar:
+    image: apachepulsar/pulsar:latest
+    ports:
+      - "6650:6650"
+      - "8080:8080"
+    command: bin/pulsar standalone

@@ -57,3 +57,13 @@ class RegistroTrabajoElegibleORM(Base):
     monto = Column(Numeric, nullable=False)
     moneda = Column(String, nullable=False)
     region = Column(String, nullable=False)
+
+
+class TransaccionORM(Base):
+    __tablename__ = "transacciones"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    pago_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    tipo = Column(String, nullable=False)  # RETENCION, LIBERACION, COMPENSACION
+    estado = Column(String, nullable=False)  # EXITOSA, FALLIDA
+    fecha = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)

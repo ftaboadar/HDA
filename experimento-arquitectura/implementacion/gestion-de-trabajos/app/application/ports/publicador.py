@@ -11,7 +11,7 @@ submódulo ACL de Pagos no necesita este puerto)."""
 
 import abc
 
-from app.domain.trabajo.eventos import TrabajoFinalizado
+from app.domain.ciclo_vida.eventos import TrabajoFinalizado
 
 
 class IPublicador(abc.ABC):

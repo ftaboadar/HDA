@@ -26,7 +26,7 @@ import abc
 from dataclasses import dataclass
 from decimal import Decimal
 
-from app.domain.trabajo.value_objects import ProveedorId, Region, TrabajoId
+from app.domain.ciclo_vida.value_objects import ProveedorId, Region, TrabajoId
 
 
 @dataclass(frozen=True)

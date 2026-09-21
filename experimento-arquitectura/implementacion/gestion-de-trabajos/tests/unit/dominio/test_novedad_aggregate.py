@@ -9,7 +9,7 @@ from app.domain.novedades.eventos import NovedadAgotada, NovedadEntregada
 from app.domain.novedades.fabrica import FabricaNovedad
 from app.domain.novedades.novedad import ErrorTransicionInvalida
 from app.domain.novedades.value_objects import EstadoNovedad
-from app.domain.trabajo.value_objects import TrabajoId
+from app.domain.ciclo_vida.value_objects import TrabajoId
 
 
 def _crear_novedad():

@@ -69,8 +69,165 @@ channels:
       operationId: publicarProveedorHabilitado
       message: { $ref: '#/components/messages/ProveedorHabilitado' }
 
+
+  persistent://hda/gestion-trabajos/novedad.registrada:
+    description: Evento NovedadRegistrada.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarNovedadRegistrada
+      message: { $ref: '#/components/messages/NovedadRegistrada' }
+
+  persistent://hda/siniestros/decision.partner:
+    description: Evento DecisionPartner.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarDecisionPartner
+      message: { $ref: '#/components/messages/DecisionPartner' }
+
+  persistent://hda/gestion-trabajos/novedad.resuelta:
+    description: Evento NovedadResuelta.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarNovedadResuelta
+      message: { $ref: '#/components/messages/NovedadResuelta' }
+
+  persistent://hda/proveedores/agenda.liberada:
+    description: Evento AgendaLiberada.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarAgendaLiberada
+      message: { $ref: '#/components/messages/AgendaLiberada' }
+
+  persistent://hda/reputacion/reputacion.publicada:
+    description: Evento ReputacionPublicada.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarReputacionPublicada
+      message: { $ref: '#/components/messages/ReputacionPublicada' }
+
+  persistent://hda/scoring/scoring.actualizado:
+    description: Evento ScoringActualizado.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarScoringActualizado
+      message: { $ref: '#/components/messages/ScoringActualizado' }
+
+  persistent://hda/proveedores/comandos:
+    description: Comandos hacia Proveedores.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: enviarComandoProveedores
+      message: { $ref: '#/components/messages/ComandoProveedores' }
+
+  persistent://hda/pagos/comandos:
+    description: Comandos hacia Pagos.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: enviarComandoPagos
+      message: { $ref: '#/components/messages/ComandoPagos' }
+
+  persistent://hda/siniestros/comandos:
+    description: Comandos hacia Siniestros.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: enviarComandoSiniestros
+      message: { $ref: '#/components/messages/ComandoSiniestros' }
+
+  persistent://hda/pagos/pago.retenido:
+    description: Evento PagoRetenido.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarPagoRetenido
+      message: { $ref: '#/components/messages/PagoRetenido' }
+
+  persistent://hda/pagos/pago.retencion-fallida:
+    description: Evento PagoRetencionFallida.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarPagoRetencionFallida
+      message: { $ref: '#/components/messages/PagoRetencionFallida' }
+
+  persistent://hda/pagos/pago.liberado:
+    description: Evento PagoLiberado.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarPagoLiberado
+      message: { $ref: '#/components/messages/PagoLiberado' }
+
+  persistent://hda/pagos/pago.fallido:
+    description: Evento PagoFallido.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarPagoFallido
+      message: { $ref: '#/components/messages/PagoFallido' }
+
+  persistent://hda/pagos/pago.compensado:
+    description: Evento PagoCompensado.
+    servers: [pulsar-gcp]
+    publish:
+      operationId: publicarPagoCompensado
+      message: { $ref: '#/components/messages/PagoCompensado' }
+
 components:
   messages:
+
+    NovedadRegistrada:
+      name: NovedadRegistrada
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/NovedadRegistrada' }
+    DecisionPartner:
+      name: DecisionPartner
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/DecisionPartner' }
+    NovedadResuelta:
+      name: NovedadResuelta
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/NovedadResuelta' }
+    AgendaLiberada:
+      name: AgendaLiberada
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/AgendaLiberada' }
+    ReputacionPublicada:
+      name: ReputacionPublicada
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ReputacionPublicada' }
+    ScoringActualizado:
+      name: ScoringActualizado
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ScoringActualizado' }
+    ComandoProveedores:
+      name: ComandoProveedores
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ComandoProveedores' }
+    ComandoPagos:
+      name: ComandoPagos
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ComandoPagos' }
+    ComandoSiniestros:
+      name: ComandoSiniestros
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ComandoSiniestros' }
+    PagoRetenido:
+      name: PagoRetenido
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/PagoRetenido' }
+    PagoRetencionFallida:
+      name: PagoRetencionFallida
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/PagoRetencionFallida' }
+    PagoLiberado:
+      name: PagoLiberado
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/PagoLiberado' }
+    PagoFallido:
+      name: PagoFallido
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/PagoFallido' }
+    PagoCompensado:
+      name: PagoCompensado
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/PagoCompensado' }
+
     TrabajoFinalizado:
       name: TrabajoFinalizado
       contentType: application/json
@@ -138,3 +295,33 @@ components:
         proveedor_id: { type: string }
         evento: { type: string, const: ProveedorHabilitado }
         routing_key: { type: string, const: proveedor.habilitado }
+
+
+    NovedadRegistrada:
+      type: object
+    DecisionPartner:
+      type: object
+    NovedadResuelta:
+      type: object
+    AgendaLiberada:
+      type: object
+    ReputacionPublicada:
+      type: object
+    ScoringActualizado:
+      type: object
+    ComandoProveedores:
+      type: object
+    ComandoPagos:
+      type: object
+    ComandoSiniestros:
+      type: object
+    PagoRetenido:
+      type: object
+    PagoRetencionFallida:
+      type: object
+    PagoLiberado:
+      type: object
+    PagoFallido:
+      type: object
+    PagoCompensado:
+      type: object

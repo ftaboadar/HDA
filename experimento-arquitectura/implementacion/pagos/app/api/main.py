@@ -95,6 +95,9 @@ def _pago_a_schema(p: Pago) -> PagoOut:
     )
 
 
+_consumidor_saga = None
+
+
 @app.on_event("startup")
 async def startup() -> None:
     Base.metadata.create_all(bind=engine)
@@ -104,6 +107,43 @@ async def startup() -> None:
         reglas_regionales=sorted(r.value for r in _reglas_regionales),
         pasarelas=sorted(_pasarelas),
     )
+
+    # Iniciar consumidor de saga
+    from app.infrastructure.messaging.consumidor import ConsumidorComandosSaga
+    from app.infrastructure.messaging.publicador import PublicadorPulsar
+    from app.application.commands.retener_pago import RetenerPago
+    from app.application.commands.liberar_pago import LiberarPago
+    from app.application.commands.compensar import CompensarPago
+
+    publicador = PublicadorPulsar()
+    retener_pago = RetenerPago(
+        _pago_repo, _registro_repo, _reglas_regionales, _pasarelas, publicador
+    )
+    liberar_pago = LiberarPago(_pago_repo, publicador)
+    compensar_pago = CompensarPago(_pago_repo, publicador)
+
+    global _consumidor_saga
+    _consumidor_saga = ConsumidorComandosSaga(
+        retener_pago=retener_pago,
+        liberar_pago=liberar_pago,
+        compensar_pago=compensar_pago,
+    )
+    # En segundo plano y sin tumbar la API: si Pulsar no está (ej. el
+    # docker-compose de CI, que solo trae Postgres), REST y /salud siguen vivos.
+    asyncio.create_task(_iniciar_consumidor_saga())
+
+
+async def _iniciar_consumidor_saga() -> None:
+    try:
+        await _consumidor_saga.iniciar()
+    except Exception as exc:
+        log_evento(logger, "consumidor_saga_no_disponible", error=str(exc))
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    if _consumidor_saga:
+        _consumidor_saga.detener()
 
 
 @app.get("/salud")

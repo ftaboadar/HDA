@@ -1,0 +1,297 @@
+version: "3.8"
+
+networks:
+  hda-net:
+    driver: bridge
+
+x-api-base: &api-base
+  restart: on-failure:5
+  networks:
+    - hda-net
+  environment:
+    - PULSAR_SERVICE_URL=pulsar://broker:6650
+    - BROKER_URL=pulsar://broker:6650
+
+services:
+  zookeeper:
+    image: apachepulsar/pulsar:3.2.2
+    user: "0:0"
+    networks:
+      - hda-net
+    environment:
+      - metadataStoreUrl=zk:zookeeper:2181
+      - PULSAR_MEM=-Xms256m -Xmx256m -XX:MaxDirectMemorySize=256m
+    command: >
+      bash -c "bin/apply-config-from-env.py conf/zookeeper.conf && bin/generate-zookeeper-config.sh conf/zookeeper.conf && exec bin/pulsar zookeeper"
+    healthcheck:
+      test: ["CMD", "bin/pulsar-zookeeper-ruok.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  pulsar-init:
+    image: apachepulsar/pulsar:3.2.2
+    networks:
+      - hda-net
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    command: >
+      bin/pulsar initialize-cluster-metadata --cluster cluster-hda --zookeeper zookeeper:2181 --configuration-store zookeeper:2181 --web-service-url http://broker:8080 --broker-service-url pulsar://broker:6650
+
+  bookie:
+    image: apachepulsar/pulsar:3.2.2
+    user: "0:0"
+    networks:
+      - hda-net
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+      pulsar-init:
+        condition: service_completed_successfully
+    environment:
+      - clusterName=cluster-hda
+      - zkServers=zookeeper:2181
+      - metadataServiceUri=metadata-store:zk:zookeeper:2181
+      - advertisedAddress=bookie
+      - BOOKIE_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
+    command: >
+      bash -c "bin/apply-config-from-env.py conf/bookkeeper.conf && exec bin/pulsar bookie"
+    healthcheck:
+      test: ["CMD", "bin/bookkeeper", "shell", "bookiesanity"]
+      interval: 15s
+      timeout: 15s
+      retries: 20
+      start_period: 30s
+
+  broker:
+    image: apachepulsar/pulsar:3.2.2
+    networks:
+      - hda-net
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+      pulsar-init:
+        condition: service_completed_successfully
+      bookie:
+        condition: service_started
+    environment:
+      - metadataStoreUrl=zk:zookeeper:2181
+      - zookeeperServers=zookeeper:2181
+      - clusterName=cluster-hda
+      - managedLedgerDefaultEnsembleSize=1
+      - managedLedgerDefaultWriteQuorum=1
+      - managedLedgerDefaultAckQuorum=1
+      - advertisedAddress=broker
+      - advertisedListeners=external:pulsar://127.0.0.1:6650
+      - PULSAR_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
+    ports:
+      - "6650:6650"
+      - "8080:8080"
+    command: >
+      bash -c "bin/apply-config-from-env.py conf/broker.conf && exec bin/pulsar broker"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/admin/v2/brokers/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  db-gestion:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=gestion_trabajos
+    ports:
+      - "5434:5432"
+
+  api-gestion:
+    <<: *api-base
+    build: ../gestion-de-trabajos
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-gestion:5432/gestion_trabajos
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+
+  db-proveedores:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=proveedores
+    ports:
+      - "5432:5432"
+
+  api-proveedores:
+    <<: *api-base
+    build: ../proveedores
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-proveedores:5432/proveedores
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+
+  db-pagos:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=hda_pagos
+    ports:
+      - "5435:5432"
+
+  api-pagos:
+    <<: *api-base
+    build: ../pagos
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8003:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-pagos:5432/hda_pagos
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+
+  db-reputacion:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=reputacion
+    ports:
+      - "5433:5432"
+
+  api-reputacion:
+    <<: *api-base
+    build: ../reputacion
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8004:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-reputacion:5432/reputacion
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+      
+  db-marketplace:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=marketplace
+    ports:
+      - "5436:5432"
+      
+  api-marketplace:
+    <<: *api-base
+    build: ../marketplace
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8005:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-marketplace:5432/marketplace
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+
+  db-siniestros:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=hda_siniestros
+    ports:
+      - "5437:5432"
+
+  api-siniestros:
+    <<: *api-base
+    build: ../siniestros
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8006:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-siniestros:5432/hda_siniestros
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+      
+  db-suscripciones:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=suscripciones
+    ports:
+      - "5438:5432"
+
+  api-suscripciones:
+    <<: *api-base
+    build: ../suscripciones
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8007:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-suscripciones:5432/suscripciones
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+      
+  db-scoring:
+    image: postgres:16-alpine
+    networks:
+      - hda-net
+    environment:
+      - POSTGRES_USER=hda
+      - POSTGRES_PASSWORD=hda
+      - POSTGRES_DB=scoring
+    ports:
+      - "5439:5432"
+
+  api-scoring:
+    <<: *api-base
+    build: ../scoring
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8008:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hda:hda@db-scoring:5432/scoring
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+
+  api-bff:
+    <<: *api-base
+    build: ../bff
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      - PULSAR_SERVICE_URL=pulsar://broker:6650
+
+  mock-pagos-stripe:
+    <<: *api-base
+    build: ../mocks-pagos
+    command: uvicorn app.stripe_mock:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8011:8000"
+
+  mock-pagos-mercadopago:
+    <<: *api-base
+    build: ../mocks-pagos
+    command: uvicorn app.mercadopago_mock:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8012:8000"
+
+  mock-crm:
+    <<: *api-base
+    build: ../mocks-crm
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8013:8000"
+

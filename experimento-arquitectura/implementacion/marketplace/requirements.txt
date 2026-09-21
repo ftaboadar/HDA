@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pulsar-client
+pydantic
+SQLAlchemy
+alembic

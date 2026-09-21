@@ -5,7 +5,7 @@ sin eventos). Mismo principio que `FabricaTrabajo`."""
 import uuid
 
 from app.domain.novedades.novedad import Novedad
-from app.domain.trabajo.value_objects import TrabajoId
+from app.domain.ciclo_vida.value_objects import TrabajoId
 
 
 class FabricaNovedad:

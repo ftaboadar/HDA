@@ -50,8 +50,9 @@ for i in $(seq 1 60); do
   sleep 10
 done
 docker exec hda-pulsar-broker bin/pulsar-admin tenants create hda --allowed-clusters cluster-hda || true
-for ns in gestion-trabajos proveedores reputacion marketplace siniestros suscripciones pagos scoring; do
+for ns in gestion-trabajos proveedores reputacion marketplace siniestros suscripciones pagos scoring bff; do
   docker exec hda-pulsar-broker bin/pulsar-admin namespaces create hda/$ns || true
+  docker exec hda-pulsar-broker bin/pulsar-admin namespaces set-schema-compatibility-strategy hda/$ns --compatibility BACKWARD
 done
 # Marca que scripts/desplegar-todo.sh espera antes de desplegar los servicios.
 touch /opt/pulsar-infra/namespaces-listos

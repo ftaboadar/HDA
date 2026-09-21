@@ -129,15 +129,15 @@
 > | Escenario | Campos 7-11 (Decisión/Puntos de sensibilidad/Tradeoffs/Riesgos/Rationale) |
 > |---|---|
 > | ESC-01 | ✅ Completo (agregado en esta sesión, junto con el desglose de umbrales por consumidor pedido en la tarea) |
-> | ESC-02 | ❌ Pendiente |
-> | ESC-03 | ❌ Pendiente |
-> | MOD-01 | ❌ Pendiente |
-> | MOD-02 | ❌ Pendiente |
-> | MOD-03 | ❌ Pendiente |
-> | DISP-01 | ❌ Pendiente |
+> | ESC-02 | ✅ Completo (actualizado en Fase final E5) |
+> | ESC-03 | ✅ Completo (actualizado en Fase final E5) |
+> | MOD-01 | ✅ Completo (actualizado en Fase final E5) |
+> | MOD-02 | ✅ Completo (actualizado en Fase final E5) |
+> | MOD-03 | ✅ Completo (actualizado en Fase final E5) |
+> | DISP-01 | ✅ Completo (actualizado en Fase final E5) |
 > | DISP-02 | ✅ Completo (documenta la implementación real en `implementacion/gestion-de-trabajos/`; diagramas C&C y Módulos sincronizados; abierto: corrida de carga completa en GCP) |
 > | DISP-03 | ✅ Completo (de una sesión anterior, ver `implementacion/proveedores/plan.md`) |
 >
-> Quedan **5 de 9** escenarios sin los campos 7-11 — trabajo transversal pendiente para el resto de
+> Todos los 9 escenarios cuentan con los campos 7-11 — trabajo transversal pendiente para el resto de
 > `escenarios_calidad.md`, no cubierto por el alcance de esta sesión (que se limitó a resolver el
 > hueco puntual de ESC-01 pedido explícitamente).

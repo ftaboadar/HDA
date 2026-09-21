@@ -8,7 +8,7 @@ from app.application.ports.registro_trabajos import (
     RegistroTrabajoElegible,
 )
 from app.common.db import SessionLocal
-from app.domain.trabajo.value_objects import ProveedorId, Region, TrabajoId
+from app.domain.ciclo_vida.value_objects import ProveedorId, Region, TrabajoId
 from app.infrastructure.persistence.models_db import RegistroTrabajoElegibleORM
 
 
