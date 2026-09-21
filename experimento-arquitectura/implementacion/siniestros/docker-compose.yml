@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hda
+      POSTGRES_PASSWORD: hda
+      POSTGRES_DB: hda_siniestros
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hda -d hda_siniestros"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  api:
+    build: .
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    restart: on-failure:5
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/hda_siniestros
+      PULSAR_SERVICE_URL: pulsar://pulsar:6650
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python -m app.worker.main
+    profiles:
+      - consumidor
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/hda_siniestros
+      PULSAR_SERVICE_URL: pulsar://pulsar:6650
+    depends_on:
+      postgres:
+        condition: service_healthy
