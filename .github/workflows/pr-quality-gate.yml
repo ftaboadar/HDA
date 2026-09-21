@@ -188,6 +188,21 @@ jobs:
       - name: terraform validate
         run: terraform validate
 
+  # Check agregador con el nombre ORIGINAL del job (antes de la matriz): si `main` lo exige como check
+  # obligatorio, sigue existiendo. Pasa solo si los 10 stacks de la matriz pasan.
+  terraform-resultado:
+    name: Terraform — formato y validación (infra GCP)
+    runs-on: ubuntu-latest
+    needs: terraform
+    if: always()
+    steps:
+      - name: Todos los stacks de Terraform deben pasar
+        run: |
+          if [ "${{ needs.terraform.result }}" != "success" ]; then
+            echo "Falló la validación de al menos un stack de Terraform: ${{ needs.terraform.result }}"
+            exit 1
+          fi
+
   scripts-despliegue:
     name: Scripts de despliegue — sintaxis bash
     runs-on: ubuntu-latest
