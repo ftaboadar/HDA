@@ -90,7 +90,7 @@ secretos). No despliega nada: desplegar es manual con los scripts.
 - `k6/README.md`: la tabla de resultados tiene placeholders `TBD`.
 - Imágenes de las vistas: ver `../contexto/diagramas/entrega-5/CORRECCIONES.md`.
 - Validar `../contexto/03-contextos-acotados-TO-BE.cml` con Context Mapper.
-- Diseño cerrado (A21-A27) y plan en `../contexto/16-plan-entrega-5.md`: **nada de la Entrega 5 está implementado todavía** (coordinador de saga, Saga Log, BFF, servicios nuevos, esquemas en el registry, cola de DISP-03 en Pulsar, campos de observabilidad).
+- Diseño cerrado (A21-A27) y plan en `../contexto/16-plan-entrega-5.md`: **Etapa 1 de la Entrega 5 implementada al 100%** (coordinador de saga que involucra GT, Proveedores, Marketplace y Pagos; Saga Log, BFF, servicios satélites nuevos, esquemas en el registry, etc.).
 
 ## 7. Fase 0 de la Entrega 5 (Infra y Contratos) completada
 - **Pulsar Namespace `bff`**: Verificados y agregados `hda/bff` con política `BACKWARD` tanto en GCP (`startup.sh.tpl`) como local (`pulsar-namespaces-local.sh`).
