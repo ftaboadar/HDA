@@ -1,4 +1,3 @@
-import pulsar
 from pulsar.schema import Record, String, Integer
 
 class ReputacionPublicadaMensaje(Record):
