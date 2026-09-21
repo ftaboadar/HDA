@@ -349,7 +349,10 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
         *[_crear_y_medir(f"prov-cp7-warm-{i}", "certificadora") for i in range(5)]
     )
     await asyncio.gather(
-        *[esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30) for c in calentamiento]
+        *[
+            esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30)
+            for c in calentamiento
+        ]
     )
 
     # Baseline: certificadora sana.
@@ -362,7 +365,10 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     # Esperar a que el worker termine de procesar la fase base para que
     # no compita por CPU con la fase de falla.
     await asyncio.gather(
-        *[esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30) for c in primera_mitad]
+        *[
+            esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30)
+            for c in primera_mitad
+        ]
     )
 
     await configurar_mock("certificadora", modo="caido")
@@ -441,7 +447,10 @@ async def test_cp7_carga_concurrente_con_falla_a_mitad_de_camino(api):
     # Limpieza: dejamos que todo llegue a estado terminal antes de terminar el test
     # (primera_mitad ya se esperó arriba)
     await asyncio.gather(
-        *[esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30) for c in segunda_mitad]
+        *[
+            esperar_estado(api, c["id"], {"COMPLETADA", "FALLIDA_DLQ"}, timeout_s=30)
+            for c in segunda_mitad
+        ]
     )
 
     assert not degradacion_significativa, (
