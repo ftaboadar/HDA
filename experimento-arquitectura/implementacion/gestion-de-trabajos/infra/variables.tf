@@ -125,7 +125,7 @@ variable "max_instance_count" {
     trae 20 vCPU por servicio, así que ahí el máximo posible es 10.
   EOT
   type        = number
-  default = 2
+  default     = 2
 }
 
 variable "min_instance_count" {
