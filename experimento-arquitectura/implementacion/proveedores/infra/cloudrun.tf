@@ -26,7 +26,7 @@ resource "google_cloud_run_v2_service" "api" {
       # incluir cold start, pero esa es una decisión de diseño de
       # experimento (disenador-escenarios/experimento-runner), no de infra.
       min_instance_count = 1
-      max_instance_count = 10 # auto-scaling horizontal — ver ESC-01/ESC-03
+      max_instance_count = 2 # auto-scaling horizontal — ver ESC-01/ESC-03
     }
 
     # Explícito en vez de dejarlo en el default de la API (hoy aparecía
@@ -127,7 +127,7 @@ resource "google_cloud_run_v2_service" "worker" {
       # push_handler.py). Con 1 instancia caliente, los 6 mensajes de CP-2
       # deberían resolverse sobre la misma instancia sin cold start.
       min_instance_count = 1
-      max_instance_count = 20 # debe absorber picos de hasta 4x — ver DISP-02
+      max_instance_count = 2 # debe absorber picos de hasta 4x — ver DISP-02
     }
 
     # Explícito por la misma razón que en el servicio api: evita

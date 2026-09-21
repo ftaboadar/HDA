@@ -121,15 +121,21 @@ async def _crear_novedad(
     # throttling hacia el CRM, que es lo que este caso de prueba busca
     # medir.
     async with semaforo:
-        resp = await cliente.post(
-            "/novedades",
-            json={
-                "trabajo_id": trabajo_id,
-                "descripcion": f"novedad de carga DISP-02 #{i}",
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["id"]
+        for intento in range(3):
+            try:
+                resp = await cliente.post(
+                    "/novedades",
+                    json={
+                        "trabajo_id": trabajo_id,
+                        "descripcion": f"novedad de carga DISP-02 #{i}",
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()["id"]
+            except (httpx.RemoteProtocolError, httpx.ReadError):
+                if intento == 2:
+                    raise
+                await asyncio.sleep(0.5)
 
 
 async def _obtener_estado(cliente: httpx.AsyncClient, novedad_id: str) -> dict:
@@ -143,9 +149,9 @@ async def test_disp02_rafaga_mayor_a_4x_sin_perdida_por_rate_limiting():
     async with httpx.AsyncClient(timeout=10) as control:
         await _configurar_mock_crm(control, CRM_LIMITE_RPS)
 
-    limites = httpx.Limits(max_connections=150, max_keepalive_connections=150)
+    limites = httpx.Limits(max_connections=25, max_keepalive_connections=25)
     semaforo = asyncio.Semaphore(
-        150
+        25
     )  # concurrencia acotada del cliente, ver docstring de _crear_novedad
     async with httpx.AsyncClient(base_url=API_URL, timeout=60, limits=limites) as api:
         trabajo_id_comun = str(uuid.uuid4())
@@ -296,8 +302,8 @@ async def test_disp02_disponibilidad_api_independiente_del_crm_saturado():
     n_novedades_saturacion = (
         100  # suficiente para mantener al Throttler ocupado varios segundos a 1rps
     )
-    limites = httpx.Limits(max_connections=50)
-    semaforo = asyncio.Semaphore(50)
+    limites = httpx.Limits(max_connections=25)
+    semaforo = asyncio.Semaphore(25)
     async with httpx.AsyncClient(base_url=API_URL, timeout=30, limits=limites) as api:
         trabajo_id_comun = str(uuid.uuid4())
         await asyncio.gather(

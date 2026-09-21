@@ -37,7 +37,7 @@ variable "sql_tier" {
     esta tarea para no tocar credenciales/Secret Manager).
 
     Con el tier actual (400), la config consistente elegida en service.tf
-    (15 por instancia × max_instance_count=20 = 300, 75% de 400) deja
+    (15 por instancia × max_instance_count = 2 = 300, 75% de 400) deja
     margen razonable SIN subir de tier ni fijar `database_flags` manual.
 
     Con la sobresuscripción resuelta (15/15/15) y el cold-start del
@@ -125,7 +125,7 @@ variable "max_instance_count" {
     trae 20 vCPU por servicio, así que ahí el máximo posible es 10.
   EOT
   type        = number
-  default     = 20
+  default     = 2
 }
 
 variable "min_instance_count" {

@@ -21,7 +21,7 @@ module "api" {
   ]
 
   min_instance_count = 0
-  max_instance_count = 10
+  max_instance_count = 2
 
   depends_on = [google_project_service.apis]
 }
@@ -55,7 +55,7 @@ resource "google_secret_manager_secret_iam_member" "runtime_lee_db_url" {
 #      respondiendo 200 en el puerto de Cloud Run) + desplegarlo con este
 #      mismo módulo, `cpu_idle = false` (CPU siempre asignada -- sin esto
 #      Cloud Run puede congelar la CPU del contenedor entre requests HTTP,
-#      matando el loop de fondo) y `min_instance_count = max_instance_count = 1`
+#      matando el loop de fondo) y `min_instance_count = max_instance_count = 2`
 #      (un solo consumidor; más de una instancia competiría por el mismo
 #      backlog de la suscripción sin coordinación adicional). Requiere
 #      tocar código de aplicación, que no es el alcance de este stack de

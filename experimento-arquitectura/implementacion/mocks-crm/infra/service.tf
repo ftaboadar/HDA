@@ -25,7 +25,7 @@ module "mock_crm" {
   container_port = 8000
 
   min_instance_count = 1
-  max_instance_count = 1
+  max_instance_count = 2
 
   depends_on = [google_project_service.apis]
 }

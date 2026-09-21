@@ -76,7 +76,7 @@ variable "min_instance_count" {
 
 variable "max_instance_count" {
   type    = number
-  default = 5
+  default = 2
 }
 
 variable "max_instance_request_concurrency" {
