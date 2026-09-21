@@ -107,7 +107,7 @@ module "api" {
   # Antes 0: la corrida de ESC-01 con concurrency=15 mostró "The request
   # was aborted because there was no available instance" en los logs de
   # Cloud Run durante el pico -- el autoscaler se quedó plantado en 10
-  # instancias activas (no en el max_instance_count=20 configurado, y no
+  # instancias activas (no en el max_instance_count = 2 configurado, y no
   # por ninguna cuota de proyecto/región -- se verificó
   # instance_limit_with_direct_vpc_egress_regional=100, muy por encima).
   # Causa real: al bajar concurrency de 200 a 15 para eliminar la

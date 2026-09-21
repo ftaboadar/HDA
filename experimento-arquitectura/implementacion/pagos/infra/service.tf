@@ -41,7 +41,7 @@ module "api" {
   ]
 
   min_instance_count = 0
-  max_instance_count = 10
+  max_instance_count = 2
 
   depends_on = [google_project_service.apis]
 }
