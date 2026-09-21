@@ -1,8 +1,12 @@
-from src.scoring.infraestructura.repositorios.repositorio_perfil import RepositorioPerfil
+from src.scoring.infraestructura.repositorios.repositorio_perfil import (
+    RepositorioPerfil,
+)
+
 
 class QueryObtenerScoring:
     def __init__(self, cliente_id: str):
         self.cliente_id = cliente_id
+
 
 class HandlerObtenerScoring:
     def __init__(self, repositorio: RepositorioPerfil):
@@ -13,5 +17,5 @@ class HandlerObtenerScoring:
         return {
             "cliente_id": perfil.cliente_id,
             "puntaje": perfil.puntaje,
-            "historial_trabajos": perfil.historial_trabajos
+            "historial_trabajos": perfil.historial_trabajos,
         }

@@ -4,6 +4,7 @@ from app.domain.seedwork.aggregate_root import AggregateRoot
 from app.domain.workflow.value_objects import EstadoSaga, PasoSaga
 from app.domain.ciclo_vida.value_objects import TrabajoId
 
+
 class SagaInstancia(AggregateRoot):
     def __init__(
         self,
@@ -34,4 +35,3 @@ class SagaInstancia(AggregateRoot):
     def compensar(self) -> None:
         self.estado = EstadoSaga.COMPENSADA
         self.actualizada_en = datetime.now(timezone.utc)
-

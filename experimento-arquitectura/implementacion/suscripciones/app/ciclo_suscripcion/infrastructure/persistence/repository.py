@@ -5,6 +5,7 @@ from app.ciclo_suscripcion.domain.entities import Suscripcion, CicloSuscripcion
 from app.ciclo_suscripcion.domain.value_objects import Franja, TipoBloqueFranja
 from .models import SuscripcionModel, CicloSuscripcionModel
 
+
 class SuscripcionRepositorySQLAlchemy(SuscripcionRepository):
     def __init__(self, session: Session):
         self.session = session
@@ -13,12 +14,14 @@ class SuscripcionRepositorySQLAlchemy(SuscripcionRepository):
         model = self.session.query(SuscripcionModel).filter_by(id=id).first()
         if not model:
             return None
-        
+
         s = Suscripcion(
             id=model.id,
             cliente_id=model.cliente_id,
             proveedor_continuo_id=model.proveedor_continuo_id,
-            franja=Franja(dia_semana=model.dia_semana, bloque=TipoBloqueFranja(model.bloque))
+            franja=Franja(
+                dia_semana=model.dia_semana, bloque=TipoBloqueFranja(model.bloque)
+            ),
         )
         s.ciclos = [
             CicloSuscripcion(
@@ -27,17 +30,20 @@ class SuscripcionRepositorySQLAlchemy(SuscripcionRepository):
                 numero_ciclo=c.numero_ciclo,
                 proveedor_id=c.proveedor_id,
                 fecha_generacion=c.fecha_generacion,
-                completado=c.completado
-            ) for c in model.ciclos
+                completado=c.completado,
+            )
+            for c in model.ciclos
         ]
         return s
 
     def save(self, suscripcion: Suscripcion):
-        model = self.session.query(SuscripcionModel).filter_by(id=suscripcion.id).first()
+        model = (
+            self.session.query(SuscripcionModel).filter_by(id=suscripcion.id).first()
+        )
         if not model:
             model = SuscripcionModel(id=suscripcion.id)
             self.session.add(model)
-        
+
         model.cliente_id = suscripcion.cliente_id
         model.dia_semana = suscripcion.franja.dia_semana
         model.bloque = suscripcion.franja.bloque.value
@@ -57,7 +63,7 @@ class SuscripcionRepositorySQLAlchemy(SuscripcionRepository):
                     numero_ciclo=ciclo.numero_ciclo,
                     proveedor_id=ciclo.proveedor_id,
                     fecha_generacion=ciclo.fecha_generacion,
-                    completado=ciclo.completado
+                    completado=ciclo.completado,
                 )
                 model.ciclos.append(c_model)
         self.session.flush()

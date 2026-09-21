@@ -7,6 +7,7 @@ from app.common.logging_utils import configurar_logging
 
 logger = configurar_logging("application.commands.compensar_pago")
 
+
 class CompensarPago:
     def __init__(self, pago_repo: IPagoRepository, publicador: PublicadorPulsar):
         self._pago_repo = pago_repo
@@ -14,39 +15,43 @@ class CompensarPago:
 
     async def ejecutar(self, trabajo_id: str) -> None:
         from app.infrastructure.messaging.esquemas import PagoCompensadoMensaje
-        
-        pagos = await asyncio.to_thread(self._pago_repo.obtener_por_trabajo, TrabajoId.desde_str(trabajo_id))
+
+        pagos = await asyncio.to_thread(
+            self._pago_repo.obtener_por_trabajo, TrabajoId.desde_str(trabajo_id)
+        )
         if not pagos:
-            logger.warning(f"No se encontró pago para trabajo {trabajo_id} al compensar")
+            logger.warning(
+                f"No se encontró pago para trabajo {trabajo_id} al compensar"
+            )
             return
-            
+
         pago = pagos[0]
-        
+
         # En la realidad llamamos a la pasarela externa para hacer el refund.
         # Aquí simulamos y registramos la transaccion.
         from app.infrastructure.persistence.models_db import TransaccionORM
         from app.common.db import SessionLocal
-        
+
         with SessionLocal() as db:
-            tx = TransaccionORM(
-                pago_id=pago.id,
-                tipo="COMPENSACION",
-                estado="EXITOSA"
-            )
+            tx = TransaccionORM(pago_id=pago.id, tipo="COMPENSACION", estado="EXITOSA")
             db.add(tx)
             db.commit()
-            
+
         pago.estado = "COMPENSADO"
         await asyncio.to_thread(self._pago_repo.guardar, pago)
-            
-        evento_msg = PagoCompensadoMensaje(
-            pago_id=str(pago.id),
-            trabajo_id=trabajo_id
+
+        evento_msg = PagoCompensadoMensaje(pago_id=str(pago.id), trabajo_id=trabajo_id)
+        self._publicador.publicar_evento(
+            evento_msg,
+            "hda/pagos/pago.compensado",
+            "PagoCompensado",
+            correlation_id=trabajo_id,
         )
-        self._publicador.publicar_evento(evento_msg, "hda/pagos/pago.compensado", "PagoCompensado", correlation_id=trabajo_id)
+
 
 class PagoNoEncontrado(Exception):
     pass
+
 
 class Compensar:
     def __init__(self, pago_repo: IPagoRepository) -> None:
@@ -61,11 +66,13 @@ class Compensar:
 
         pago.compensar()
         await asyncio.to_thread(self._pago_repo.guardar, pago)
-        
+
         from app.application.dispatcher_eventos_dominio import despachar
+
         await despachar(pago.recoger_eventos())
 
         from app.common.logging_utils import log_evento
+
         log_evento(
             logger,
             "pago_compensado",

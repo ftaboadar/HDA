@@ -2,9 +2,11 @@ from pydantic import BaseModel
 import uuid
 from typing import List
 
+
 class EventoDominio(BaseModel):
     id: str
     tipo: str
+
 
 class PerfilCrediticio(BaseModel):
     id: str
@@ -19,7 +21,7 @@ class PerfilCrediticio(BaseModel):
         else:
             self.puntaje -= 5
         self.historial_trabajos += 1
-        
+
         self.eventos.append(
             EventoDominio(id=str(uuid.uuid4()), tipo="ScoringActualizado")
         )

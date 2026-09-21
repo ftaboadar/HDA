@@ -28,9 +28,19 @@ class RetenerPago:
         self._pasarelas = pasarelas
         self._publicador = publicador
 
-    async def ejecutar(self, trabajo_id: str, proveedor_id: str, monto: str, moneda: str, region: str, pasarela: str) -> None:
-        
-        from app.infrastructure.messaging.esquemas import PagoRetenidoMensaje, PagoRetencionFallidaMensaje
+    async def ejecutar(
+        self,
+        trabajo_id: str,
+        proveedor_id: str,
+        monto: str,
+        moneda: str,
+        region: str,
+        pasarela: str,
+    ) -> None:
+        from app.infrastructure.messaging.esquemas import (
+            PagoRetenidoMensaje,
+            PagoRetencionFallidaMensaje,
+        )
 
         try:
             # En la saga, al retener pago puede que el trabajo no exista todavía en el registro local,
@@ -45,8 +55,10 @@ class RetenerPago:
             # Strategy
             regla = self._reglas_regionales.get(pago.region)
             if not regla:
-                raise ValueError(f"No hay ReglaRegional configurada para la región {region}")
-            
+                raise ValueError(
+                    f"No hay ReglaRegional configurada para la región {region}"
+                )
+
             pasarela_impl = self._pasarelas.get(pasarela)
             if not pasarela_impl:
                 raise ValueError(f"Pasarela desconocida: {pasarela}")
@@ -59,17 +71,13 @@ class RetenerPago:
             # (en un sistema real se llama a la pasarela)
             pago.marcar_exitoso("ref_retencion_" + str(uuid.uuid4())[:8])
             await asyncio.to_thread(self._pago_repo.guardar, pago)
-            
+
             from app.infrastructure.persistence.models_db import TransaccionORM
             from app.common.db import SessionLocal
-            
+
             # Registrar transaccion de RETENCION
             with SessionLocal() as db:
-                tx = TransaccionORM(
-                    pago_id=pago.id,
-                    tipo="RETENCION",
-                    estado="EXITOSA"
-                )
+                tx = TransaccionORM(pago_id=pago.id, tipo="RETENCION", estado="EXITOSA")
                 db.add(tx)
                 db.commit()
 
@@ -79,16 +87,24 @@ class RetenerPago:
                 monto=float(monto),
                 moneda=moneda,
                 pasarela=pasarela,
-                regla_regional=type(regla).__name__
+                regla_regional=type(regla).__name__,
             )
-            self._publicador.publicar_evento(evento_msg, "hda/pagos/pago.retenido", "PagoRetenido", correlation_id=trabajo_id)
+            self._publicador.publicar_evento(
+                evento_msg,
+                "hda/pagos/pago.retenido",
+                "PagoRetenido",
+                correlation_id=trabajo_id,
+            )
 
         except Exception as e:
             # Fallo en la retención
             logger.error(f"Error reteniendo pago: {e}")
             evento_fallo = PagoRetencionFallidaMensaje(
-                pago_id="N/A",
-                trabajo_id=trabajo_id,
-                motivo=str(e)
+                pago_id="N/A", trabajo_id=trabajo_id, motivo=str(e)
             )
-            self._publicador.publicar_evento(evento_fallo, "hda/pagos/pago.retencion-fallida", "PagoRetencionFallida", correlation_id=trabajo_id)
+            self._publicador.publicar_evento(
+                evento_fallo,
+                "hda/pagos/pago.retencion-fallida",
+                "PagoRetencionFallida",
+                correlation_id=trabajo_id,
+            )

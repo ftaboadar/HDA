@@ -1,13 +1,16 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class RedPermitida:
     homologados: list[str]
+
 
 @dataclass
 class MontoMaximo:
     valor: float
     moneda: str
+
 
 @dataclass
 class ReglaDeAprobacion:

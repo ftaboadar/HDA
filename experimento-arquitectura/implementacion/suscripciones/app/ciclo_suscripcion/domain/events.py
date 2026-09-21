@@ -3,6 +3,7 @@ from datetime import datetime
 import uuid
 from app.seedwork.domain_event import DomainEvent
 
+
 @dataclass(kw_only=True)
 class SuscripcionCreada(DomainEvent):
     id_evento: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -11,6 +12,7 @@ class SuscripcionCreada(DomainEvent):
     cliente_id: str
     dia_semana: int
     bloque: str
+
 
 @dataclass(kw_only=True)
 class CicloSuscripcionGenerado(DomainEvent):
@@ -22,4 +24,3 @@ class CicloSuscripcionGenerado(DomainEvent):
     es_primer_ciclo: bool
     dia_semana: int
     bloque: str
-

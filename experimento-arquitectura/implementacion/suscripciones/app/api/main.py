@@ -2,12 +2,22 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.common.db import SessionLocal, Base, engine
 from pydantic import BaseModel
-from app.ciclo_suscripcion.application.commands.iniciar_suscripcion import IniciarSuscripcionCommand, ejecutar_iniciar_suscripcion
-from app.ciclo_suscripcion.infrastructure.persistence.repository import SuscripcionRepositorySQLAlchemy
+from app.ciclo_suscripcion.application.commands.iniciar_suscripcion import (
+    IniciarSuscripcionCommand,
+    ejecutar_iniciar_suscripcion,
+)
+from app.ciclo_suscripcion.application.queries.consultar_suscripcion import (
+    ConsultarSuscripcionQuery,
+    ejecutar_consultar_suscripcion,
+)
+from app.ciclo_suscripcion.infrastructure.persistence.repository import (
+    SuscripcionRepositorySQLAlchemy,
+)
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Suscripciones API")
+
 
 def get_db():
     db = SessionLocal()
@@ -16,29 +26,28 @@ def get_db():
     finally:
         db.close()
 
+
 @app.get("/salud")
 def salud():
     return {"status": "ok", "servicio": "suscripciones"}
+
 
 class IniciarSuscripcionReq(BaseModel):
     cliente_id: str
     dia_semana: int
     bloque: str
 
+
 @app.post("/suscripciones", status_code=202)
 def iniciar_suscripcion(req: IniciarSuscripcionReq, db: Session = Depends(get_db)):
     repo = SuscripcionRepositorySQLAlchemy(db)
     cmd = IniciarSuscripcionCommand(
-        cliente_id=req.cliente_id,
-        dia_semana=req.dia_semana,
-        bloque=req.bloque
+        cliente_id=req.cliente_id, dia_semana=req.dia_semana, bloque=req.bloque
     )
     suscripcion_id = ejecutar_iniciar_suscripcion(cmd, repo)
     db.commit()
     return {"suscripcion_id": suscripcion_id}
 
-
-from app.ciclo_suscripcion.application.queries.consultar_suscripcion import ConsultarSuscripcionQuery, ejecutar_consultar_suscripcion
 
 @app.get("/suscripciones/{id}")
 def consultar_suscripcion(id: str, db: Session = Depends(get_db)):
@@ -47,7 +56,7 @@ def consultar_suscripcion(id: str, db: Session = Depends(get_db)):
     suscripcion = ejecutar_consultar_suscripcion(query, repo)
     if not suscripcion:
         raise HTTPException(status_code=404, detail="Suscripción no encontrada")
-    
+
     return {
         "id": suscripcion.id,
         "cliente_id": suscripcion.cliente_id,
@@ -59,7 +68,8 @@ def consultar_suscripcion(id: str, db: Session = Depends(get_db)):
                 "id": c.id,
                 "numero_ciclo": c.numero_ciclo,
                 "proveedor_id": c.proveedor_id,
-                "completado": c.completado
-            } for c in suscripcion.ciclos
-        ]
+                "completado": c.completado,
+            }
+            for c in suscripcion.ciclos
+        ],
     }

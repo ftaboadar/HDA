@@ -64,6 +64,6 @@ class TransaccionORM(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     pago_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    tipo = Column(String, nullable=False) # RETENCION, LIBERACION, COMPENSACION
-    estado = Column(String, nullable=False) # EXITOSA, FALLIDA
+    tipo = Column(String, nullable=False)  # RETENCION, LIBERACION, COMPENSACION
+    estado = Column(String, nullable=False)  # EXITOSA, FALLIDA
     fecha = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)

@@ -1,5 +1,6 @@
 from pulsar.schema import Record, String, Float
 
+
 class PublicarElegiblesRecord(Record):
     comando_id = String()
     saga_id = String()
@@ -7,13 +8,15 @@ class PublicarElegiblesRecord(Record):
     origen = String()
     origen_id = String()
 
+
 class ElegiblesCalculadosRecord(Record):
     evento_id = String()
     saga_id = String()
     correlation_id = String()
     origen = String()
     origen_id = String()
-    proveedores = String() # JSON array string with [{id, score}, ...]
+    proveedores = String()  # JSON array string with [{id, score}, ...]
+
 
 class ReservarFranjaRecord(Record):
     comando_id = String()
@@ -24,6 +27,7 @@ class ReservarFranjaRecord(Record):
     fecha_franja = String()
     bloque = String()
 
+
 class FranjaReservadaRecord(Record):
     evento_id = String()
     saga_id = String()
@@ -31,6 +35,7 @@ class FranjaReservadaRecord(Record):
     reserva_id = String()
     monto = Float()
     moneda = String()
+
 
 class FranjaRechazadaRecord(Record):
     evento_id = String()

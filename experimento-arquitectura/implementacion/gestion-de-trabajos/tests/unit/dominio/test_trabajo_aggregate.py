@@ -16,7 +16,7 @@ def _crear_trabajo():
     return FabricaTrabajo.crear(
         monto=Decimal(100000),
         region=Region.COLOMBIA,
-        proveedor_id=ProveedorId(str(uuid.uuid4()))
+        proveedor_id=ProveedorId(str(uuid.uuid4())),
     )
 
 

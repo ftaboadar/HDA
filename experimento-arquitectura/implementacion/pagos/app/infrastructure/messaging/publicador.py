@@ -9,6 +9,7 @@ logger = configurar_logging("infrastructure.messaging.publicador_pulsar")
 
 VERSION_ESQUEMA = "1"
 
+
 class PublicadorPulsar:
     def __init__(self, service_url: str = None) -> None:
         self._service_url = service_url or settings.pulsar_service_url
@@ -22,10 +23,13 @@ class PublicadorPulsar:
         import pulsar
         from pulsar.schema import JsonSchema
         from app.infrastructure.messaging.esquemas import (
-            PagoRetenidoMensaje, PagoRetencionFallidaMensaje,
-            PagoLiberadoMensaje, PagoFallidoMensaje, PagoCompensadoMensaje
+            PagoRetenidoMensaje,
+            PagoRetencionFallidaMensaje,
+            PagoLiberadoMensaje,
+            PagoFallidoMensaje,
+            PagoCompensadoMensaje,
         )
-        
+
         if self._cliente is None:
             self._cliente = pulsar.Client(self._service_url)
 
@@ -41,25 +45,31 @@ class PublicadorPulsar:
             schema = JsonSchema(PagoFallidoMensaje)
         elif "pago.compensado" in topic:
             schema = JsonSchema(PagoCompensadoMensaje)
-            
+
         productor = self._cliente.create_producer(topic, schema=schema)
         self._productores[topic] = productor
         return productor
 
-    def publicar_evento(self, evento_registro: Any, topic: str, tipo_evento: str, correlation_id: str = "") -> None:
+    def publicar_evento(
+        self,
+        evento_registro: Any,
+        topic: str,
+        tipo_evento: str,
+        correlation_id: str = "",
+    ) -> None:
         productor = self._asegurar_productor(topic)
-        
+
         inicio = time.perf_counter()
-        
+
         message_id = publicar_mensaje_generico(
             productor=productor,
             mensaje=evento_registro,
             tipo_evento=tipo_evento,
             productor_nombre="pagos",
             correlation_id=correlation_id,
-            version_esquema=VERSION_ESQUEMA
+            version_esquema=VERSION_ESQUEMA,
         )
-        
+
         log_evento(
             logger,
             "evento_publicado",

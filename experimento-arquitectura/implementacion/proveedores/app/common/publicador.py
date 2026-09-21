@@ -259,7 +259,7 @@ class PublicadorPulsar(Publicador):
 
     async def publicar_comando_saga(self, topic: str, mensaje_record, tipo_evento: str) -> None:
         from pulsar.schema import JsonSchema
-        
+
         productor = self._cliente.create_producer(topic, schema=JsonSchema(type(mensaje_record)))
         propiedades = {
             "tipo_evento": tipo_evento,

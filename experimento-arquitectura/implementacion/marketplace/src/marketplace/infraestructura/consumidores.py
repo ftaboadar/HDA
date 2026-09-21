@@ -1,12 +1,16 @@
 import pulsar
 from pulsar.schema import JsonSchema
 from marketplace.infraestructura.schema.v1.eventos import ElegiblesPublicadosPayload
-import json
+
 
 def consumir_elegibles(broker_url: str):
     client = pulsar.Client(broker_url)
-    consumer = client.subscribe('persistent://public/default/elegibles-publicados', subscription_name='marketplace-sub', schema=JsonSchema(ElegiblesPublicadosPayload))
-    
+    consumer = client.subscribe(
+        "persistent://public/default/elegibles-publicados",
+        subscription_name="marketplace-sub",
+        schema=JsonSchema(ElegiblesPublicadosPayload),
+    )
+
     while True:
         msg = consumer.receive()
         try:

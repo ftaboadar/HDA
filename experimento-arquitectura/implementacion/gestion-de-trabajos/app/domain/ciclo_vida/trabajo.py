@@ -69,18 +69,24 @@ class Trabajo(AggregateRoot):
 
     def iniciar_workflow(self) -> None:
         if self.estado != EstadoTrabajo.SOLICITADO:
-            raise ErrorTransicionInvalida(f"Transición inválida de {self.estado} a ESPERANDO_ELEGIBLES")
+            raise ErrorTransicionInvalida(
+                f"Transición inválida de {self.estado} a ESPERANDO_ELEGIBLES"
+            )
         self.estado = EstadoTrabajo.ESPERANDO_ELEGIBLES
-        
+
     def asignar_proveedor(self, proveedor_id: ProveedorId) -> None:
         if self.estado != EstadoTrabajo.ESPERANDO_ELEGIBLES:
-            raise ErrorTransicionInvalida(f"Transición inválida de {self.estado} a ASIGNADO")
+            raise ErrorTransicionInvalida(
+                f"Transición inválida de {self.estado} a ASIGNADO"
+            )
         self.proveedor_id = proveedor_id
         self.estado = EstadoTrabajo.ASIGNADO
-        
+
     def iniciar_curso(self) -> None:
         if self.estado != EstadoTrabajo.ASIGNADO:
-            raise ErrorTransicionInvalida(f"Transición inválida de {self.estado} a EN_CURSO")
+            raise ErrorTransicionInvalida(
+                f"Transición inválida de {self.estado} a EN_CURSO"
+            )
         self.estado = EstadoTrabajo.EN_CURSO
 
     def finalizar(self) -> None:
@@ -88,7 +94,11 @@ class Trabajo(AggregateRoot):
         finalizarse otra vez — evita, por ejemplo, que un reintento del
         cliente HTTP dispare dos veces el evento de integración
         `trabajos.finalizado` sobre el mismo trabajo."""
-        if self.estado in (EstadoTrabajo.FINALIZADO, EstadoTrabajo.PAGADO, EstadoTrabajo.CANCELADO):
+        if self.estado in (
+            EstadoTrabajo.FINALIZADO,
+            EstadoTrabajo.PAGADO,
+            EstadoTrabajo.CANCELADO,
+        ):
             raise ErrorTransicionInvalida(
                 f"El trabajo {self.id} ya está en un estado final ({self.estado}), no puede finalizarse"
             )
@@ -106,15 +116,29 @@ class Trabajo(AggregateRoot):
 
     def pagar(self) -> None:
         if self.estado != EstadoTrabajo.FINALIZADO:
-            raise ErrorTransicionInvalida(f"Transición inválida de {self.estado} a PAGADO")
+            raise ErrorTransicionInvalida(
+                f"Transición inválida de {self.estado} a PAGADO"
+            )
         self.estado = EstadoTrabajo.PAGADO
 
     def disputar(self) -> None:
-        if self.estado not in (EstadoTrabajo.FINALIZADO, EstadoTrabajo.ASIGNADO, EstadoTrabajo.EN_CURSO):
-            raise ErrorTransicionInvalida(f"Transición inválida de {self.estado} a EN_DISPUTA")
+        if self.estado not in (
+            EstadoTrabajo.FINALIZADO,
+            EstadoTrabajo.ASIGNADO,
+            EstadoTrabajo.EN_CURSO,
+        ):
+            raise ErrorTransicionInvalida(
+                f"Transición inválida de {self.estado} a EN_DISPUTA"
+            )
         self.estado = EstadoTrabajo.EN_DISPUTA
 
     def cancelar(self) -> None:
-        if self.estado in (EstadoTrabajo.FINALIZADO, EstadoTrabajo.PAGADO, EstadoTrabajo.CANCELADO):
-            raise ErrorTransicionInvalida(f"Transición inválida de {self.estado} a CANCELADO")
+        if self.estado in (
+            EstadoTrabajo.FINALIZADO,
+            EstadoTrabajo.PAGADO,
+            EstadoTrabajo.CANCELADO,
+        ):
+            raise ErrorTransicionInvalida(
+                f"Transición inválida de {self.estado} a CANCELADO"
+            )
         self.estado = EstadoTrabajo.CANCELADO

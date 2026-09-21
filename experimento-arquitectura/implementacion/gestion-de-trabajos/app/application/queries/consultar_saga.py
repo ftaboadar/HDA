@@ -1,7 +1,10 @@
 import uuid
 from typing import Optional
-from app.infrastructure.persistence.saga_repository_sqlalchemy import SagaRepositorySQLAlchemy
+from app.infrastructure.persistence.saga_repository_sqlalchemy import (
+    SagaRepositorySQLAlchemy,
+)
 from app.domain.workflow.saga import SagaInstancia
+
 
 class ConsultarSaga:
     def __init__(self, repo: SagaRepositorySQLAlchemy):

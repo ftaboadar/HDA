@@ -1,6 +1,7 @@
 import logging
 import json
 
+
 class ObservabilityFormatter(logging.Formatter):
     def format(self, record):
         log_record = {
@@ -17,17 +18,19 @@ class ObservabilityFormatter(logging.Formatter):
         }
         return json.dumps(log_record)
 
+
 def setup_logger(name, log_level=logging.INFO):
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
-    
+
     if not logger.handlers:
         handler = logging.StreamHandler()
         formatter = ObservabilityFormatter()
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        
+
     return logger
+
 
 # Ejemplo de uso:
 # logger = setup_logger("app")

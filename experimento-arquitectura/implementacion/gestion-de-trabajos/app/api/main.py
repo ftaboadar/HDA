@@ -34,6 +34,7 @@ from fastapi import FastAPI, HTTPException, Request
 from app.application.commands.crear_trabajo import CrearTrabajo
 from app.application.commands.publicar_novedad import PublicarNovedad
 from app.application.queries.consultar_novedad import ConsultarNovedad
+from app.application.queries.consultar_saga import ConsultarSaga
 from app.application.queries.consultar_trabajo import ConsultarTrabajo
 from app.common.config import settings
 from app.common.db import Base, engine
@@ -59,6 +60,9 @@ from app.infrastructure.persistence.novedad_repository_sqlalchemy import (
 )
 from app.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import (
     RegistroTrabajosRepositorySQLAlchemy,
+)
+from app.infrastructure.persistence.saga_repository_sqlalchemy import (
+    SagaRepositorySQLAlchemy,
 )
 from app.infrastructure.persistence.trabajo_repository_sqlalchemy import (
     TrabajoRepositorySQLAlchemy,
@@ -179,6 +183,7 @@ async def salud():
 @app.post("/trabajos", response_model=TrabajoIdOut, status_code=201)
 async def crear_trabajo(payload: TrabajoCreate):
     import os
+
     if os.getenv("HABILITAR_ATAJO_CARGA") != "true":
         raise HTTPException(status_code=403, detail="Ruta de atajo deshabilitada")
     comando = CrearTrabajo(_trabajo_repo, _publicador, _registro_repo)
@@ -245,9 +250,9 @@ async def obtener_novedad(novedad_id: uuid.UUID):
         creado_en=novedad.creado_en,
     )
 
-from app.application.queries.consultar_saga import ConsultarSaga
-from app.infrastructure.persistence.saga_repository_sqlalchemy import SagaRepositorySQLAlchemy
+
 _saga_repo = SagaRepositorySQLAlchemy()
+
 
 @app.get("/sagas/{saga_id}")
 async def obtener_saga(saga_id: uuid.UUID):
@@ -261,5 +266,5 @@ async def obtener_saga(saga_id: uuid.UUID):
         "estado": saga.estado.value,
         "paso_actual": saga.paso_actual.value,
         "creado_en": saga.iniciada_en,
-        "actualizado_en": saga.actualizada_en
+        "actualizado_en": saga.actualizada_en,
     }

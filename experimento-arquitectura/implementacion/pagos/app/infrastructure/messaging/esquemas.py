@@ -1,9 +1,11 @@
 import uuid
 from pulsar.schema import Record, String, Float
 
+
 class PagoMensajeBase(Record):
     pago_id = String()
     trabajo_id = String()
+
 
 class PagoRetenidoMensaje(PagoMensajeBase):
     monto = Float()
@@ -11,18 +13,23 @@ class PagoRetenidoMensaje(PagoMensajeBase):
     pasarela = String()
     regla_regional = String()
 
+
 class PagoRetencionFallidaMensaje(PagoMensajeBase):
     motivo = String()
+
 
 class PagoLiberadoMensaje(PagoMensajeBase):
     monto = Float()
     moneda = String()
 
+
 class PagoFallidoMensaje(PagoMensajeBase):
     motivo = String()
 
+
 class PagoCompensadoMensaje(PagoMensajeBase):
     pass
+
 
 def publicar_mensaje_generico(
     productor,
@@ -31,7 +38,7 @@ def publicar_mensaje_generico(
     productor_nombre: str,
     correlation_id: str,
     causation_id: str = None,
-    version_esquema: str = "1"
+    version_esquema: str = "1",
 ) -> str:
     propiedades = {
         "tipo_evento": tipo_evento,
@@ -43,5 +50,5 @@ def publicar_mensaje_generico(
     }
     if causation_id:
         propiedades["causation_id"] = str(causation_id)
-        
+
     return productor.send(mensaje, properties=propiedades)

@@ -131,10 +131,10 @@ class PublicadorPulsar(IPublicador):
     async def publicar_comando(self, comando: Any) -> None:
         """Publica un ComandoSaga en el tópico correspondiente."""
         self._asegurar_productor()
-        
+
         # Mapeo simple de tipo de comando a tópico (solo para esta prueba)
         tipo = type(comando).__name__
-        topic = self._topic # por defecto
+        topic = self._topic  # por defecto
         if tipo == "PublicarElegibles":
             topic = "hda/proveedores/elegibles"
         elif tipo == "ReservarFranja":
@@ -147,30 +147,30 @@ class PublicadorPulsar(IPublicador):
             topic = "hda/proveedores/franja.liberar"
         elif tipo == "CompensarPago":
             topic = "hda/pagos/pago.compensar"
-            
+
         import dataclasses
+
         if dataclasses.is_dataclass(comando):
             mensaje = dataclasses.asdict(comando)
         else:
             mensaje = vars(comando)
-            
+
         propiedades = {
             "tipo_evento": tipo,
             "version_esquema": "1",
             "content_type": "application/json",
             "productor": "gestion-de-trabajos",
         }
-        
+
         loop = asyncio.get_event_loop()
         import pulsar
+
         cliente = pulsar.Client(self._service_url)
         prod = cliente.create_producer(topic)
         try:
             await loop.run_in_executor(
                 None,
-                lambda: prod.send(
-                    json.dumps(mensaje).encode(), properties=propiedades
-                ),
+                lambda: prod.send(json.dumps(mensaje).encode(), properties=propiedades),
             )
         finally:
             cliente.close()
