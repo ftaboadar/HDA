@@ -13,7 +13,13 @@ from app.domain.pagos.eventos import (
 )
 from app.domain.pagos.fabrica import FabricaPago
 from app.domain.pagos.pago import ErrorTransicionInvalidaPago
-from app.domain.pagos.value_objects import Dinero, EstadoPago, Pasarela, Region, TrabajoId
+from app.domain.pagos.value_objects import (
+    Dinero,
+    EstadoPago,
+    Pasarela,
+    Region,
+    TrabajoId,
+)
 
 
 def _crear_pago():

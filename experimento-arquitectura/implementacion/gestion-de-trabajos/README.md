@@ -1,9 +1,12 @@
 # Gestión de Trabajos
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** En la Entrega 5 este servicio se reorganiza en los módulos **Ciclo de Vida, Motor de Workflow, Novedades e Integraciones Externas**, con la máquina de estados completa del Trabajo y consumidores Pulsar (worker). Ver [`../../contexto/15-arquitectura-entrega-5.md`](../../contexto/15-arquitectura-entrega-5.md) §4-§6.
+
+
 **Estado: esqueleto inicial (skeleton), no implementación completa.** Este documento es honesto a
 propósito sobre qué falta — lo termina una persona real del equipo (ver sección "Qué falta" al
 final). Construido según el runbook de Frans en
-`experimento-arquitectura/contexto/12-plan-entrega-4.md` (sección 8) y las reglas de
+`experimento-arquitectura/contexto/historico/12-plan-entrega-4.md` (sección 8) y las reglas de
 `.claude/agents/implementador-ddd.md`.
 
 **Separación de Pagos (posterior a la construcción inicial de este servicio)**: el módulo ACL de

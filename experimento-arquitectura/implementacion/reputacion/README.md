@@ -1,7 +1,10 @@
 # Reputación — Entrega 4 (Event Sourcing)
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** En la Entrega 5 Reputación deja de solo auditar `trabajos.finalizado`: habilita la calificación del trabajo, publica `ReputacionPublicada` y consume `ScoringActualizado`; su consumidor se despliega como `worker` en Cloud Run. Ver [`../../contexto/15-arquitectura-entrega-5.md`](../../contexto/15-arquitectura-entrega-5.md) y [`../CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md`](../CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md) §5.
+
+
 Microservicio propio de Hogar de los Alpes, 4to servicio de la transacción larga (ver
-`experimento-arquitectura/contexto/12-plan-entrega-4.md`, secciones 1 y 6). Consume
+`experimento-arquitectura/contexto/historico/12-plan-entrega-4.md`, secciones 1 y 6). Consume
 `trabajos.finalizado` (evento de INTEGRACIÓN publicado por Gestión de Trabajos vía Apache Pulsar) y
 expone el agregado `PerfilReputacion`, calificado por proveedor.
 

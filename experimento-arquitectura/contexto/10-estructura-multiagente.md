@@ -1,5 +1,8 @@
 # Estructura multiagéntica — Entrega 3
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** Los roles siguen vigentes; sus archivos en `.claude/agents/` ya apuntan a la Entrega 5. Donde este documento hable solo de la Entrega 3 o de un único servicio DDD, léase *los 8 microservicios del journey* (ver [`15-arquitectura-entrega-5.md`](15-arquitectura-entrega-5.md)).
+
+
 Hogar de los Alpes (HdA) — cómo se garantiza calidad del entregable y del producto, y cómo se valida
 o refuta la hipótesis del experimento de arquitectura.
 

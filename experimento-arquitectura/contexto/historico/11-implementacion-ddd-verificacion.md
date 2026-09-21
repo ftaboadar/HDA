@@ -1,9 +1,12 @@
 # 11. Implementación DDD del servicio de Verificación (Regla 5, 45pt)
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** Documento **histórico** (Entrega 3). La §7 (tercer adaptador Kafka/Redpanda) **nunca se construyó**: el bus entre servicios es Apache Pulsar y la cola de Verificación sigue en Pub/Sub. Vigente: [`15-arquitectura-entrega-5.md`](../15-arquitectura-entrega-5.md)
+
+
 > **Nota de rutas** (corregidas tras la reorganización de `experimento-arquitectura/` en
 > `contexto/` vs. `implementacion/<experimento>/` — ver `10-estructura-multiagente.md`): este
 > documento vive en `experimento-arquitectura/contexto/`, junto a `escenarios_calidad.md`,
-> `REGLAS-DURAS-rubrica-entrega-3.md`, `03-contextos-acotados-TO-BE.cml` y
+> `REGLAS-DURAS-rubrica-entrega-3.md`, `../03-contextos-acotados-TO-BE.cml` y
 > `07-vista-informacion.puml` (referenciados abajo por nombre simple, como siblings). El código del
 > experimento vive en `experimento-arquitectura/implementacion/proveedores/` — todas las rutas `app/...`
 > de este documento (`app/domain/`, `app/api/main.py`, `app/common/models_db.py`, etc.) son
@@ -29,7 +32,7 @@ actualizado para reflejarlo — no hay ambigüedad pendiente entre diagrama y c�
 
 ## 1. Alcance
 
-Bounded Context: **`ContextoProveedores`** (`03-contextos-acotados-TO-BE.cml`, línea ~1:
+Bounded Context: **`ContextoProveedores`** (`../03-contextos-acotados-TO-BE.cml`, línea ~1:
 *"Dueño único del registro y verificación. Publica eventos de habilitación."*). Un solo agregado
 raíz para esta pieza: `Verificacion` — mapea 1:1 con la tabla `verificaciones` que ya existe en
 `app/common/models_db.py`. No se modela `Proveedor` como agregado completo en este PoC (vive
@@ -256,7 +259,7 @@ ningún documento** — se resuelve aquí:
 | `VerificacionAgotoReintentos` | **Dominio (interno)** | No | Delgado | En memoria — dispara el comando `MoverADLQ` |
 | `VerificacionSolicitada` | **Integración** | Sí — ya existe hoy vía `publicar_solicitud` | Delgado (solo IDs + tipo) | RabbitMQ / Pub-Sub / Kafka (puerto `Publicador`) |
 | `VerificacionFallidaDLQ` | **Integración** | Sí — ya existe hoy vía `publicar_fallida` | Gordo (incluye `motivo_falla`, `intentos`, contexto completo) — se decidió gordo a propósito para que quien consuma la DLQ no tenga que hacer una consulta adicional a este servicio | RabbitMQ / Pub-Sub / Kafka |
-| `ProveedorHabilitado` | **Integración (nuevo)** | Sí — hacia `ContextoMarketplace`, `ContextoSiniestros`, `ContextoSuscripciones` (ver `03-contextos-acotados-TO-BE.cml`) | Gordo (incluye `proveedor_id`, `nivel_habilitacion`, `zonas_cobertura`, `timestamp`) — evita que Marketplace tenga que preguntar de vuelta | Mismo tópico de integración, nuevo routing key `proveedor.habilitado` |
+| `ProveedorHabilitado` | **Integración (nuevo)** | Sí — hacia `ContextoMarketplace`, `ContextoSiniestros`, `ContextoSuscripciones` (ver `../03-contextos-acotados-TO-BE.cml`) | Gordo (incluye `proveedor_id`, `nivel_habilitacion`, `zonas_cobertura`, `timestamp`) — evita que Marketplace tenga que preguntar de vuelta | Mismo tópico de integración, nuevo routing key `proveedor.habilitado` |
 
 **Por qué la distinción importa para la Regla 5, no solo para la 4:** el criterio 4 de la Regla 5 pide
 específicamente comunicación **intra-servicio** por eventos de dominio — hoy, dentro de

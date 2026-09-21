@@ -21,6 +21,12 @@
 # colector GMP sin datos que recolectar.
 
 terraform {
+  # State remoto en GCS, un bucket por proyecto y un prefix por stack: lo inicializan
+  # scripts/comun.sh (tf_init) o, a mano:
+  #   terraform init -backend-config="bucket=<PROYECTO>-tfstate" -backend-config="prefix=<stack>"
+  # CI valida con `terraform init -backend=false`. Ver CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md §6.
+  backend "gcs" {}
+
   required_version = ">= 1.5"
   required_providers {
     google = {

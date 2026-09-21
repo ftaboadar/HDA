@@ -1,5 +1,8 @@
 # Mensajería, DDD y datos en la PoC (qué hay, por qué, y dónde verlo en los logs)
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** La topología de la §3 es la de la Entrega 4. El catálogo completo de tópicos de la Entrega 5 (12 eventos, productores, consumidores, propiedades `id_evento`/`correlation_id`) está en [`../contexto/15-arquitectura-entrega-5.md`](../contexto/15-arquitectura-entrega-5.md) §7.
+
+
 Este documento responde: contextos y subdominios, comandos y eventos, Pub/Sub y Pulsar,
 formato de los mensajes (¿por qué JSON y no Avro/Protobuf?), evolución de contratos,
 AsyncAPI y modelo de datos. Cada concepto indica el **campo del log** donde se ve en

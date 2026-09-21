@@ -1,4 +1,7 @@
 # Cómo armamos la Entrega 4 — paso a paso, como equipo
+
+> **⚠ Revisado en Entrega 5 (2026-09-21).** Runbook **histórico** de la Entrega 4. Donde trate a Pagos como ACL interno de Gestión de Trabajos, está desactualizado. Vigente: [`15-arquitectura-entrega-5.md`](../15-arquitectura-entrega-5.md) y `../../implementacion/CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md`.
+
 ### Complementa a `12-plan-entrega-4.md` (ese es el "qué" y "por qué" técnico; este es el "en qué orden" y "quién hace qué")
 
 > **Nota de integración (2026-09-13):** copiado desde `~/Downloads/COMOENTREGARNOMONOLITICASE4.md`

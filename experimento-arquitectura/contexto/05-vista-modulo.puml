@@ -1,102 +1,213 @@
 @startuml 05-vista-modulo
 
-' Hogar de los Alpes (HdA) - Vista de Módulo (TO-BE)
-' Diseño táctico - Diagrama de Módulo (vista funcional / estructural-estática)
+' Hogar de los Alpes (HdA) - Vista de Módulos (TO-BE, Entrega 5)
 '
-' A diferencia del diagrama de Contexto (que muestra actores + límite del sistema),
-' aquí se muestra SOLO la estructura interna: los módulos/servicios, sus dependencias
-' estáticas (quién depende del contrato/evento de quién) y hacia qué sistemas externos
-' dependen vía ACL. No se incluyen actores humanos ni Partners B2B2C: esos son parte
-' de la vista de Contexto, no de la estructura del sistema.
+' Fuente legible por agentes de la vista del equipo
+' diagramas/entrega-5/03-vista-modulos.{png,excalidraw.svg}, YA CORREGIDA según
+' 15-arquitectura-entrega-5.md §3 (decisiones A1-A7). Si esta vista y la imagen no
+' coinciden, manda esta + 15-arquitectura-entrega-5.md; lo que falta redibujar en la
+' imagen está en diagramas/entrega-5/CORRECCIONES.md.
 '
-' Convención ad-hoc (microservicios):
-'   flecha punteada  = dependencia asíncrona por evento de dominio (OHS/PL)
-'   flecha sólida    = dependencia síncrona / ACL hacia sistema externo (API, Webhook, Batch)
-'   la flecha apunta del productor/proveedor del contrato hacia el consumidor/dependiente
-'   (mismo sentido usado en 03-contextos-acotados-TO-BE.cml)
+' Qué muestra: cada microservicio con sus MÓDULOS internos y cómo se hablan
+'   - entre módulos del mismo servicio: sync (comando a la capa de aplicación del otro
+'     módulo) o async (evento de DOMINIO por el dispatcher en memoria) — 15-…md §8
+'   - entre servicios: evento de INTEGRACIÓN por Apache Pulsar — catálogo en 15-…md §7
+'   - hacia externos: ACL/ADP (REST, webhook)
+' Cada módulo tiene internamente Aplicación / Dominio / Infraestructura (hexagonal);
+' no se dibujan las 3 capas aquí para que el diagrama siga siendo legible.
+'
+' Historial: la versión anterior (Entregas 2-4) marcaba Pagos como <<externo>> y no
+' tenía módulos internos; quedó en git.
 
 skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 11
 skinparam component {
-  BackgroundColor<<microservicio>> #DAE8FC
-  BorderColor<<microservicio>> #6C8EBF
+  BackgroundColor<<modulo>> #DAE8FC
+  BorderColor<<modulo>> #6C8EBF
   BackgroundColor<<sensible>> #FFE6CC
   BorderColor<<sensible>> #D79B00
+  BackgroundColor<<seedwork>> #EEEEEE
+  BorderColor<<seedwork>> #999999
   BackgroundColor<<externo>> #F5F5F5
   BorderColor<<externo>> #666666
+  BackgroundColor<<infra>> #FFF2CC
+  BorderColor<<infra>> #D6B656
 }
 
-title Hogar de los Alpes (HdA) — Vista de Módulo (TO-BE)
+title Hogar de los Alpes — Vista de Módulos (TO-BE, Entrega 5)
 
-package "Hogar de los Alpes — Módulos Core" {
-  component "Marketplace" as MKT <<microservicio>>
-  component "Siniestros" as SIN <<microservicio>>
-  component "Suscripciones" as SUS <<microservicio>>
-  component "Reputación y Calidad" as REP <<microservicio>>
-  component "Scoring y Crédito" as SCR <<microservicio>>
-  component "Gestión de Trabajos\n⚠ punto de sensibilidad" as GT <<sensible>>
-  component "Proveedores\n⚠ punto de sensibilidad" as PRV <<sensible>>
+package "Marketplace" {
+  component "API" as MKT_API <<modulo>>
+  component "Diagnóstico" as MKT_DIAG <<modulo>>
+  component "Publicación y Cotización" as MKT_PUB <<modulo>>
+  component "Seedwork" as MKT_SW <<seedwork>>
 }
 
-component "Sistemas de\nVerificación" as VER <<externo>>
-component "Notificaciones" as NOT <<externo>>
-component "Gestor\nDocumental" as DOC <<externo>>
-component "Pagos" as PAG <<externo>>
-component "Contabilidad" as CONT <<externo>>
-component "Gestión de\nAgentes" as AGT <<externo>>
+package "Siniestros" {
+  component "API\n[SP6]" as SIN_API <<sensible>>
+  component "Orquestación de Partner" as SIN_ORQ <<modulo>>
+  component "Facturación" as SIN_FAC <<modulo>>
+  component "Seedwork" as SIN_SW <<seedwork>>
+}
 
-' --- Dependencias por evento de dominio (async) ---
-MKT ..> GT : publica\nIntención Trabajo
-SIN ..> GT : publica\nTrabajo Siniestro
-SUS ..> GT : publica\nCiclo Suscripción
-PRV ..> MKT : publica Habilitación
-PRV ..> SIN : publica Habilitación
-PRV ..> SUS : publica Habilitación
-GT ..> REP : publica\nTrabajo Completado
-GT ..> SCR : publica\nTrabajo Completado
-REP ..> MKT : publica\nScore Actualizado
+package "Suscripciones" {
+  component "API" as SUS_API <<modulo>>
+  component "Ciclo de Suscripción\n(contrato, ciclos, continuidad,\nreserva recurrente)" as SUS_CIC <<modulo>>
+  component "Seedwork" as SUS_SW <<seedwork>>
+}
 
-' --- Dependencias síncronas / ACL hacia sistemas externos ---
-PRV --> VER : consulta
-GT --> NOT : API REST
-MKT --> NOT : API REST
-GT --> DOC : API / S3
-PRV --> DOC : API / S3
-GT --> AGT : Webhooks
-PRV --> AGT : Webhooks
-GT --> PAG : API REST
-SUS --> PAG : API REST
-PAG --> CONT : Batch / API
-SCR --> CONT : Batch / API
+package "Gestión de Trabajos (núcleo)" {
+  component "API\n[SP1]" as GT_API <<sensible>>
+  component "Ciclo de Vida\n(agregado Trabajo)" as GT_CV <<modulo>>
+  component "Motor de Workflow\n(sub-trabajos)" as GT_WF <<modulo>>
+  component "Novedades\n(agregado Novedad) [SP2]" as GT_NOV <<sensible>>
+  component "Integraciones Externas\n«Throttler» [SP3]" as GT_INT <<sensible>>
+  component "Seedwork" as GT_SW <<seedwork>>
+}
 
-note right of GT
-  Submódulo **Novedades** (DISP-02): Sidecar/Throttler
-  de salida hacia Gestión de Agentes (CRM SaaS) —
-  cola acotada + token bucket + reintento con
-  Retry-After/backoff. Vive dentro de este módulo,
-  no es un módulo aparte.
+package "Proveedores" {
+  component "API" as PRV_API <<modulo>>
+  component "Registro\n(Proveedor, técnicos,\nservicios, zonas)" as PRV_REG <<modulo>>
+  component "Elegibilidad\n(habilitación, filtro, orden)" as PRV_ELE <<modulo>>
+  component "Agenda\n(AgendaTecnico, franjas)" as PRV_AGE <<modulo>>
+  component "Verificación\n[SP4]" as PRV_VER <<sensible>>
+  component "Seedwork" as PRV_SW <<seedwork>>
+}
+
+package "Pagos (Gestión de Pagos)" {
+  component "API" as PAG_API <<modulo>>
+  component "Liberación y Compensación\n(retener · liberar · compensar;\nReglaRegional: Strategy)" as PAG_LIB <<modulo>>
+  component "Pasarelas\n(PasarelaDePago: Adapter\nStripe · MercadoPago)" as PAG_PAS <<modulo>>
+  component "Seedwork" as PAG_SW <<seedwork>>
+}
+
+package "Reputación" {
+  component "API" as REP_API <<modulo>>
+  component "Calificación\n(Event Sourcing)" as REP_CAL <<modulo>>
+  component "Seedwork" as REP_SW <<seedwork>>
+}
+
+package "Scoring" {
+  component "API" as SCR_API <<modulo>>
+  component "Cálculo de Score" as SCR_CAL <<modulo>>
+  component "Seedwork" as SCR_SW <<seedwork>>
+}
+
+package "Infraestructura de mensajería" {
+  component "Apache Pulsar\n(tópicos por contexto)\n[SP5]" as BUS <<infra>>
+  component "API Gateway / LB\n(llamadas REST)" as GW <<infra>>
+}
+
+package "Sistemas externos" {
+  component "Verificación\n(Policía · RUES · Certificadora)" as X_VER <<externo>>
+  component "Pasarela de Pago\n(Stripe · MercadoPago)" as X_PAS <<externo>>
+  component "Gestión de Agentes\n(CRM SaaS)" as X_CRM <<externo>>
+  component "Notificaciones (Twilio)" as X_NOT <<externo>>
+  component "Gestor Documental (S3)" as X_DOC <<externo>>
+  component "ERP Contable" as X_ERP <<externo>>
+}
+
+' ===== Comunicación ENTRE MÓDULOS (dentro de cada servicio) =====
+MKT_API --> MKT_DIAG
+MKT_DIAG --> MKT_PUB : sync · PublicarSolicitud
+
+SIN_API --> SIN_ORQ
+SIN_ORQ ..> SIN_FAC : async · SiniestroAprobado\n(evento de dominio)
+
+SUS_API --> SUS_CIC
+
+GT_API --> GT_CV
+GT_CV --> GT_WF : sync · IniciarWorkflow(trabajoId)
+GT_WF ..> GT_CV : async · SubTrabajosCompletos
+GT_WF ..> GT_NOV : async · EstadoTrabajoCambiado /\nNovedadRequiereSaaS
+GT_NOV --> GT_INT : sync · EnviarNovedad
+GT_INT ..> GT_WF : async · RespuestaExternaRecibida
+
+PRV_API --> PRV_REG
+PRV_REG --> PRV_ELE : sync · SolicitarHabilitacion
+PRV_ELE --> PRV_VER : sync · SolicitarVerificacion\n(por técnico / empresa)
+PRV_ELE --> PRV_AGE : sync · ConsultarFranjasLibres
+PRV_AGE ..> PRV_ELE : async · ReservaConfirmada /\nReservaLiberada
+PRV_VER ..> PRV_ELE : async · ProveedorVerificado
+
+PAG_API --> PAG_LIB
+PAG_LIB --> PAG_PAS : sync · autorizar/capturar (ADP)
+PAG_PAS ..> PAG_LIB : async · PagoConfirmado\n(webhook → evento)
+
+REP_API --> REP_CAL
+SCR_API --> SCR_CAL
+
+' ===== Comunicación ENTRE SERVICIOS (eventos de integración vía Pulsar) =====
+MKT_PUB ..> BUS : SolicitudDiagnosticada ·\nProveedorSeleccionado
+SIN_ORQ ..> BUS : SiniestroAprobado
+SUS_CIC ..> BUS : CicloSuscripcion
+BUS ..> GT_CV : SolicitudDiagnosticada · SiniestroAprobado ·\nCicloSuscripcion · AgendaConfirmada ·\nDecisionPartner · Pago*
+
+GT_CV ..> BUS : TrabajoCreado · TrabajoFinalizado ·\nNovedadRegistrada · NovedadResuelta
+BUS ..> PRV_ELE : TrabajoCreado · TrabajoFinalizado ·\nReputacionPublicada
+PRV_ELE ..> BUS : ElegiblesPublicados
+BUS ..> PRV_AGE : ProveedorSeleccionado
+PRV_AGE ..> BUS : AgendaConfirmada /\nAgendaRechazada / AgendaLiberada
+BUS ..> MKT_PUB : ElegiblesPublicados (origen mkt)
+BUS ..> SIN_ORQ : ElegiblesPublicados (origen siniestro) ·\nNovedadRegistrada (sincronización con el partner)
+SIN_ORQ ..> BUS : ProveedorSeleccionado (partner aprueba) ·\nDecisionPartner
+BUS ..> SUS_CIC : ElegiblesPublicados (primer ciclo)
+SUS_CIC ..> BUS : ProveedorSeleccionado
+
+BUS ..> PAG_LIB : AgendaConfirmada (retener) ·\nTrabajoFinalizado (liberar) ·\nNovedadResuelta (disputa → compensar)
+PAG_LIB ..> BUS : PagoRetenido · PagoRetencionFallida ·\nPagoLiberado · PagoFallido · PagoCompensado
+
+BUS ..> REP_CAL : TrabajoFinalizado · ScoringActualizado ·\nAgendaConfirmada · NovedadResuelta
+REP_CAL ..> BUS : ReputacionPublicada
+BUS ..> SCR_CAL : TrabajoFinalizado
+SCR_CAL ..> BUS : ScoringActualizado
+BUS ..> SIN_FAC : TrabajoFinalizado (origen siniestro)
+BUS ..> SUS_CIC : TrabajoFinalizado\n(MOD-03: consumidor nuevo)
+
+' ===== Hacia sistemas externos (ACL / ADP) =====
+PRV_VER --> X_VER : consulta con timeout,\nreintento + DLQ (DISP-03)
+PAG_PAS --> X_PAS : API REST (MOD-02)
+GT_INT --> X_CRM : Webhook dosificado (DISP-02)
+GT_INT --> X_NOT : REST · Circuit Breaker
+GT_INT --> X_DOC : REST/S3 · Circuit Breaker
+SIN_FAC --> X_ERP : asiento contable
+GW --> MKT_API
+GW --> SIN_API
+GW --> SUS_API
+GW --> GT_API
+GW --> PRV_API
+GW --> REP_API
+
+note right of GT_CV
+  No elige proveedor: solo asigna el que le indica el canal
+  del origen (A9). En siniestros aplica una novedad solo tras
+  DecisionPartner(APROBADA) (A11).
+  Dueño del estado del Trabajo:
+  SOLICITADO → ESPERANDO_ELEGIBLES → ASIGNADO →
+  EN_CURSO → FINALIZADO → PAGADO (+ EN_DISPUTA, CANCELADO)
+  Ver 15-arquitectura-entrega-5.md §6.
 end note
 
-note bottom of GT
-  9 dependientes (3 productores que le publican +
-  2 consumidores de su evento + 4 ACL externos).
-  Cambiar su contrato de eventos (OHS/PL) rompe
-  en cascada a todo el resto del sistema.
-end note
-
-note bottom of PRV
-  Única fuente de "Habilitación" para 3 canales
-  (Marketplace/Siniestros/Suscripciones) y depende
-  de 3 sistemas externos de verificación (latencia/
-  disponibilidad fuera de nuestro control).
+note bottom of BUS
+  Puntos de sensibilidad:
+  SP1 API de Gestión de Trabajos (fan-in de 3 canales, ESC-01)
+  SP2 Novedades (ráfagas de novedades, DISP-02)
+  SP3 Integraciones Externas / Throttler hacia CRM (DISP-02)
+  SP4 Verificación de Proveedores ante externos (DISP-03)
+  SP5 Bus Pulsar (fan-out de TrabajoFinalizado a 6 consumidores, ESC-01)
+  SP6 API de Siniestros (pico 4x por evento climático, ESC-01)
 end note
 
 legend right
   |= símbolo |= significado |
-  | <back:#DAE8FC>  </back> | microservicio propio |
-  | <back:#FFE6CC>  </back> | módulo con punto de sensibilidad |
-  | <back:#F5F5F5>  </back> | sistema externo (SaaS/ERP comprado) |
-  | ..> | dependencia asíncrona (evento de dominio) |
-  | --> | dependencia síncrona (API/Webhook/Batch vía ACL) |
+  | <back:#DAE8FC>  </back> | módulo (Aplicación / Dominio / Infraestructura) |
+  | <back:#FFE6CC>  </back> | módulo con punto de sensibilidad (SPn) |
+  | <back:#EEEEEE>  </back> | Seedwork (propio de cada servicio) |
+  | <back:#F5F5F5>  </back> | sistema externo |
+  | <back:#FFF2CC>  </back> | infraestructura |
+  | --> | síncrono (comando entre módulos / REST / ACL) |
+  | ..> | asíncrono (evento de dominio entre módulos, o de integración vía Pulsar) |
 endlegend
 
 @enduml

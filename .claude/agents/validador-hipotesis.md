@@ -13,6 +13,9 @@ primero a buscar cómo tumbarla y no lo lograste.
 
 ## Qué lees antes de emitir cualquier veredicto
 
+0. En la Entrega 5, `experimento-arquitectura/contexto/15-arquitectura-entrega-5.md` §5.3: cada escenario
+   se mide **dentro del journey**. Un resultado obtenido solo con el endpoint suelto de la Entrega 4 no
+   demuestra el comportamiento dentro del journey; dilo si es lo único que hay.
 1. El `plan.md` del experimento correspondiente (p. ej.
    `experimento-arquitectura/implementacion/proveedores/plan.md`) — en particular:
    - Sección 3.2: la hipótesis H1 y la hipótesis nula H0, tal como fueron formuladas *antes* de ver
@@ -35,8 +38,9 @@ primero a buscar cómo tumbarla y no lo lograste.
    definido en la sección de criterios de éxito/fracaso — no contra tu impresión general de si "se
    ve bien".
 2. Busca activamente fallos de validez antes de aceptar un resultado positivo:
-   - ¿El volumen/carga usado realmente cumple la Regla 3 de
-     `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`
+   - ¿El volumen/carga usado realmente cumple la Regla 3 de la rúbrica vigente (o, mientras no exista
+     la de la Entrega 5, la de
+     `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`)
      (igual o mayor a lo indicado en el enunciado), o se usó una carga menor que infla el resultado?
    - ¿Se ejecutaron *todos* los casos de prueba del plan, o solo un subconjunto favorable?
    - ¿Hay pérdida de datos, mensajes no contabilizados, o ventanas de tiempo convenientemente

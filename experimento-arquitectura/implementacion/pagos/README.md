@@ -1,5 +1,8 @@
 # Pagos
 
+> **⚠ Revisado en Entrega 5 (2026-09-21).** Pagos **ya no se considera externo**: es el contexto Gestión de Pagos (la pasarela es lo externo). En la Entrega 5 deja de ser solo REST: consume `TrabajoFinalizado`/`NovedadResuelta` y publica `PagoLiberado`/`PagoFallido`/`PagoCompensado` por Pulsar. Ver [`../../contexto/15-arquitectura-entrega-5.md`](../../contexto/15-arquitectura-entrega-5.md).
+
+
 **Estado: esqueleto inicial (skeleton), extraído de `gestion-de-trabajos` a su propio
 microservicio.** Este documento es honesto a propósito sobre qué falta — ver la sección "Qué
 falta" al final. La lógica de dominio/aplicación NO se reescribió al separar este servicio: se

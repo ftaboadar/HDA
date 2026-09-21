@@ -60,7 +60,7 @@ Domain FintechYPagos {
 
   Subdomain Pagos {
     type = GENERIC_SUBDOMAIN
-    domainVisionStatement = "Gestionar el flujo de dinero (cobro, retención, liberación, facturación B2B2C). Subdominio genérico delegable a un proveedor de pagos para marketplace (ej. Stripe)."
+    domainVisionStatement = "Gestionar el flujo de dinero (cobro, retención, liberación, compensación, facturación B2B2C). Genérico: HdA construye la liberación/compensación y la regla regional, y delega en una pasarela de pagos externa (ej. Stripe, MercadoPago) el cobro en sí. (Revisado en Entrega 5, ver 15-arquitectura-entrega-5.md A1.)"
   }
 }
 

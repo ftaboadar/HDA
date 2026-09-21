@@ -1,6 +1,6 @@
 # Infraestructura del cluster de Apache Pulsar — Hogar de los Alpes (Entrega 4)
 
-> Dueño: Daniel (ver `experimento-arquitectura/contexto/12-plan-entrega-4.md`, sección 8).
+> Dueño: Daniel (ver `experimento-arquitectura/contexto/historico/12-plan-entrega-4.md`, sección 8).
 > **Este es el componente más urgente de todo el reparto**: sin este cluster corriendo, ni
 > Gestión de Trabajos (Frans) ni Proveedores (Johan) pueden probar sus publicadores/consumidores
 > reales contra Pulsar. Avisar al equipo apenas `docker-compose up` levante sano.
@@ -124,5 +124,5 @@ docker-compose down -v       # además borra zk-data y bk-data (cluster completa
 ## Ver también
 
 - `helm/values.yaml` + `helm/README.md` — mismo cluster, para GKE, vía el chart oficial de Pulsar.
-- `experimento-arquitectura/contexto/12-plan-entrega-4.md`, sección 3 — contexto completo de por
+- `experimento-arquitectura/contexto/historico/12-plan-entrega-4.md`, sección 3 — contexto completo de por
   qué Pulsar y por qué cluster autogestionado (no hay servicio gestionado nativo de Pulsar en GCP).

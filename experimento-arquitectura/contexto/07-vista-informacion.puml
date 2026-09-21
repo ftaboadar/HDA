@@ -1,23 +1,23 @@
 @startuml 07-vista-informacion
 
-' Hogar de los Alpes (HdA) - Vista de Información (TO-BE)
-' Diseño táctico - Diagrama de Entidades
+' Hogar de los Alpes (HdA) - Vista de Información (TO-BE, Entrega 5)
 '
-' Un Agregado por Bounded Context (coherente con 03-contextos-acotados-TO-BE.cml).
-' No se detallan atributos/métodos: solo entidades, objetos valor y relaciones.
-' Se marca explícitamente la Entidad Raíz de cada agregado (Aggregate Root).
-' Las referencias entre agregados de distintos módulos son solo por id (sin
-' composición), como corresponde entre Bounded Contexts independientes.
+' Fuente legible por agentes de la vista del equipo
+' diagramas/entrega-5/02-vista-informacion.{png,svg} (Entidad-Relación, UML 2.5,
+' agregaciones y referencias por ID). Un agregado (o más) por Bounded Context; entre
+' agregados de contextos distintos solo hay referencias POR ID.
 '
-' CHANGELOG: paquete "Proveedores" actualizado para alinearse con el modelo de
-' Verificación de Proveedores usado en escenarios_calidad.md (DISP-03) y en el
-' PPTX de la Entrega 2 — reemplaza la versión anterior (Empleado/Certificado)
-' que había quedado desincronizada del resto de la documentación.
-' Verificacion cuelga tanto de Proveedor (verificación empresarial/persona
-' natural) como de Tecnico (verificación individual por empleado) — el
-' enunciado exige explícitamente que "cada empleado que visite el predio... 
-' haya sido verificado individualmente" y que "un técnico nuevo... no puede
-' atender trabajos hasta ser verificado".
+' Diferencias deliberadas con la imagen (ver 15-arquitectura-entrega-5.md, A8, y
+' diagramas/entrega-5/CORRECCIONES.md):
+'   - Cotización: en la imagen es entidad del agregado Trabajo. Aquí vive en Marketplace
+'     (SolicitudTrabajo), que es el módulo que cotiza según las vistas de módulos y C&C;
+'     el Trabajo guarda solo la cotización aceptada por ID + su Monto. [decidido, A8]
+'   - Factura: en la imagen está dentro de la caja "Agregación Siniestro"; aquí es un
+'     agregado propio del contexto Siniestros (módulo Facturación).
+'   - Marketplace: la imagen no dibuja su agregado; se toma SolicitudTrabajo/Diagnostico
+'     de la versión anterior de esta vista.
+'
+' Historial: versión anterior (Entregas 2-4) en git.
 
 hide circle
 hide empty members
@@ -31,51 +31,53 @@ skinparam class {
   BorderColor<<ValueObject>> #9673A6
 }
 
-title Hogar de los Alpes — Vista de Información (TO-BE)\nEntidades, Objetos Valor y Agregados
+title Hogar de los Alpes — Vista de Información (TO-BE, Entrega 5)\nAgregados, entidades, objetos valor y referencias por ID
 
-package "Gestión de Trabajos" {
+class Pais <<Entity>>
+
+package "Gestión de Trabajos · Agregación Trabajo" {
   class Trabajo <<AggregateRoot>>
   class SubTrabajo <<Entity>>
-  class Cotizacion <<Entity>>
-  class Novedad <<Entity>>
-  class Direccion <<ValueObject>>
+  class Evidencia <<Entity>>
+  class EstadoTrabajo <<ValueObject>>
+  class Ubicacion <<ValueObject>>
   class Urgencia <<ValueObject>>
-  class CategoriaServicio <<ValueObject>>
+  class Categoria <<ValueObject>>
+  class Monto <<ValueObject>>
+  class Moneda <<ValueObject>>
+  class Fecha <<ValueObject>>
+  class TipoNovedad <<ValueObject>>
 
   Trabajo "1" *-- "1..*" SubTrabajo
-  SubTrabajo "1" *-- "0..*" Cotizacion
-  Trabajo "1" *-- "0..*" Novedad
-  Trabajo *-- Direccion
+  SubTrabajo ..> Trabajo : actualiza estado de
+  SubTrabajo ..> SubTrabajo : bloquea a
+  Trabajo "1" *-- "0..*" Evidencia : documenta
+  Trabajo *-- EstadoTrabajo
+  Trabajo *-- Ubicacion
   Trabajo *-- Urgencia
-  SubTrabajo *-- CategoriaServicio
+  Trabajo *-- Categoria
+  Trabajo *-- Monto
+  Trabajo *-- Fecha
+  Monto *-- Moneda
 }
 
-package "Marketplace" {
-  class Cliente <<AggregateRoot>>
+package "Gestión de Trabajos · Agregación Novedad (A17)" {
+  class Novedad <<AggregateRoot>>
+  class EstadoNovedad <<ValueObject>>
+  Novedad *-- TipoNovedad
+  Novedad *-- EstadoNovedad
+}
+
+package "Marketplace · Agregación Solicitud" {
   class SolicitudTrabajo <<AggregateRoot>>
   class Diagnostico <<ValueObject>>
+  class Cotizacion <<Entity>>
 
   SolicitudTrabajo *-- Diagnostico
+  SolicitudTrabajo "1" *-- "0..*" Cotizacion : recibe
 }
 
-package "Siniestros" {
-  class Siniestro <<AggregateRoot>>
-  class Partner <<AggregateRoot>>
-  class SLA <<ValueObject>>
-
-  Partner "1" *-- "0..*" SLA
-}
-
-package "Suscripciones" {
-  class Suscripcion <<AggregateRoot>>
-  class AsignacionProveedor <<Entity>>
-  class CicloFacturacion <<ValueObject>>
-
-  Suscripcion "1" *-- "1..*" AsignacionProveedor
-  Suscripcion *-- CicloFacturacion
-}
-
-package "Proveedores" {
+package "Proveedores · Agregación Proveedor" {
   class Proveedor <<AggregateRoot>>
   class ProveedorPersonaNatural <<Entity>>
   class ProveedorEmpresa <<Entity>>
@@ -88,53 +90,118 @@ package "Proveedores" {
 
   Proveedor <|-- ProveedorPersonaNatural
   Proveedor <|-- ProveedorEmpresa
-  ProveedorEmpresa "1" *-- "0..*" Tecnico
-  Proveedor "1" *-- "0..*" Verificacion
-  Tecnico "1" *-- "0..*" Verificacion
-  Proveedor "1" *-- "0..*" Servicio
-  Proveedor *-- ZonaCobertura
-  ProveedorPersonaNatural *-- DocumentoIdentidad
-  Tecnico *-- DocumentoIdentidad
-  Verificacion *-- NivelVerificacion
+  ProveedorEmpresa "1" *-- "0..*" Tecnico : emplea
+  Proveedor "1" *-- "0..*" Verificacion : tiene
+  Tecnico "1" *-- "0..*" Verificacion : tiene
+  Proveedor "1" *-- "0..*" Servicio : ofrece
+  Proveedor *-- ZonaCobertura : zona
+  ProveedorPersonaNatural *-- DocumentoIdentidad : identificado por
+  ProveedorEmpresa *-- DocumentoIdentidad : identificado por
+  Verificacion *-- NivelVerificacion : nivel
+
+  class AgendaTecnico <<AggregateRoot>>
+  class Reserva <<Entity>>
+  class Franja <<ValueObject>>
+
+  AgendaTecnico "1" *-- "0..*" Reserva
+  Reserva *-- Franja : fecha + bloque
 }
 
-package "Reputación y Calidad" {
-  class PerfilReputacion <<AggregateRoot>>
+package "Reputación · Agregación Reputación" {
+  class PerfilDeReputacion <<AggregateRoot>>
   class Calificacion <<Entity>>
-  class Garantia <<ValueObject>>
+  class Puntaje <<ValueObject>>
 
-  PerfilReputacion "1" *-- "0..*" Calificacion
-  Calificacion *-- Garantia
+  PerfilDeReputacion "1" *-- "0..*" Calificacion : acumula
+  Calificacion *-- Puntaje
 }
 
-package "Scoring y Crédito" {
+package "Scoring · Agregación Scoring" {
   class PerfilCrediticio <<AggregateRoot>>
-  class Prestamo <<AggregateRoot>>
-  class HistorialScore <<Entity>>
+  class PuntajeCrediticio <<ValueObject>>
 
-  PerfilCrediticio "1" *-- "0..*" HistorialScore
+  PerfilCrediticio *-- PuntajeCrediticio
 }
 
-' --- Referencias entre agregados de distintos módulos (solo por id) ---
-Cotizacion ..> Proveedor : referencia (id)
-Siniestro ..> Trabajo : referencia (id)
-Suscripcion ..> Trabajo : genera (id)
-AsignacionProveedor ..> Proveedor : referencia (id)
-Calificacion ..> Trabajo : referencia (id)
-PerfilReputacion ..> Proveedor : referencia (id)
-PerfilCrediticio ..> Proveedor : referencia (id)
-Prestamo ..> PerfilCrediticio : referencia (id)
-SolicitudTrabajo ..> Cliente : referencia (id)
+package "Suscripciones · Agregación Suscripción" {
+  class Suscripcion <<AggregateRoot>>
+  class TipoServicioRecurrente <<ValueObject>>
+  class Frecuencia <<ValueObject>>
+  class EstadoSuscripcion <<ValueObject>>
+
+  Suscripcion *-- TipoServicioRecurrente : tipo
+  Suscripcion *-- Frecuencia
+  Suscripcion *-- EstadoSuscripcion
+}
+
+package "Siniestros · Agregaciones Partner, Siniestro y Factura" {
+  class Partner <<AggregateRoot>>
+  class Aseguradora <<Entity>>
+  class Banco <<Entity>>
+  class Comercio <<Entity>>
+  class ReglaDeAprobacion <<ValueObject>>
+  class Siniestro <<AggregateRoot>>
+  class DatosPoliza <<ValueObject>>
+  class EvidenciaClimatica <<ValueObject>>
+  class EstadoSiniestro <<ValueObject>>
+  class Factura <<AggregateRoot>>
+  class EstadoFactura <<ValueObject>>
+
+  Partner <|-- Aseguradora
+  Partner <|-- Banco
+  Partner <|-- Comercio
+  Partner *-- ReglaDeAprobacion : define
+  Siniestro *-- DatosPoliza : póliza
+  Siniestro *-- EvidenciaClimatica : evidencia
+  Siniestro *-- EstadoSiniestro
+  Factura *-- EstadoFactura
+}
+
+package "Pagos · Agregación Pago" {
+  class Pago <<AggregateRoot>>
+  class EstadoPago <<ValueObject>>
+  note right of EstadoPago : RETENIDO → LIBERADO | COMPENSADO | FALLIDO (A18)
+
+  Pago *-- EstadoPago
+}
+
+' --- Referencias entre agregados de distintos contextos (solo por ID) ---
+Trabajo ..> Proveedor : asignado a (id)
+Novedad ..> Trabajo : registrada en (id)
+Trabajo ..> Cotizacion : cotización aceptada (id)
+Trabajo ..> Pais : ubicado en (id)
+Cotizacion ..> Proveedor : propuesta por (id)
 SolicitudTrabajo ..> Trabajo : deriva en (id)
+Siniestro ..> Trabajo : genera (id)
+Siniestro ..> Partner : de (id)
+Partner ..> Pais : opera en (id)
+ReglaDeAprobacion ..> SubTrabajo : aprueba pasos de (id)
+Suscripcion ..> Trabajo : genera (id)
+Suscripcion ..> Proveedor : asignado a (id)
+Factura ..> Comercio : facturado a (id)
+Factura ..> Trabajo : factura (id)
+Pago ..> Trabajo : genera (id)
+Calificacion ..> Trabajo : califica (id)
+PerfilDeReputacion ..> Proveedor : de (id)
+PerfilCrediticio ..> Proveedor : de (id)
+AgendaTecnico ..> Tecnico : agenda de (id)
+Reserva ..> Trabajo : reservada para (id)
+Reserva ..> Suscripcion : o para (id, recurrente)
+
+note bottom of Pais
+  País/región → Strategy ReglaRegional (MOD-02)
+  y Moneda del Pago. El Pago la toma del Trabajo,
+  no del request HTTP.
+end note
 
 legend right
   |= símbolo |= significado |
-  | <back:#FFE6CC>  </back> | Entidad Raíz de Agregado (Aggregate Root) |
+  | <back:#FFE6CC>  </back> | Raíz de agregado |
   | <back:#DAE8FC>  </back> | Entidad (parte del agregado) |
-  | <back:#E1D5E7>  </back> | Objeto Valor (Value Object) |
+  | <back:#E1D5E7>  </back> | Objeto valor |
   | *-- | composición (pertenece al agregado) |
-  | <\|-- | herencia / especialización |
-  | ..> | referencia entre agregados de otro módulo (solo por id) |
+  | <\|-- | especialización |
+  | ..> | referencia a otro agregado (solo por id) |
 endlegend
 
 @enduml

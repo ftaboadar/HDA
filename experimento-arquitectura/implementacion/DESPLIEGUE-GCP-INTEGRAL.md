@@ -28,6 +28,29 @@ del proceso). Se limpiaron los artefactos locales que dejó (`terraform.tfstate`
 
 ## Receta vigente: montar todo desde cero en un proyecto nuevo (desde `main`)
 
+> **Forma recomendada (desde 2026-09-21): los scripts de [`scripts/`](scripts/).** Hacen exactamente esta
+> receta, con el state de Terraform en un bucket GCS del proyecto (`gs://<PROYECTO>-tfstate`), así que
+> **cualquiera con acceso al proyecto puede desplegar o destruir**, no solo quien desplegó:
+>
+> ```bash
+> cd experimento-arquitectura/implementacion/scripts
+> PROJECT=<tu-proyecto> ./desplegar-todo.sh          # imágenes → Pulsar (+namespaces) → mocks → servicios → Grafana
+> PROJECT=<tu-proyecto> ./destruir-todo.sh           # orden inverso + bucket de Cloud Build + verificación
+> PROJECT=<tu-proyecto> ./verificar-nada-facturando.sh
+> ```
+>
+> Cambiar de proyecto (por ejemplo, si se acaban los créditos) = cambiar `PROJECT`. Antes de perder el
+> proyecto viejo: guardar la evidencia en el repo y correr `destruir-todo.sh`.
+> **Estado de los scripts:** `verificar-nada-facturando.sh` probado contra `hogaralpes`; `desplegar-todo.sh`
+> y `destruir-todo.sh` validados (bash -n, shellcheck, `terraform validate` de los 10 stacks) pero
+> **todavía no corridos de punta a punta contra GCP**. La primera persona que los corra actualiza
+> `ESTADO-IMPLEMENTACION.md`.
+>
+> Si prefieres hacerlo a mano, sigue abajo. Desde que los stacks usan backend GCS, cada `terraform init`
+> necesita `-backend-config="bucket=<PROYECTO>-tfstate" -backend-config="prefix=<stack>"`, y el bucket se
+> crea antes: `gcloud storage buckets create gs://<PROYECTO>-tfstate --location <REGION> --uniform-bucket-level-access`.
+> Los namespaces de Pulsar ya los crea la VM al arrancar.
+
 Esta es la receta que se usó para levantar `hogaralpes` y la que debe seguir cualquier compañero. Lo que dice el resto del
 documento es el diseño y la historia (mantiene `hda-projectt` y el estado de 2026-09-14). **Hacer merge del PR a `main` da el código
 y el Terraform; no da la infraestructura**: cada persona levanta la suya en su propio proyecto.
@@ -50,7 +73,7 @@ gcloud services enable cloudbuild.googleapis.com --project $PROJECT
 # 0) Por cada servicio con imagen: crear SOLO su repositorio (Terraform habilita las APIs que necesita) y publicar la imagen.
 #    Hay que hacerlo antes del apply completo: Cloud Run falla al crearse si la imagen no existe.
 bootstrap() {  # <stack> <repo-artifact-registry> <imagen> <carpeta-con-Dockerfile>
-  (cd $IMPL/$1 && terraform init -input=false \
+  (cd $IMPL/$1 && terraform init -input=false -reconfigure -backend-config="bucket=${PROJECT}-tfstate" -backend-config="prefix=$1" \
      && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION \
         -target=google_artifact_registry_repository.hda)
   gcloud builds submit $IMPL/$4 --tag $R/$2/$3:latest --project $PROJECT --quiet
@@ -63,7 +86,7 @@ bootstrap reputacion/infra           reputacion-poc-hda         hda-reputacion  
 bootstrap proveedores/infra          disp03-poc-hda             hda-disp03               proveedores   # el prefijo disp03-poc es el nombre histórico de los recursos
 
 # 1) Pulsar (VM). Esperar 2-3 min a que el broker levante antes de seguir.
-(cd $IMPL/pulsar-infra/gcp && terraform init -input=false \
+(cd $IMPL/pulsar-infra/gcp && terraform init -input=false -reconfigure -backend-config="bucket=${PROJECT}-tfstate" -backend-config="prefix=pulsar-infra/gcp" \
    && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
 PULSAR_IP=$(cd $IMPL/pulsar-infra/gcp && terraform output -raw ip_privada)     # IP PRIVADA, no la pública
 
@@ -84,9 +107,39 @@ CRM=$(cd $IMPL/mocks-crm/infra && terraform output -raw mock_crm_url)
 (cd $IMPL/proveedores/infra && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
 
 # 4) Grafana al final (el dashboard necesita servicios reales que graficar)
-(cd $IMPL/observabilidad && terraform init -input=false \
+(cd $IMPL/observabilidad && terraform init -input=false -reconfigure -backend-config="bucket=${PROJECT}-tfstate" -backend-config="prefix=observabilidad" \
    && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION)
 ```
+
+### Entrega 5: lo que cambia en esta receta
+
+La receta de arriba despliega lo que existe hasta la Entrega 4. La Entrega 5 agrega **4 stacks nuevos** y un
+**`worker` por servicio que consume Pulsar**. Todos siguen el patrón de
+[`CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md`](CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md) §5-§6. **Actualiza este bloque
+cuando cada stack exista de verdad**: hasta entonces es el orden acordado, no una receta probada.
+
+```bash
+# 0) bootstrap de imágenes: agregar los 4 servicios nuevos
+bootstrap marketplace/infra    marketplace-poc-hda    hda-marketplace    marketplace
+bootstrap siniestros/infra     siniestros-poc-hda     hda-siniestros     siniestros
+bootstrap suscripciones/infra  suscripciones-poc-hda  hda-suscripciones  suscripciones
+bootstrap scoring/infra        scoring-poc-hda        hda-scoring        scoring
+
+# 1b) después de Pulsar y ANTES de cualquier servicio: tenant + 8 namespaces (CONVENCIONES §4)
+
+# 3) todos los servicios de negocio reciben -var pulsar_service_url=pulsar://$PULSAR_IP:6650
+#    (antes solo gestion-de-trabajos); cada stack que consume despliega api + worker
+for s in marketplace siniestros suscripciones scoring reputacion pagos proveedores; do
+  (cd $IMPL/$s/infra && terraform apply -auto-approve -var project_id=$PROJECT -var region=$REGION \
+     -var pulsar_service_url=pulsar://$PULSAR_IP:6650)      # + las -var propias de cada stack (mocks de pagos, etc.)
+done
+```
+
+- **Cuota de vCPU:** con 8 servicios × (api + worker) conviene `cpu = "1"` y `max_instance_count` bajo (1-3)
+  en los servicios nuevos y en todos los workers. Suma antes de aplicar (CONVENCIONES §6, regla 4).
+- **Destroy:** los 4 stacks nuevos van **antes** de `pulsar-infra/gcp` en el bucle de apagado (dependen de su IP).
+- **Postman:** agregar `marketplace_url`, `siniestros_url`, `suscripciones_url`, `scoring_url` a
+  `postman/HdA-GCP.postman_environment.json`.
 
 Después del despliegue:
 1. URLs de todo: `gcloud run services list --region $REGION --project $PROJECT --format="value(metadata.name,status.url)"`; pégalas en `postman/HdA-GCP.postman_environment.json`.
@@ -99,6 +152,7 @@ Problemas conocidos al montar (ver `GUIA-DEMO-ESCENARIOS.md`, sección "Problema
 **Apagar todo (orden inverso; el `destroy` borra también las bases de Cloud SQL y sus datos):**
 
 ```bash
+# Entrega 5: anteponer marketplace/infra siniestros/infra suscripciones/infra scoring/infra cuando existan
 for s in observabilidad proveedores/infra reputacion/infra pagos/infra gestion-de-trabajos/infra mocks-crm/infra mocks-pagos/infra pulsar-infra/gcp; do
   (cd $IMPL/$s && terraform destroy -auto-approve -var project_id=$PROJECT -var region=$REGION)
 done

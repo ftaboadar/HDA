@@ -1,10 +1,22 @@
 # Hogar de los Alpes — POC de Experimentación (Entrega Parcial)
 
+## Entrega 5 (en curso): un solo journey
+
+Los 4 escenarios de abajo se midieron **sueltos**. La Entrega 5 los conecta en un journey de negocio
+entre 8 microservicios (se suman `marketplace/`, `siniestros/`, `suscripciones/` y `scoring/`):
+proveedor verificado (DISP-03) → solicitud → trabajo creado y asignado (ESC-01) → novedades hacia el CRM
+(DISP-02) → trabajo finalizado → pago con regla regional y pasarela (MOD-02) → calificación.
+
+- **Qué existe hoy y qué se puede desplegar: [`ESTADO-IMPLEMENTACION.md`](ESTADO-IMPLEMENTACION.md)**
+- Qué se construye: [`../contexto/15-arquitectura-entrega-5.md`](../contexto/15-arquitectura-entrega-5.md)
+- Cómo se construye y despliega: [`CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md`](CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md)
+- Montar/apagar todo en GCP: [`DESPLIEGUE-GCP-INTEGRAL.md`](DESPLIEGUE-GCP-INTEGRAL.md)
+
 ## Escenarios de calidad validados
 
 Uno por cada atributo de calidad acordado con el profesor, sobre la cadena de transacción larga
-**Gestión de Trabajos → Proveedores → Pagos** (que se orquestará como Saga en la Entrega 5), más
-Reputación como consumidor independiente.
+**Gestión de Trabajos → Proveedores → Pagos**, más Reputación como consumidor independiente (resultados de la
+entrega parcial / Entrega 4).
 
 | Escenario | Atributo | Qué prueba | ¿Pasa su umbral? |
 |---|---|---|---|
@@ -54,10 +66,10 @@ experimento-arquitectura/implementacion/
 
 ## Resultados
 
-- [`proveedores/RESULTADOS-DISP03.md`](experimento-arquitectura/implementacion/proveedores/RESULTADOS-DISP03.md)
-- [`RESULTADOS-DISP02.md`](experimento-arquitectura/implementacion/RESULTADOS-DISP02.md)
-- [`RESULTADOS-ESCALABILIDAD-GCP.md`](experimento-arquitectura/implementacion/RESULTADOS-ESCALABILIDAD-GCP.md)
-- [`RESULTADOS-MOD02.md`](experimento-arquitectura/implementacion/RESULTADOS-MOD02.md)
+- [`proveedores/RESULTADOS-DISP03.md`](proveedores/RESULTADOS-DISP03.md)
+- [`RESULTADOS-DISP02.md`](RESULTADOS-DISP02.md)
+- [`RESULTADOS-ESCALABILIDAD-GCP.md`](RESULTADOS-ESCALABILIDAD-GCP.md)
+- [`RESULTADOS-MOD02.md`](RESULTADOS-MOD02.md)
 
 Ver también [`ACTIVIDADES.md`](../../ACTIVIDADES.md) (raíz del repo) para la contribución de cada
 miembro del equipo.

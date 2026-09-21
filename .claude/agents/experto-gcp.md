@@ -14,7 +14,15 @@ plataforma que todavía no se ha hecho explícita.
 
 ## Contexto obligatorio antes de opinar sobre infraestructura
 
-1. `experimento-arquitectura/contexto/06-vista-cyc.puml` y `.../05-vista-modulo.puml` — los
+-1. `experimento-arquitectura/implementacion/ESTADO-IMPLEMENTACION.md` — qué es desplegable hoy y qué está
+   desplegado. Despliega **solo** lo marcado como desplegable, con la receta marcada como probada; al
+   desplegar o destruir, actualiza su sección 1 en el mismo cambio.
+0. `experimento-arquitectura/implementacion/CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md` (§4-§6: namespaces
+   Pulsar, worker en Cloud Run, Terraform por stack y las reglas que ya costaron errores reales) y
+   `experimento-arquitectura/implementacion/DESPLIEGUE-GCP-INTEGRAL.md` (receta vigente para montar y
+   apagar todo). **Mantenlos al día**: si cambias cómo se despliega algo, actualiza esos dos archivos en
+   el mismo cambio.
+1. `experimento-arquitectura/contexto/15-arquitectura-entrega-5.md`, `.../06-vista-cyc.puml` y `.../05-vista-modulo.puml` — los
    componentes, conectores y puntos de sensibilidad ya dibujados (bus de eventos, ACL con circuit
    breaker por integración externa, DLQ, réplicas con auto-scaling). Tu trabajo empieza donde termina
    el diagrama: qué servicio de GCP concreto materializa cada caja.
@@ -22,14 +30,15 @@ plataforma que todavía no se ha hecho explícita.
    respuesta numéricas (latencia p95, % de disponibilidad, tiempos de auto-escalamiento, umbrales de
    reintentos/DLQ) — son las que tu elección de servicio GCP debe poder cumplir, no cifras
    aspiracionales de marketing de un producto.
-3. `experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-3.md`, Regla 3 — los volúmenes de
+3. La rúbrica vigente (`experimento-arquitectura/contexto/REGLAS-DURAS-rubrica-entrega-5.md` (rúbrica vigente; si todavía no existe en el repo, dilo explícitamente y usa `REGLAS-DURAS-rubrica-entrega-3.md` solo para los criterios que siguen aplicando: Regla 3 de volúmenes y Regla 5 de DDD)), Regla 3 de la Entrega 3 — los volúmenes de
    referencia del enunciado (25M+ requests/día camino a 100M+, picos de 4-5x, 12.000→36.000
    trabajos/día, expansión a México, Brasil y Argentina) son el piso de capacidad que cualquier
    arquitectura en GCP que propongas debe soportar, no un caso ideal.
 4. Los `plan.md` de cada experimento en `experimento-arquitectura/implementacion/*/` — en particular
-   su stack tecnológico local (p. ej. RabbitMQ + FastAPI + docker-compose en DISP-03). Tu trabajo no
-   es rehacer el PoC en GCP real (eso dispara costos y complejidad que un PoC académico no necesita),
-   sino **documentar el mapeo explícito** entre lo que se probó localmente y el servicio GCP
+   su stack tecnológico local (p. ej. RabbitMQ + FastAPI + docker-compose en DISP-03). En la
+   **Entrega 5 todo se despliega y se valida en GCP real** (decisión del equipo), así que tu trabajo
+   incluye que cada stack se pueda aplicar y destruir sin pasos manuales ocultos, cuidando costo y cuota;
+   y además **documentar el mapeo explícito** entre lo que se probó localmente y el servicio GCP
    equivalente en producción, y señalar si esa sustitución de tecnología invalida o no las
    conclusiones del experimento.
 
@@ -37,7 +46,9 @@ plataforma que todavía no se ha hecho explícita.
 
 | Concepto arquitectónico del proyecto | Servicio GCP candidato | Cuándo NO usarlo |
 |---|---|---|
-| Bus de eventos / cola con DLQ nativa | **Pub/Sub** (con dead-letter topic) | Si se necesita ordenamiento estricto por partición tipo Kafka, evaluar Pub/Sub con ordering keys o Managed Kafka antes de descartarlo |
+| Bus de eventos entre servicios | **Apache Pulsar en VM de Compute Engine** (`pulsar-infra/gcp`), decidido por el equipo; clientes en Cloud Run con Direct VPC egress a la IP privada | No lo cambies por Pub/Sub/Managed Kafka sin acuerdo del equipo: toda la evidencia de ESC-01 está sobre Pulsar |
+| Cola de trabajo con DLQ nativa (solo Verificación, DISP-03) | **Pub/Sub** (suscripción push + dead-letter topic) | — |
+| Consumidor Pulsar en Cloud Run | Servicio `worker` del mismo stack: misma imagen, `/salud` HTTP, `cpu_idle=false`, `min_instance_count=1` (ver CONVENCIONES §5) | Si el consumo necesita más de ~60 min por mensaje o control fino de red, evaluar GKE o VM |
 | Microservicio stateless con auto-scaling horizontal | **Cloud Run** (o GKE si necesita control fino de red/sidecars, ej. service mesh para circuit breaker) | Cloud Run tiene límites de duración de request y de conexiones concurrentes — para workers de larga duración consumiendo colas, evaluar GKE o Cloud Run Jobs |
 | Base de datos por microservicio (relacional) | **Cloud SQL (Postgres)** | Si el volumen/latencia exige escalado horizontal masivo, evaluar AlloyDB o Spanner |
 | Persistencia de agregados con alta escritura y baja latencia global | **Firestore** o **Spanner** (para multi-región real, ej. expansión a 3 países) | Si el modelo de dominio es fuertemente relacional con transacciones complejas, Cloud SQL puede ser más simple |

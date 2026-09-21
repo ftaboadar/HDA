@@ -1,4 +1,7 @@
 # Plan — Entrega 4 (Transacción larga, no monolítica)
+
+> **⚠ Revisado en Entrega 5 (2026-09-21).** Documento **histórico** de la Entrega 4. Quedaron invalidadas su §0.1 y todo lo que dice que *Pagos es externo / un módulo ACL dentro de Gestión de Trabajos / sin tópico propio*: Gestión de Pagos es un microservicio propio que se integra por eventos Pulsar. La fuente de verdad vigente es [`15-arquitectura-entrega-5.md`](../15-arquitectura-entrega-5.md)
+
 ### Hogar de los Alpes · Alineado a la guía "AeroAlpes" del profesor
 
 > **Nota de integración (2026-09-13):** este documento se copió desde un insumo externo
@@ -32,7 +35,7 @@
 > contradice el diseño de dominio **ya aprobado y sustentado con el tutor en Entrega 1**: `Pagos` es
 > un **`GENERIC_SUBDOMAIN`** explícitamente "delegable a un proveedor de pagos para marketplace (ej.
 > Stripe)" (`01-dominios-subdominios.cml`), no tiene `BoundedContext` propio en el Context Map TO-BE
-> (`03-contextos-acotados-TO-BE.cml`), y en la Vista de Módulos (`05-vista-modulo.puml`) está dibujado
+> (`../03-contextos-acotados-TO-BE.cml`), y en la Vista de Módulos (`05-vista-modulo.puml`) está dibujado
 > como componente `<<externo>>` — mismo trato que Notificaciones, Gestor Documental o Contabilidad. Los
 > tres artefactos son independientes entre sí y coinciden: Pagos se compra, no se construye. Ver
 > sección 0.1 para el detalle y la corrección aplicada en todo este documento.
@@ -60,13 +63,13 @@ El profesor no pide 4 microservicios sueltos, cada uno con un escenario distinto
 
 **Esta es una corrección sobre el insumo original**, no una decisión nueva del equipo: el diseño de
 dominio de Entrega 1 (`experimento-arquitectura/contexto/01-dominios-subdominios.cml`,
-`03-contextos-acotados-TO-BE.cml`, `05-vista-modulo.puml`), ya sustentado con el tutor, es explícito y
+`../03-contextos-acotados-TO-BE.cml`, `05-vista-modulo.puml`), ya sustentado con el tutor, es explícito y
 consistente en los tres artefactos:
 
 | Artefacto | Qué dice de Pagos |
 |---|---|
 | `01-dominios-subdominios.cml` | `Subdomain Pagos { type = GENERIC_SUBDOMAIN }` — "Subdominio genérico delegable a un proveedor de pagos para marketplace (ej. Stripe)" |
-| `03-contextos-acotados-TO-BE.cml` | `BoundedContext ContextoPagos` está listado junto a Notificaciones, Contabilidad y Gestor Documental bajo el comentario `/* Sistemas Genéricos Externos (Comprados/SaaS) */` — no es un contexto que HdA construya |
+| `../03-contextos-acotados-TO-BE.cml` | `BoundedContext ContextoPagos` está listado junto a Notificaciones, Contabilidad y Gestor Documental bajo el comentario `/* Sistemas Genéricos Externos (Comprados/SaaS) */` — no es un contexto que HdA construya |
 | `05-vista-modulo.puml` | `component "Pagos" as PAG <<externo>>` — mismo estilo visual que Notificaciones/Contabilidad/Gestión de Agentes; `GT --> PAG : API REST` (llamada síncrona saliente, como cualquier ACL hacia un SaaS) |
 
 **Consecuencia directa para esta entrega:** no se construye un microservicio `Pagos` con su propia
@@ -170,7 +173,7 @@ Cada persona agrega su propia entrada a `ACTIVIDADES.md` en la raíz del repo **
 
 Las instrucciones piden que los principios de DDD sean **claros y explícitos** en el diseño: agregaciones, contextos acotados, inversión de dependencias, capas. Los 3 quedan así, nombrados uno por uno:
 
-- **Contextos acotados:** cada uno de los 3 microservicios propios **es su propio Bounded Context** — Gestión de Trabajos, Proveedores y Reputación tienen cada uno su propio modelo de dominio, su propio lenguaje ubicuo, y no comparten entidades entre sí. Pagos **no** es un cuarto contexto acotado propio (sección 0.1) — es un sistema externo con el que Gestión de Trabajos integra vía ACL, igual que Notificaciones o Contabilidad ya lo hacen en `03-contextos-acotados-TO-BE.cml`.
+- **Contextos acotados:** cada uno de los 3 microservicios propios **es su propio Bounded Context** — Gestión de Trabajos, Proveedores y Reputación tienen cada uno su propio modelo de dominio, su propio lenguaje ubicuo, y no comparten entidades entre sí. Pagos **no** es un cuarto contexto acotado propio (sección 0.1) — es un sistema externo con el que Gestión de Trabajos integra vía ACL, igual que Notificaciones o Contabilidad ya lo hacen en `../03-contextos-acotados-TO-BE.cml`.
 - **Agregaciones:** cada contexto tiene su propia raíz de agregado — `Verificacion` en Proveedores (ya construido), y el equivalente nuevo en Gestión de Trabajos y Reputación (ej. `Trabajo` en Gestión de Trabajos, `PerfilReputacion` en Reputación).
 - **Inversión de dependencias:** el dominio (`domain/`) define **interfaces** (puertos) que la infraestructura implementa — el dominio nunca importa SQLAlchemy, Pulsar, ni ningún detalle técnico; es infraestructura quien depende del dominio, no al revés. El puerto `PasarelaDePago` de Gestión de Trabajos sigue esta misma regla: el dominio de Trabajo no conoce Stripe ni MercadoPago, solo el puerto.
 - **Capas (arquitectura hexagonal/cebolla):**
@@ -289,7 +292,7 @@ Aclaración del profe, más estricta que la rúbrica original: *"NO debe haber l
 **Nuestro diseño ya cumple esto sin cambios:**
 - Gestión de Trabajos → Proveedores/Reputación: 100% por evento, nunca por llamada directa.
 - Ningún servicio le pregunta nada a otro en tiempo real — todo lo que necesitan viaja en la carga de estado del evento.
-- Las únicas llamadas HTTP síncronas son hacia sistemas externos mockeados (Policía/RUES/CONTE, Gestión de Agentes, **Stripe/MercadoPago**) — no son "entre nuestros servicios", son ACL hacia sistemas comprados, exactamente como ya lo modela `03-contextos-acotados-TO-BE.cml` para Pagos/Notificaciones/Contabilidad (sección 0.1).
+- Las únicas llamadas HTTP síncronas son hacia sistemas externos mockeados (Policía/RUES/CONTE, Gestión de Agentes, **Stripe/MercadoPago**) — no son "entre nuestros servicios", son ACL hacia sistemas comprados, exactamente como ya lo modela `../03-contextos-acotados-TO-BE.cml` para Pagos/Notificaciones/Contabilidad (sección 0.1).
 - La API HTTP de cada microservicio (ej. `POST /verificaciones`) es la puerta de entrada del sistema, no una llamada de un microservicio a otro.
 
 ---
@@ -432,7 +435,7 @@ git checkout -b feature/gestion-trabajos-y-acl-pagos
 > Lee `experimento-arquitectura/contexto/12-plan-entrega-4.md` completo (en especial la sección 0.1) y `.claude/agents/implementador-ddd.md`. Necesito, todo dentro de un único microservicio nuevo `Gestión de Trabajos` en `experimento-arquitectura/implementacion/gestion-de-trabajos/` (hexagonal: domain/application/infrastructure):
 >
 > 1. **Núcleo**: comando `CrearTrabajo` (expuesto como tópico de comando en Pulsar, no HTTP entre servicios), query `ConsultarTrabajo`, tabla `trabajos`, y publicador del evento `trabajos.finalizado` con carga de estado (ver sección 4.1 del plan).
-> 2. **Módulo ACL de Pagos** (NO como servicio aparte — ver sección 0.1: Pagos es un `GENERIC_SUBDOMAIN` externo según `01-dominios-subdominios.cml`/`03-contextos-acotados-TO-BE.cml`/`05-vista-modulo.puml`): comandos de aplicación `PagarTrabajo`/`Compensar`, Strategy `ReglaRegional` (`ReglaColombia` + `ReglaBrasil` nueva), puerto+adaptador `PasarelaDePago` (`Stripe` + `MercadoPago`, mockeados vía HTTP síncrono contra los mocks que construye Johan por separado), query `ConsultarPago`, tabla `pagos` (misma BD de Gestión de Trabajos, no una BD nueva).
+> 2. **Módulo ACL de Pagos** (NO como servicio aparte — ver sección 0.1: Pagos es un `GENERIC_SUBDOMAIN` externo según `01-dominios-subdominios.cml`/`../03-contextos-acotados-TO-BE.cml`/`05-vista-modulo.puml`): comandos de aplicación `PagarTrabajo`/`Compensar`, Strategy `ReglaRegional` (`ReglaColombia` + `ReglaBrasil` nueva), puerto+adaptador `PasarelaDePago` (`Stripe` + `MercadoPago`, mockeados vía HTTP síncrono contra los mocks que construye Johan por separado), query `ConsultarPago`, tabla `pagos` (misma BD de Gestión de Trabajos, no una BD nueva).
 >
 > Ambas piezas comparten el mismo esqueleto hexagonal pero viven en archivos/módulos separados dentro
 > de `domain/`, `application/commands/` e `infrastructure/adapters/` — para que quede claro en el
