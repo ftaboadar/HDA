@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Despliega en GCP todo lo que ESTADO-IMPLEMENTACION.md marca como desplegable, en el mismo
+# orden y con las mismas variables de la "Receta vigente" de DESPLIEGUE-GCP-INTEGRAL.md
+# (probada en hogaralpes): imágenes → Pulsar (+ namespaces) → mocks → servicios → Grafana.
+#
+# Uso:   PROJECT=<proyecto> ./desplegar-todo.sh
+# Opcional: REGION (default southamerica-east1), GT_MAX_INSTANCIAS (default 9),
+#           SALTAR_IMAGENES=1 (no reconstruye imágenes que ya existen).
+# Prerrequisitos: facturación activa, `gcloud auth login`, `gcloud auth application-default login`,
+#                 Terraform >= 1.5.
+# Es idempotente: si falla a mitad, se puede volver a correr.
+
+# shellcheck source=comun.sh
+source "$(dirname "$0")/comun.sh"
+requiere gcloud terraform
+
+log "Proyecto ${PROJECT} · región ${REGION} · state en gs://${BUCKET_STATE}"
+gcloud services enable cloudbuild.googleapis.com storage.googleapis.com compute.googleapis.com \
+  iap.googleapis.com --project "$PROJECT"
+asegurar_bucket_state
+
+# 0) Repositorio de Artifact Registry de cada servicio + su imagen. Cloud Run falla al crearse si
+#    la imagen no existe, por eso va antes del apply completo.
+#    stack | repositorio | imagen | carpeta con el Dockerfile
+IMAGENES=(
+  "mocks-pagos/infra|mocks-pagos-poc-hda|hda-mocks-pagos|mocks-pagos"
+  "mocks-crm/infra|mocks-crm-poc-hda|hda-mocks-crm|mocks-crm"
+  "pagos/infra|pagos-poc-hda|hda-pagos|pagos"
+  "gestion-de-trabajos/infra|gestion-trabajos-poc-hda|hda-gestion-de-trabajos|gestion-de-trabajos"
+  "reputacion/infra|reputacion-poc-hda|hda-reputacion|reputacion"
+  "proveedores/infra|disp03-poc-hda|hda-disp03|proveedores" # prefijo disp03-poc: nombre histórico (A20)
+)
+for fila in "${IMAGENES[@]}"; do
+  IFS='|' read -r stack repo imagen carpeta <<<"$fila"
+  log "Imagen ${imagen}"
+  tf_init "$stack"
+  # shellcheck disable=SC2046
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" $(vars_extra "$stack") \
+    -target=google_artifact_registry_repository.hda
+  if [ "${SALTAR_IMAGENES:-0}" = 1 ] &&
+    gcloud artifacts docker images describe "${AR}/${repo}/${imagen}:latest" --project "$PROJECT" >/dev/null 2>&1; then
+    aviso "SALTAR_IMAGENES=1 y la imagen ya existe: no se reconstruye"
+  else
+    gcloud builds submit "$IMPL/$carpeta" --tag "${AR}/${repo}/${imagen}:latest" --project "$PROJECT" --quiet
+  fi
+done
+
+# 1) Pulsar en VM. El startup script de la VM crea tenant y namespaces y deja una marca al terminar.
+log "Pulsar (VM de Compute Engine)"
+tf_init pulsar-infra/gcp
+tf pulsar-infra/gcp apply -auto-approve -input=false "${VARS_BASE[@]}"
+PULSAR_IP="$(tf pulsar-infra/gcp output -raw ip_privada)"
+VM="$(tf pulsar-infra/gcp output -raw vm_name)"
+ZONA="$(tf pulsar-infra/gcp output -raw vm_zone)"
+
+log "Esperando a que Pulsar y sus namespaces estén listos (hasta 15 min)"
+listo=0
+for _ in $(seq 1 45); do
+  if gcloud compute ssh "$VM" --zone "$ZONA" --tunnel-through-iap --project "$PROJECT" --quiet \
+    --command "test -f /opt/pulsar-infra/namespaces-listos" >/dev/null 2>&1; then
+    listo=1
+    break
+  fi
+  sleep 20
+done
+if [ "$listo" != 1 ]; then
+  echo "Pulsar no quedó listo. Revisa la VM:"
+  echo "  gcloud compute ssh $VM --zone $ZONA --tunnel-through-iap --project $PROJECT --command 'sudo journalctl -u google-startup-scripts --no-pager | tail -50'"
+  exit 1
+fi
+
+# 2) Mocks de pagos y del CRM.
+for stack in mocks-pagos/infra mocks-crm/infra; do
+  log "Stack ${stack}"
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}"
+done
+STRIPE="$(tf mocks-pagos/infra output -raw mock_stripe_url)"
+MP="$(tf mocks-pagos/infra output -raw mock_mercadopago_url)"
+CRM="$(tf mocks-crm/infra output -raw mock_crm_url)"
+
+# 3) Servicios de negocio.
+log "Stack pagos/infra"
+tf pagos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" \
+  -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}"
+
+log "Stack gestion-de-trabajos/infra"
+tf gestion-de-trabajos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" \
+  -var "max_instance_count=${GT_MAX_INSTANCIAS}" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650" \
+  -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}" -var "crm_mock_url=${CRM}"
+
+for stack in reputacion/infra proveedores/infra; do
+  log "Stack ${stack}"
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}"
+done
+
+# 4) Grafana al final (el dashboard necesita servicios reales que graficar).
+log "Stack observabilidad"
+tf_init observabilidad
+tf observabilidad apply -auto-approve -input=false "${VARS_BASE[@]}"
+
+log "Listo. URLs de los servicios (pégalas en postman/HdA-GCP.postman_environment.json):"
+gcloud run services list --region "$REGION" --project "$PROJECT" --format="table(metadata.name,status.url)"
+echo
+echo "Grafana: $(tf observabilidad output -raw grafana_url)  (usuario admin; contraseña:"
+echo "  gcloud secrets versions access latest --secret=$(tf observabilidad output -raw grafana_admin_password_secret) --project ${PROJECT})"
+echo
+echo "Recuerda: actualizar ESTADO-IMPLEMENTACION.md §1 (qué quedó desplegado y dónde)."

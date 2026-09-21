@@ -41,3 +41,17 @@ sed -i "s/__ADVERTISED_IP__/$INTERNAL_IP/" /opt/pulsar-infra/docker-compose.over
 
 cd /opt/pulsar-infra
 docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
+
+# Tenant y namespaces del proyecto. Antes era un paso manual (bug 4 de DESPLIEGUE-GCP-INTEGRAL.md:
+# sin ellos publicar falla con TopicNotFound). Lista = CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md §4.
+# Espera a que el broker responda (hasta 10 min) y crea todo de forma idempotente (|| true).
+for i in $(seq 1 60); do
+  curl -sf http://localhost:8080/admin/v2/brokers/health >/dev/null && break
+  sleep 10
+done
+docker exec hda-pulsar-broker bin/pulsar-admin tenants create hda --allowed-clusters cluster-hda || true
+for ns in gestion-trabajos proveedores reputacion marketplace siniestros suscripciones pagos scoring; do
+  docker exec hda-pulsar-broker bin/pulsar-admin namespaces create hda/$ns || true
+done
+# Marca que scripts/desplegar-todo.sh espera antes de desplegar los servicios.
+touch /opt/pulsar-infra/namespaces-listos
