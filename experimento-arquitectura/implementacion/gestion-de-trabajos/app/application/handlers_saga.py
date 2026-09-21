@@ -1,6 +1,5 @@
 import uuid
 import logging
-from typing import Dict, Any
 
 from app.infrastructure.persistence.saga_repository_sqlalchemy import SagaRepositorySQLAlchemy
 from app.infrastructure.persistence.trabajo_repository_sqlalchemy import TrabajoRepositorySQLAlchemy

@@ -3,7 +3,7 @@ import json
 from typing import Any
 
 from app.common.config import settings
-from app.common.logging_utils import configurar_logging, log_evento
+from app.common.logging_utils import configurar_logging
 from app.application.commands.retener_pago import RetenerPago
 from app.application.commands.liberar_pago import LiberarPago
 from app.application.commands.compensar import CompensarPago
@@ -83,7 +83,7 @@ class ConsumidorComandosSaga:
                     logger.error(f"Error procesando mensaje: {ex}")
                     consumidor.negative_acknowledge(msg)
                     
-            except Exception as e:
+            except Exception:
                 # Timeout
                 await asyncio.sleep(0.1)
 

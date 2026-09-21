@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import uuid
 from typing import List
 
@@ -7,7 +6,7 @@ from app.domain.workflow.value_objects import PasoSaga, EstadoSaga, SagaId
 from app.domain.ciclo_vida.trabajo import Trabajo
 from app.domain.workflow.eventos import (
     ComandoSaga, PublicarElegibles, ReservarFranja, 
-    RetenerPago, LiberarPago, LiberarFranja, CompensarPago
+    RetenerPago, LiberarPago, LiberarFranja
 )
 
 class CoordinadorSaga:

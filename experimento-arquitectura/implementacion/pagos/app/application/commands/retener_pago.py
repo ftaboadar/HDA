@@ -1,10 +1,9 @@
 import asyncio
-import time
 import uuid
 
 from app.application.ports.pasarela_de_pago import IPasarelaDePago
 from app.application.ports.registro_trabajos import IRegistroTrabajosRepository
-from app.common.logging_utils import configurar_logging, log_evento
+from app.common.logging_utils import configurar_logging
 from app.domain.pagos.fabrica import FabricaPago
 from app.domain.pagos.regla_regional import ReglaRegional
 from app.domain.pagos.repository import IPagoRepository
@@ -30,7 +29,6 @@ class RetenerPago:
         self._publicador = publicador
 
     async def ejecutar(self, trabajo_id: str, proveedor_id: str, monto: str, moneda: str, region: str, pasarela: str) -> None:
-        inicio = time.perf_counter()
         
         from app.infrastructure.messaging.esquemas import PagoRetenidoMensaje, PagoRetencionFallidaMensaje
 

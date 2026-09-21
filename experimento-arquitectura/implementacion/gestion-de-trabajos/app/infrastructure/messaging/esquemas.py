@@ -1,7 +1,5 @@
-import json
-import time
 import uuid
-from typing import Any, Callable, Type, TypeVar
+from typing import TypeVar
 import pulsar
 from pulsar.schema import Record
 

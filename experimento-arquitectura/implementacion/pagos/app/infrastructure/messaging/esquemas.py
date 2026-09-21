@@ -1,5 +1,5 @@
 import uuid
-from pulsar.schema import Record, String, Float, JsonSchema
+from pulsar.schema import Record, String, Float
 
 class PagoMensajeBase(Record):
     pago_id = String()

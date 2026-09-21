@@ -1,6 +1,5 @@
 import asyncio
 import uuid
-import time
 from app.domain.pagos.repository import IPagoRepository
 from app.domain.pagos.value_objects import PagoId, TrabajoId
 from app.infrastructure.messaging.publicador import PublicadorPulsar

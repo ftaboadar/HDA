@@ -1,9 +1,8 @@
-import json
 import time
 from typing import Any
 
 from app.common.config import settings
-from app.common.logging_utils import configurar_logging, describir_mensaje, log_evento
+from app.common.logging_utils import configurar_logging, log_evento
 from app.infrastructure.messaging.esquemas import publicar_mensaje_generico
 
 logger = configurar_logging("infrastructure.messaging.publicador_pulsar")
