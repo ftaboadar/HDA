@@ -258,7 +258,6 @@ class PublicadorPulsar(Publicador):
         await self._enviar(self._productor_eventos, {**mensaje, "routing_key": routing_key})
 
     async def publicar_comando_saga(self, topic: str, mensaje_record, tipo_evento: str) -> None:
-        import pulsar
         from pulsar.schema import JsonSchema
         
         productor = self._cliente.create_producer(topic, schema=JsonSchema(type(mensaje_record)))

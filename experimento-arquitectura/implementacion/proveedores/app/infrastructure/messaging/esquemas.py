@@ -1,4 +1,4 @@
-from pulsar.schema import Record, String, Integer, Float, JsonSchema
+from pulsar.schema import Record, String, Float
 
 class PublicarElegiblesRecord(Record):
     comando_id = String()

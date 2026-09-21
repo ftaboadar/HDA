@@ -1,8 +1,7 @@
-import asyncio
 import json
 import uuid
 import logging
-from app.infrastructure.messaging.esquemas import PublicarElegiblesRecord, ElegiblesCalculadosRecord
+from app.infrastructure.messaging.esquemas import ElegiblesCalculadosRecord
 from app.common.publicador import PublicadorPulsar
 
 logger = logging.getLogger(__name__)
