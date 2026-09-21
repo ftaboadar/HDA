@@ -24,8 +24,9 @@ def iniciar_consumidor():
     while True:
         msg = consumer.receive()
         try:
-            # Fan-out message consumption
             data = msg.value()
+            payload_str = json.dumps({"cliente_id": data.cliente_id, "trabajo_id": data.trabajo_id, "exito": data.exito})
+            print(f"Evento TrabajoFinalizado recibido: {payload_str}")
             comando = ComandoActualizarScoring(
                 cliente_id=data.cliente_id,
                 exito=data.exito

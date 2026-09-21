@@ -14,6 +14,7 @@ def publicar_scoring_actualizado(cliente_id: str, nuevo_puntaje: int):
     )
     
     evento = ScoringActualizadoEvento(cliente_id=cliente_id, nuevo_puntaje=nuevo_puntaje)
-    # Using json.dumps and JsonSchema
+    payload_str = json.dumps({"cliente_id": cliente_id, "nuevo_puntaje": nuevo_puntaje})
+    print(f"Enviando evento: {payload_str}")
     producer.send(evento)
     client.close()
