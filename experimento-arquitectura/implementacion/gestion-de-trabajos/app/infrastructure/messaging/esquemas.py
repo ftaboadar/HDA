@@ -3,7 +3,7 @@ import time
 import uuid
 from typing import Any, Callable, Type, TypeVar
 import pulsar
-from pulsar.schema import Record, JsonSchema
+from pulsar.schema import Record
 
 T = TypeVar('T', bound=Record)
 

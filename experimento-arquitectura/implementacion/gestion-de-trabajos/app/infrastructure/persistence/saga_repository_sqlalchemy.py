@@ -4,7 +4,7 @@ from typing import Optional
 
 from app.common.db import SessionLocal
 from app.domain.workflow.saga import SagaInstancia
-from app.domain.workflow.value_objects import EstadoSaga, PasoSaga, SagaId
+from app.domain.workflow.value_objects import EstadoSaga, PasoSaga
 from app.domain.ciclo_vida.value_objects import TrabajoId
 from app.infrastructure.persistence.models_db import SagaInstanciaORM, SagaLogORM
 

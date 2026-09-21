@@ -1,5 +1,4 @@
 import ast
-import os
 from pathlib import Path
 
 def test_dominio_no_importa_infraestructura_ni_aplicacion():

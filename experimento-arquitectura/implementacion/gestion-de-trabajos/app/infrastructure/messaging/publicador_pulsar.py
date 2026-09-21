@@ -130,7 +130,7 @@ class PublicadorPulsar(IPublicador):
 
     async def publicar_comando(self, comando: Any) -> None:
         """Publica un ComandoSaga en el tópico correspondiente."""
-        productor = self._asegurar_productor()
+        self._asegurar_productor()
         
         # Mapeo simple de tipo de comando a tópico (solo para esta prueba)
         tipo = type(comando).__name__
