@@ -13,7 +13,7 @@ resource "google_cloud_run_v2_service" "mock" {
   template {
     scaling {
       min_instance_count = 0
-      max_instance_count = 5
+      max_instance_count = 2
     }
     containers {
       image   = local.imagen_app

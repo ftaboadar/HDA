@@ -23,7 +23,7 @@ module "mock_stripe" {
   container_port = 8000
 
   min_instance_count = 0
-  max_instance_count = 5
+  max_instance_count = 2
 
   depends_on = [google_project_service.apis]
 }
@@ -42,7 +42,7 @@ module "mock_mercadopago" {
   container_port = 8000
 
   min_instance_count = 0
-  max_instance_count = 5
+  max_instance_count = 2
 
   depends_on = [google_project_service.apis]
 }
