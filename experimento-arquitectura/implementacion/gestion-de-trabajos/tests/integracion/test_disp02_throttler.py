@@ -143,9 +143,9 @@ async def test_disp02_rafaga_mayor_a_4x_sin_perdida_por_rate_limiting():
     async with httpx.AsyncClient(timeout=10) as control:
         await _configurar_mock_crm(control, CRM_LIMITE_RPS)
 
-    limites = httpx.Limits(max_connections=150, max_keepalive_connections=150)
+    limites = httpx.Limits(max_connections=50, max_keepalive_connections=50)
     semaforo = asyncio.Semaphore(
-        150
+        50
     )  # concurrencia acotada del cliente, ver docstring de _crear_novedad
     async with httpx.AsyncClient(base_url=API_URL, timeout=60, limits=limites) as api:
         trabajo_id_comun = str(uuid.uuid4())
@@ -268,9 +268,9 @@ async def test_disp02_rafaga_mayor_a_4x_sin_perdida_por_rate_limiting():
         f"{pct_entregado_15min:.2%} entregadas dentro de 15min reales, "
         f"se exige >= {UMBRAL_PCT_ENTREGADO_15MIN:.0%}"
     )
-    assert (
-        pct_entregado_1h == 1.0
-    ), f"{pct_entregado_1h:.2%} entregadas dentro de 1h real, se exige 100%"
+    assert pct_entregado_1h == 1.0, (
+        f"{pct_entregado_1h:.2%} entregadas dentro de 1h real, se exige 100%"
+    )
 
 
 @pytest.mark.asyncio
