@@ -1,0 +1,48 @@
+networks:
+  pulsar-infra_pulsar:
+    external: true
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hda
+      POSTGRES_PASSWORD: hda
+      POSTGRES_DB: suscripciones
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hda -d suscripciones"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  api:
+    build: .
+    command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
+    restart: on-failure:5
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/suscripciones
+    ports:
+      - "8005:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: python -m app.worker.main
+    restart: on-failure:5
+    profiles: ["consumidor"]
+    networks:
+      - default
+      - pulsar-infra_pulsar
+    environment:
+      DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/suscripciones
+      PULSAR_SERVICE_URL: pulsar://hda-pulsar-broker:6650
+      PULSAR_TOPIC_TRABAJOS_FINALIZADO: persistent://hda/gestion-trabajos/trabajos.finalizado
+      PULSAR_TOPIC_CICLO_SUSCRIPCION: persistent://hda/suscripciones/suscripciones.ciclo_suscripcion
+      PULSAR_SUBSCRIPTION: suscripciones-trabajos-finalizado
+    depends_on:
+      postgres:
+        condition: service_healthy
