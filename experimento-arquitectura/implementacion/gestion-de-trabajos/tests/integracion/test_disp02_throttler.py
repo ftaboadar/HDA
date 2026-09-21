@@ -268,9 +268,9 @@ async def test_disp02_rafaga_mayor_a_4x_sin_perdida_por_rate_limiting():
         f"{pct_entregado_15min:.2%} entregadas dentro de 15min reales, "
         f"se exige >= {UMBRAL_PCT_ENTREGADO_15MIN:.0%}"
     )
-    assert pct_entregado_1h == 1.0, (
-        f"{pct_entregado_1h:.2%} entregadas dentro de 1h real, se exige 100%"
-    )
+    assert (
+        pct_entregado_1h == 1.0
+    ), f"{pct_entregado_1h:.2%} entregadas dentro de 1h real, se exige 100%"
 
 
 @pytest.mark.asyncio
