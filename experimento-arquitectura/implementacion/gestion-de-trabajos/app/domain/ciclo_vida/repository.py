@@ -4,8 +4,8 @@ app/infrastructure/persistence/trabajo_repository_sqlalchemy.py."""
 
 import abc
 
-from app.domain.trabajo.trabajo import Trabajo
-from app.domain.trabajo.value_objects import TrabajoId
+from app.domain.ciclo_vida.trabajo import Trabajo
+from app.domain.ciclo_vida.value_objects import TrabajoId
 
 
 class ITrabajoRepository(abc.ABC):

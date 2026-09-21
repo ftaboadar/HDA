@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from app.domain.novedades.eventos import NovedadAgotada, NovedadEntregada
 from app.domain.novedades.value_objects import EstadoNovedad, NovedadId
 from app.domain.seedwork.aggregate_root import AggregateRoot
-from app.domain.trabajo.value_objects import TrabajoId
+from app.domain.ciclo_vida.value_objects import TrabajoId
 
 
 class ErrorTransicionInvalida(Exception):

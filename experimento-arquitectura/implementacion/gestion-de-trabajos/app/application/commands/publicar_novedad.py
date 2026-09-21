@@ -20,7 +20,7 @@ import uuid
 
 from app.domain.novedades.fabrica import FabricaNovedad
 from app.domain.novedades.repository import INovedadRepository
-from app.domain.trabajo.value_objects import TrabajoId
+from app.domain.ciclo_vida.value_objects import TrabajoId
 from app.infrastructure.messaging.throttler import ThrottlerCrm
 
 

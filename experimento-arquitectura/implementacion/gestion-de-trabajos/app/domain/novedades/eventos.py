@@ -27,7 +27,7 @@ from dataclasses import dataclass
 
 from app.domain.novedades.value_objects import NovedadId
 from app.domain.seedwork.domain_event import DomainEvent
-from app.domain.trabajo.value_objects import TrabajoId
+from app.domain.ciclo_vida.value_objects import TrabajoId
 
 
 @dataclass(frozen=True)

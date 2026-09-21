@@ -80,8 +80,14 @@ class EstadoTrabajo(str, Enum):
     (ASIGNADO, EN_PROGRESO, etc. — ver SubTrabajo/Cotizacion en
     07-vista-informacion.puml) — eso es parte de la Saga, Entrega 5."""
 
-    PENDIENTE = "PENDIENTE"
+    SOLICITADO = "SOLICITADO"
+    ESPERANDO_ELEGIBLES = "ESPERANDO_ELEGIBLES"
+    ASIGNADO = "ASIGNADO"
+    EN_CURSO = "EN_CURSO"
     FINALIZADO = "FINALIZADO"
+    PAGADO = "PAGADO"
+    EN_DISPUTA = "EN_DISPUTA"
+    CANCELADO = "CANCELADO"
 
 
 @dataclass(frozen=True)
