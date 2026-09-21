@@ -240,6 +240,10 @@ class PublicadorPulsar(Publicador):
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, lambda: productor.send(json.dumps(mensaje).encode()))
 
+    async def _enviar_record(self, productor, mensaje, propiedades: dict) -> None:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: productor.send(mensaje, properties=propiedades))
+
     async def publicar_solicitud(self, mensaje: dict) -> None:
         if not self._productor_sol:
             raise RuntimeError("PULSAR_TOPIC_SOLICITUDES no configurado")
@@ -249,12 +253,23 @@ class PublicadorPulsar(Publicador):
         await self._enviar(self._productor_dlq, mensaje)
 
     async def publicar_evento(self, routing_key: str, mensaje: dict) -> None:
-        # Igual que en Pub/Sub, Pulsar no tiene routing keys tipo AMQP — el
-        # routing_key viaja como campo del mensaje, publicado exclusivamente
-        # al tópico de eventos de integración, nunca al de solicitudes.
         if not self._productor_eventos:
             raise RuntimeError("PULSAR_TOPIC_EVENTOS no configurado")
         await self._enviar(self._productor_eventos, {**mensaje, "routing_key": routing_key})
+
+    async def publicar_comando_saga(self, topic: str, mensaje_record, tipo_evento: str) -> None:
+        import pulsar
+        from pulsar.schema import JsonSchema
+        
+        productor = self._cliente.create_producer(topic, schema=JsonSchema(type(mensaje_record)))
+        propiedades = {
+            "tipo_evento": tipo_evento,
+            "version_esquema": "1",
+            "content_type": "application/json",
+            "productor": "proveedores",
+        }
+        await self._enviar_record(productor, mensaje_record, propiedades)
+        productor.close()
 
     def cerrar(self) -> None:
         """Cierre explícito del cliente — no hay un hook de shutdown de
