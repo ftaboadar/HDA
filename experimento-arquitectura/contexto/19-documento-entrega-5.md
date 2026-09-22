@@ -87,4 +87,74 @@ Para evidenciar el correcto funcionamiento de los Journeys (JRN-01 a JRN-05) a t
     "estado": "SOLICITADO"
 }
 ```
-*Nota: La ejecución completa de los casos de éxito, compensación por disputa y reglas de negocio, así como las consultas a la base de datos (Saga Log), se demostrarán en vivo durante el Video de Sustentación utilizando la colección Postman provista.*
+
+### JRN-02: Pico de Siniestros
+**Request (POST /v1/siniestros):**
+```json
+{
+    "cliente_id": "CLI-5555",
+    "propiedad_id": "PROP-999",
+    "tipo_siniestro": "INUNDACION",
+    "monto_estimado": 1500000
+}
+```
+**Response (HTTP 202 Accepted):**
+```json
+{
+    "mensaje": "Siniestro radicado, pendiente de reglas de aprobación.",
+    "siniestro_id": "SIN-4040"
+}
+```
+
+### JRN-03: Caída CRM y Disputa (Compensación)
+**Request (POST /v1/trabajos/TRB-12345678/novedades):**
+```json
+{
+    "tipo_novedad": "DISPUTA_CLIENTE",
+    "descripcion": "El proveedor no llegó a la hora acordada."
+}
+```
+**Response (HTTP 202 Accepted):**
+```json
+{
+    "mensaje": "Novedad recibida. El coordinador ha iniciado la compensación (reembolso) de la Saga.",
+    "estado_saga": "COMPENSANDO"
+}
+```
+
+### JRN-04: Transacción Internacional (Brasil)
+**Request (POST /v1/trabajos) - Forzando MercadoPago:**
+```json
+{
+    "cliente_id": "BR-001",
+    "tipo_servicio": "limpieza",
+    "region": "BR",
+    "metodo_pago": "MERCADOPAGO"
+}
+```
+**Response (HTTP 202 Accepted):**
+```json
+{
+    "mensaje": "Trabajo recibido. Saga iniciada en región BR.",
+    "trabajo_id": "TRB-99998888",
+    "saga_id": "SAGA-77776666",
+    "pasarela_asignada": "MercadoPagoAdapter"
+}
+```
+
+### JRN-05: Fan-Out Background (Scoring)
+**Request (GET /v1/scoring/clientes/CLI-9876):**
+```json
+// Sin body (GET)
+```
+**Response (HTTP 200 OK):**
+```json
+{
+    "cliente_id": "CLI-9876",
+    "score_actual": 850,
+    "ultimo_evento_procesado": "TrabajoFinalizado"
+}
+```
+
+*Nota: La ejecución completa de todos estos casos, así como las consultas a la base de datos (Saga Log), se demostrarán en vivo durante el Video de Sustentación utilizando la colección Postman provista en el repositorio.*
+
