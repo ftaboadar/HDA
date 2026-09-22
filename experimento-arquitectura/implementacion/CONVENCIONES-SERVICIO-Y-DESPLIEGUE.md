@@ -242,6 +242,13 @@ Reglas de despliegue que ya costaron errores reales (no repetir):
 7. **Costo**: cada stack con Cloud SQL factura aunque no haya tráfico. Apaga con `terraform destroy`
    (orden inverso del despliegue) cuando termines de medir; ver el checklist de "nada facturando" en
    `DESPLIEGUE-GCP-INTEGRAL.md`.
+8. **Si el stack se despliega en una región distinta a la región por defecto** (ej. `gestion-de-trabajos`,
+   `proveedores`, `scoring`, `marketplace` en `us-east1`; `siniestros` en `us-central1` — Regla 3, reparte
+   cuota de vCPU entre regiones): construye y sube la imagen a esa MISMA región (Artifact Registry es
+   regional). `scripts/comun.sh::region_de_stack()` es la única fuente de verdad; si el bootstrap de
+   imágenes y el `apply` final usan regiones distintas, Terraform recrea el repo en la región nueva
+   (borrando la imagen) y Cloud Run falla con `Image ... not found` — bug real, ver
+   `DESPLIEGUE-GCP-INTEGRAL.md`.
 
 ## 7. CI
 

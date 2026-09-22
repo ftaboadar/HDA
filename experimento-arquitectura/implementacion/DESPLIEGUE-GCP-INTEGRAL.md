@@ -39,12 +39,34 @@ del proceso). Se limpiaron los artefactos locales que dejó (`terraform.tfstate`
 > PROJECT=<tu-proyecto> ./verificar-nada-facturando.sh
 > ```
 >
-> Cambiar de proyecto (por ejemplo, si se acaban los créditos) = cambiar `PROJECT`. Antes de perder el
-> proyecto viejo: guardar la evidencia en el repo y correr `destruir-todo.sh`.
+> Cambiar de proyecto (por ejemplo, si se acaban los créditos, o si su facturación se cierra) = cambiar
+> `PROJECT`. Antes de perder el proyecto viejo: guardar la evidencia en el repo y correr
+> `destruir-todo.sh`. **Si el ADC (`gcloud auth application-default login`) quedó con el quota project
+> apuntando al proyecto viejo**, el primer `terraform init` contra el bucket de state del proyecto nuevo
+> falla con `403 UserProjectAccountProblem: billing account ... disabled in state closed` aunque el
+> proyecto nuevo sí tenga facturación activa — corre primero
+> `gcloud auth application-default set-quota-project <PROYECTO>` y `gcloud config set project
+> <PROYECTO>` (encontrado migrando de `hda-projectt`/`hogaralpes` a `project-b68c032a-000b-4601-8bd`,
+> 2026-09-22).
 > **Estado de los scripts:** `verificar-nada-facturando.sh` probado contra `hogaralpes`; `desplegar-todo.sh`
-> y `destruir-todo.sh` validados (bash -n, shellcheck, `terraform validate` de los 10 stacks) pero
-> **todavía no corridos de punta a punta contra GCP**. La primera persona que los corra actualiza
-> `ESTADO-IMPLEMENTACION.md`.
+> corrido de punta a punta contra `hogaralpes` (2026-09-21) y de nuevo, stack por stack (ver nota más abajo
+> sobre el clasificador de modo automático), contra `project-b68c032a-000b-4601-8bd` (2026-09-22), con 2
+> bugs de infraestructura nuevos encontrados y corregidos ese día (región de build vs. despliegue
+> desalineada; nombre de bucket de Grafana > 63 caracteres con un `project_id` largo) — ver
+> `ESTADO-IMPLEMENTACION.md` §1. **`destruir-todo.sh` probado de punta a punta contra
+> `project-b68c032a-000b-4601-8bd` (2026-09-22)**: su `ORDEN` estaba desactualizado (le faltaban
+> `bff/infra`, `marketplace/infra`, `siniestros/infra`, `suscripciones/infra`, `scoring/infra` —
+> los 5 servicios nuevos de Entrega 5, que `desplegar-todo.sh` sí crea) y habría dejado esos 5 stacks
+> desplegados y facturando en silencio; corregido. Además el destroy de `bff/infra` exige los 8
+> `-var *_url=...` (sin default en `variables.tf`) aunque los servicios ya no existan — el propio
+> `destruir-todo.sh` no los pasaba; corregido pasando valores placeholder solo para el destroy (no
+> importan: identifican recursos por dirección, no por el valor del env var).
+> **Nota sobre ejecutar el script completo de un tirón**: en un entorno con un clasificador de
+> permisos que distingue comandos "vistos" de scripts que encadenan muchos `terraform apply` sin
+> plan visible por paso (ej. Claude Code en modo automático), `desplegar-todo.sh` invocado como un solo
+> comando puede bloquearse como "Blind Apply". La alternativa que sí funciona es correr los mismos
+> comandos `terraform init`/`apply` del script uno por uno (mismas variables, mismo orden) — más lento,
+> pero cada `plan` queda visible antes de aplicarse.
 >
 > Si prefieres hacerlo a mano, sigue abajo. Desde que los stacks usan backend GCS, cada `terraform init`
 > necesita `-backend-config="bucket=<PROYECTO>-tfstate" -backend-config="prefix=<stack>"`, y el bucket se
@@ -137,6 +159,14 @@ done
 
 - **Cuota de vCPU:** con 8 servicios × (api + worker) conviene `cpu = "1"` y `max_instance_count` bajo (1-3)
   en los servicios nuevos y en todos los workers. Suma antes de aplicar (CONVENCIONES §6, regla 4).
+- **Región de build = región de despliegue, siempre**: si un stack se despliega en una región distinta
+  a `$REGION` (ej. `gestion-de-trabajos`/`proveedores`/`scoring`/`marketplace` en `us-east1`,
+  `siniestros` en `us-central1`), su imagen debe construirse y subirse a Artifact Registry en **esa
+  misma región**, no en la región por defecto del bootstrap. `scripts/comun.sh::region_de_stack()` es
+  la fuente única de verdad para esto — úsala tanto al construir la imagen como al hacer el `apply`
+  final. Si difieren, Terraform destruye y recrea el repo de Artifact Registry en la región nueva
+  (borrando la imagen ya subida) y Cloud Run falla con `Image ... not found` (bug real encontrado y
+  corregido en `project-b68c032a-000b-4601-8bd`, 2026-09-22).
 - **Destroy:** los 4 stacks nuevos van **antes** de `pulsar-infra/gcp` en el bucle de apagado (dependen de su IP).
 - **Postman:** agregar `marketplace_url`, `siniestros_url`, `suscripciones_url`, `scoring_url` a
   `postman/HdA-GCP.postman_environment.json`.
@@ -386,7 +416,13 @@ vez de inventar un puerto distinto para GCP).
 
 Ya documentadas en detalle en `proveedores/README.md`, sección "Diferencias local (RabbitMQ) vs. GCP
 (Pub/Sub) vs. Apache Pulsar" — aplica igual aquí para `gestion-de-trabajos`/`reputacion`, que usan
-Pulsar como único transporte de integración (no hay variante Pub/Sub de esos dos servicios). Se agrega
+Pulsar como único transporte de integración (no hay variante Pub/Sub de esos dos servicios).
+**[2026-09-22] `proveedores/infra` se migró también a Pulsar** (Direct VPC egress +
+`TRANSPORTE=pulsar` + `pulsar_service_url` real en ambos `google_cloud_run_v2_service.api`/`.worker`
+de `proveedores/infra/cloudrun.tf`; verificado con un `POST /verificaciones` real completando en
+~4s contra `project-b68c032a-000b-4601-8bd`) — la topología de Pub/Sub (`proveedores/infra/pubsub.tf`)
+se deja desplegada pero en desuso (`TRANSPORTE` ya no vale `"pubsub"` en ningún despliegue real), no
+se retiró de Terraform en este cambio. Se agrega
 un matiz nuevo, específico de correr Pulsar en una VM propia en vez de local: **el hallazgo #2 de este
 documento (`advertisedListeners`) es una amenaza a la validez adicional, específica del despliegue en
 GCP, que no existe ni en el docker-compose local ni en ningún experimento ya corrido** — cualquier
