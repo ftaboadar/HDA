@@ -28,6 +28,14 @@ class Suscripcion(AggregateRoot):
     proveedor_continuo_id: Optional[str] = None
     ciclos: List[CicloSuscripcion] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # `Suscripcion` es un @dataclass y AggregateRoot/Entity no lo son:
+        # el __init__ generado por @dataclass no invoca automáticamente el
+        # __init__ de las bases, así que el buffer de eventos de dominio
+        # (`_eventos_dominio`, ver app/seedwork/aggregate_root.py) nunca
+        # quedaría inicializado sin este __post_init__ explícito.
+        AggregateRoot.__init__(self, self.id)
+
     def iniciar_suscripcion(
         self, cliente_id: str, dia_semana: int, bloque: TipoBloqueFranja
     ):

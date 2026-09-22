@@ -5,3 +5,4 @@ pydantic-settings==2.5.2
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.13
 httpx==0.27.2
+pulsar-client==3.6.1
