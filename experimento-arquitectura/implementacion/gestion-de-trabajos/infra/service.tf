@@ -127,7 +127,7 @@ module "api" {
   # -var min_instance_count=10 explícitamente (y apagarlo de nuevo después,
   # tal como ya decía este comentario antes de que existiera var.min_instance_count).
   min_instance_count = var.min_instance_count
-  max_instance_count = 2var.max_instance_count
+  max_instance_count = var.max_instance_count
   # Antes 200, desincronizado de max_workers (100 fijo en main.py) y del
   # pool de conexiones (50+50) -- generaba cola interna en la instancia Y
   # sobresuscripción de conexiones contra Cloud SQL al mismo tiempo (dos
