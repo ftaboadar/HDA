@@ -84,14 +84,25 @@ tf pagos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}"
 
 log "Stack gestion-de-trabajos/infra"
-tf gestion-de-trabajos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" \
+tf gestion-de-trabajos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-east1" \
   -var "max_instance_count=${GT_MAX_INSTANCIAS}" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}" -var "crm_mock_url=${CRM}"
 
-for stack in reputacion/infra proveedores/infra; do
+
+for stack in reputacion/infra; do
   log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}"
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=southamerica-east1"
 done
+for stack in proveedores/infra; do
+  log "Stack ${stack}"
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-east1"
+done
+# Siniestros (Multi-Region patch)
+if [ -d "siniestros/infra" ]; then
+  log "Stack siniestros/infra"
+  tf "siniestros/infra" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-central1"
+fi
+
 
 # 4) Grafana al final (el dashboard necesita servicios reales que graficar).
 log "Stack observabilidad"
@@ -99,7 +110,13 @@ tf_init observabilidad
 tf observabilidad apply -auto-approve -input=false "${VARS_BASE[@]}"
 
 log "Listo. URLs de los servicios (pégalas en postman/HdA-GCP.postman_environment.json):"
-gcloud run services list --region "$REGION" --project "$PROJECT" --format="table(metadata.name,status.url)"
+echo "== Servicios en southamerica-east1 (Pagos, Reputación, Mocks, Grafana) =="
+gcloud run services list --region "southamerica-east1" --project "$PROJECT" --format="table(metadata.name,status.url)"
+echo "== Servicios en us-central1 (Siniestros) =="
+gcloud run services list --region "us-central1" --project "$PROJECT" --format="table(metadata.name,status.url)"
+echo "== Servicios en us-east1 (Gestión de Trabajos, Proveedores, etc) =="
+gcloud run services list --region "us-east1" --project "$PROJECT" --format="table(metadata.name,status.url)"
+
 echo
 echo "Grafana: $(tf observabilidad output -raw grafana_url)  (usuario admin; contraseña:"
 echo "  gcloud secrets versions access latest --secret=$(tf observabilidad output -raw grafana_admin_password_secret) --project ${PROJECT})"
