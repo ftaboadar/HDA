@@ -11,8 +11,12 @@
 '
 ' Historial: la versión anterior (Entregas 2-4) tenía "Pagos" como System_Ext; quedó en git.
 
+
 !define RELATIVE_INCLUDE
 !include ./C4-PlantUML/C4_Container.puml
+
+AddElementTag("nuevo_e5", $bgColor="#d4edda", $fontColor="#155724", $borderColor="#28a745", $legendText="Nuevo / Cambiado en Entrega 5")
+
 
 title Hogar de los Alpes (HdA) — Vista de Contexto (TO-BE, Entrega 5)
 
@@ -22,7 +26,8 @@ Person(partner, "Partner B2B2C", "Aseguradora, banco o comercio")
 Person(agente, "Agente de Gestión", "Atiende novedades y disputas en el CRM")
 
 System_Boundary(hda, "HdA — Plataforma de Servicios (microservicios orientados a eventos)") {
-  Container(gestionTrabajos, "Gestión de Trabajos", "Microservicio · núcleo", "Orquestación de flujos; dueño del Trabajo (SP)")
+  Container(bff, "API Gateway / BFF", "Microservicio · fachada", "Enruta peticiones de los actores a las APIs de dominio", $tags="nuevo_e5")
+  Container(gestionTrabajos, "Gestión de Trabajos (Coordinador de Sagas)", "Microservicio · núcleo", "Orquestación de flujos mediante Saga Log; dueño del Trabajo (SP)", $tags="nuevo_e5")
   Container(proveedores, "Proveedores de Servicio", "Microservicio", "Registro, verificación y elegibilidad")
   Container(marketplace, "Marketplace", "Microservicio", "Diagnóstico, publicación y cotización")
   Container(reputacion, "Reputación y Calidad", "Microservicio", "Calificaciones")
@@ -41,14 +46,23 @@ System_Ext(erp, "ERP Contable", "Conciliación financiera")
 System_Ext(crm, "Gestión de Agentes", "Coordinación humana (CRM SaaS)")
 
 ' --- Actores -> sistema ---
-Rel(duenoHogar, marketplace, "Solicita, elige cotización")
-Rel(duenoHogar, reputacion, "Califica")
-Rel(duenoHogar, suscripciones, "Contrata")
-Rel(proveedor, proveedores, "Se registra")
-Rel(proveedor, marketplace, "Cotiza")
-Rel(proveedor, gestionTrabajos, "Reporta avance")
-Rel(partner, siniestros, "Crea siniestro, aprueba pasos")
+Rel(duenoHogar, bff, "Solicita, elige cotización")
+Rel(duenoHogar, bff, "Califica")
+Rel(duenoHogar, bff, "Contrata")
+Rel(proveedor, bff, "Se registra")
+Rel(proveedor, bff, "Cotiza")
+Rel(proveedor, bff, "Reporta avance")
+Rel(partner, bff, "Crea siniestro, aprueba pasos")
 Rel(agente, crm, "Atiende tickets")
+
+
+' --- BFF -> servicios internos ---
+Rel(bff, marketplace, "Enruta")
+Rel(bff, reputacion, "Enruta")
+Rel(bff, suscripciones, "Enruta")
+Rel(bff, proveedores, "Enruta")
+Rel(bff, gestionTrabajos, "Enruta")
+Rel(bff, siniestros, "Enruta")
 
 ' --- Sistema -> externos (síncrono, vía ACL/ADP) ---
 Rel(pagos, pasarela, "Autoriza / captura")

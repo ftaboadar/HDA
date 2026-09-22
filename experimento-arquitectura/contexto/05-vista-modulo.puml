@@ -33,6 +33,9 @@ skinparam component {
   BorderColor<<externo>> #666666
   BackgroundColor<<infra>> #FFF2CC
   BorderColor<<infra>> #D6B656
+  BackgroundColor<<nuevo>> #d4edda
+  BorderColor<<nuevo>> #28a745
+
 }
 
 title Hogar de los Alpes — Vista de Módulos (TO-BE, Entrega 5)
@@ -60,7 +63,7 @@ package "Suscripciones" {
 package "Gestión de Trabajos (núcleo)" {
   component "API\n[SP1]" as GT_API <<sensible>>
   component "Ciclo de Vida\n(agregado Trabajo)" as GT_CV <<modulo>>
-  component "Motor de Workflow\n(sub-trabajos)" as GT_WF <<modulo>>
+  component "Motor de Workflow\n(Coordinador de Sagas)" as GT_WF <<nuevo>>
   component "Novedades\n(agregado Novedad) [SP2]" as GT_NOV <<sensible>>
   component "Integraciones Externas\n«Throttler» [SP3]" as GT_INT <<sensible>>
   component "Seedwork" as GT_SW <<seedwork>>
@@ -96,7 +99,7 @@ package "Scoring" {
 
 package "Infraestructura de mensajería" {
   component "Apache Pulsar\n(tópicos por contexto)\n[SP5]" as BUS <<infra>>
-  component "API Gateway / LB\n(llamadas REST)" as GW <<infra>>
+  component "BFF / API Gateway\n(llamadas REST)" as GW <<nuevo>>
 }
 
 package "Sistemas externos" {
@@ -206,6 +209,7 @@ legend right
   | <back:#EEEEEE>  </back> | Seedwork (propio de cada servicio) |
   | <back:#F5F5F5>  </back> | sistema externo |
   | <back:#FFF2CC>  </back> | infraestructura |
+  | <back:#d4edda>  </back> | nuevo o modificado en Entrega 5 |
   | --> | síncrono (comando entre módulos / REST / ACL) |
   | ..> | asíncrono (evento de dominio entre módulos, o de integración vía Pulsar) |
 endlegend
