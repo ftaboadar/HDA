@@ -61,3 +61,30 @@ La arquitectura se desplegó bajo el paradigma de Infraestructura como Código (
     *   **Swagger/OpenAPI:** Exportado en `/docs` del BFF y cada microservicio.
     *   **Colección Postman:** Disponible en `postman/`.
 
+
+---
+
+## 8. Anexo: Evidencia Funcional (BFF y Postman)
+Para evidenciar el correcto funcionamiento de los Journeys (JRN-01 a JRN-05) a través del BFF, se adjunta la colección oficial en `implementacion/journey/Journey E5.postman_collection.json`. A continuación, un ejemplo de la respuesta esperada al iniciar una transacción en el BFF (Paso 1 del Journey):
+
+**Request (POST /v1/trabajos):**
+```json
+{
+    "cliente_id": "CLI-9876",
+    "tipo_servicio": "plomeria",
+    "region": "CO",
+    "detalles": "Fuga de agua en lavamanos"
+}
+```
+
+**Response Exitosa (HTTP 202 Accepted):**
+```json
+{
+    "mensaje": "Trabajo recibido. Saga iniciada.",
+    "trabajo_id": "TRB-12345678",
+    "saga_id": "SAGA-87654321",
+    "correlation_id": "req-abc-123",
+    "estado": "SOLICITADO"
+}
+```
+*Nota: La ejecución completa de los casos de éxito, compensación por disputa y reglas de negocio, así como las consultas a la base de datos (Saga Log), se demostrarán en vivo durante el Video de Sustentación utilizando la colección Postman provista.*
