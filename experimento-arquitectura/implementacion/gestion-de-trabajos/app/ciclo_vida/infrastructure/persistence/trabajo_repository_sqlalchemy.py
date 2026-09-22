@@ -19,7 +19,7 @@ from app.infrastructure.persistence.models_db import TrabajoORM
 def _a_dominio(fila: TrabajoORM) -> Trabajo:
     return Trabajo(
         id=fila.id,
-        proveedor_id=ProveedorId(fila.proveedor_id),
+        proveedor_id=ProveedorId(fila.proveedor_id) if fila.proveedor_id else None,
         monto=Dinero(fila.monto, fila.moneda),
         region=Region(fila.region),
         estado=EstadoTrabajo(fila.estado),
@@ -35,7 +35,9 @@ class TrabajoRepositorySQLAlchemy(ITrabajoRepository):
                 fila = TrabajoORM(id=trabajo.id, fecha_creacion=trabajo.fecha_creacion)
                 sesion.add(fila)
 
-            fila.proveedor_id = str(trabajo.proveedor_id)
+            fila.proveedor_id = (
+                str(trabajo.proveedor_id) if trabajo.proveedor_id else None
+            )
             fila.estado = trabajo.estado.value
             fila.monto = trabajo.monto.valor
             fila.moneda = trabajo.monto.moneda

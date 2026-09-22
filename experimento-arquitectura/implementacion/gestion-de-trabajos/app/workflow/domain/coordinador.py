@@ -4,6 +4,7 @@ from typing import List
 from app.workflow.domain.saga import SagaInstancia
 from app.workflow.domain.value_objects import PasoSaga, EstadoSaga, SagaId
 from app.ciclo_vida.domain.trabajo import Trabajo
+from app.ciclo_vida.domain.value_objects import ProveedorId, TrabajoId
 from app.workflow.domain.eventos import (
     ComandoSaga,
     PublicarElegibles,
@@ -21,11 +22,18 @@ class CoordinadorSaga:
     def iniciar_saga(
         trabajo: Trabajo, origen: str, origen_id: str
     ) -> tuple[SagaInstancia, List[ComandoSaga]]:
-        """Paso 1: local CrearTrabajo -> dispara PublicarElegibles"""
+        """Paso 1: local CrearTrabajo -> dispara PublicarElegibles.
+
+        Tabla de estados (15-arquitectura-entrega-5.md §6): SOLICITADO
+        --(TrabajoCreado publicado)--> ESPERANDO_ELEGIBLES. `trabajo` llega
+        recién creado por `FabricaTrabajo` (SOLICITADO, sin proveedor); este
+        método es quien dispara esa transición al armar el comando
+        `PublicarElegibles` (el equivalente local a "publicar TrabajoCreado")."""
+        trabajo.esperar_elegibles()
         saga_id = SagaId.nueva()
         saga = SagaInstancia(
             id=saga_id.valor,
-            trabajo_id=trabajo.id,
+            trabajo_id=TrabajoId(trabajo.id),
             origen=origen,
             estado=EstadoSaga.INICIADA,
             paso_actual=PasoSaga.PUBLICAR_ELEGIBLES,
@@ -63,9 +71,19 @@ class CoordinadorSaga:
 
     @staticmethod
     def on_franja_reservada(
-        saga: SagaInstancia, reserva_id: str, monto: float, moneda: str
+        saga: SagaInstancia,
+        trabajo: Trabajo,
+        proveedor_id: str,
+        reserva_id: str,
+        monto: float,
+        moneda: str,
     ) -> List[ComandoSaga]:
-        """Paso 4: Pagos RetenerPago"""
+        """Paso 4: `AgendaConfirmada` -> GT·Ciclo de Vida AsignarProveedor
+        (ASIGNADO) -> Pagos RetenerPago (15-arquitectura-entrega-5.md §5.1
+        paso 4 y §7.1 paso 3-4). Antes de este fix, `asignar_proveedor()`
+        nunca se llamaba en ningún lado del coordinador y el Trabajo se
+        quedaba en SOLICITADO para siempre."""
+        trabajo.asignar_proveedor(ProveedorId(proveedor_id))
         saga.avanzar_paso(PasoSaga.RETENER_PAGO)
         comando = RetenerPago(
             comando_id=str(uuid.uuid4()),
@@ -93,9 +111,12 @@ class CoordinadorSaga:
 
     @staticmethod
     def on_pago_retenido(saga: SagaInstancia, trabajo: Trabajo) -> List[ComandoSaga]:
-        """Paso 5: local IniciarWorkflow"""
+        """Paso 5: local IniciarWorkflow (ASIGNADO -> EN_CURSO). Antes de
+        este fix llamaba `trabajo.iniciar_curso()`, método inexistente en
+        `Trabajo` (el real es `iniciar_workflow()`) -- `AttributeError`
+        garantizado en cuanto llegaba `PagoRetenido`."""
         saga.avanzar_paso(PasoSaga.INICIAR_WORKFLOW)
-        trabajo.iniciar_curso()
+        trabajo.iniciar_workflow()
         return []
 
     @staticmethod

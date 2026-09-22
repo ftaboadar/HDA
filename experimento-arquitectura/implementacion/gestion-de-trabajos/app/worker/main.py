@@ -36,6 +36,12 @@ def start_worker():
         "persistent://hda/pagos/pago.retencion-fallida",
         "persistent://hda/pagos/pago.liberado",
         "persistent://hda/pagos/pago.compensado",
+        # Paso 3 (§7.1): el canal dueño del origen publica ProveedorSeleccionado
+        # en SU propio namespace -- son 3 tópicos distintos, uno por canal
+        # (catálogo §7, fila ProveedorSeleccionado), no uno solo.
+        "persistent://hda/marketplace/proveedor.seleccionado",
+        "persistent://hda/siniestros/proveedor.seleccionado",
+        "persistent://hda/suscripciones/proveedor.seleccionado",
     ]
 
     consumer = client.subscribe(
@@ -85,6 +91,13 @@ def start_worker():
             elif tipo == "PagoCompensado" or "pago.compensado" in msg.topic_name():
                 loop.run_until_complete(
                     handlers.handle_pago_compensado(payload, id_evento)
+                )
+            elif (
+                tipo == "ProveedorSeleccionado"
+                or "proveedor.seleccionado" in msg.topic_name()
+            ):
+                loop.run_until_complete(
+                    handlers.handle_proveedor_seleccionado(payload, id_evento)
                 )
 
             consumer.acknowledge(msg)

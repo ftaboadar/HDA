@@ -65,11 +65,19 @@ class CrearTrabajo:
             region=Region(region),
         )
 
-        # Skeleton simplificado (12-plan-entrega-4.md sección 3): sin
-        # modelar el ciclo de vida intermedio de un Trabajo real (eso es
-        # de la Saga, Entrega 5), este comando finaliza el trabajo de
-        # inmediato para poder demostrar el evento `trabajos.finalizado`
-        # de punta a punta.
+        # Atajo de carga de ESC-01 (A15, 15-arquitectura-entrega-5.md): no
+        # pasa por la Saga real (Motor de Workflow), pero SÍ debe respetar
+        # el invariante de máquina de estados del agregado -- `finalizar()`
+        # exige EN_CURSO, no SOLICITADO. Antes de este fix llamaba
+        # `trabajo.finalizar()` directo sobre un trabajo recién creado en
+        # SOLICITADO, lo que lanzaba `ErrorTransicionInvalida` siempre.
+        # Camina la máquina de estados completa en un solo comando síncrono
+        # para simular, de punta a punta, el mismo resultado de negocio que
+        # produce la saga real (SOLICITADO -> ASIGNADO -> EN_CURSO ->
+        # FINALIZADO), sin coordinador ni eventos de integración
+        # intermedios -- solo el evento de dominio final `TrabajoFinalizado`.
+        trabajo.asignar_proveedor(trabajo.proveedor_id)
+        trabajo.iniciar_workflow()
         trabajo.finalizar()
         await asyncio.to_thread(self._repo.guardar, trabajo)
         t_persistido = time.perf_counter()

@@ -69,17 +69,54 @@ class SagaHandlers:
 
         trabajo_id = uuid.UUID(payload["correlation_id"])
         saga = self.repo_saga.obtener_por_trabajo_id(trabajo_id)
-        if not saga:
-            logger.error(f"Saga no encontrada para trabajo {trabajo_id}")
+        trabajo = self.repo_trabajos.obtener_por_id(TrabajoId(trabajo_id))
+        if not saga or not trabajo:
+            logger.error(f"Saga o trabajo no encontrado para trabajo {trabajo_id}")
             return
         comandos = self.coordinador.on_franja_reservada(
             saga=saga,
+            trabajo=trabajo,
+            proveedor_id=payload["proveedor_id"],
             reserva_id=payload["reserva_id"],
             monto=payload["monto"],
             moneda=payload.get("moneda", "COP"),
         )
         await self._procesar_y_publicar(
-            saga, None, comandos, "AgendaConfirmada", payload, id_mensaje
+            saga, trabajo, comandos, "AgendaConfirmada", payload, id_mensaje
+        )
+
+    async def handle_proveedor_seleccionado(self, payload: dict, id_mensaje: str):
+        """Paso 3 (§7.1): el canal del origen (Marketplace/Siniestros/
+        Suscripciones) elige al proveedor y publica `ProveedorSeleccionado`
+        en su propio namespace -- GT responde con el comando `ReservarFranja`
+        a Proveedores·Agenda (A14). `on_proveedor_seleccionado` en
+        `coordinador.py` ya armaba ese comando; antes de este fix no existía
+        ningún handler que lo invocara, así que nunca se enviaba.
+
+        Nota de payload: a diferencia de los demás handlers de esta clase,
+        aquí se busca la saga por `payload["trabajo_id"]`, no por
+        `payload["correlation_id"]` -- así lo trae el contrato de
+        `ProveedorSeleccionado` en el catálogo (§7)."""
+        if self.es_mensaje_duplicado(id_mensaje):
+            logger.info(f"Mensaje {id_mensaje} ya procesado. Ignorando.")
+            return
+
+        trabajo_id = uuid.UUID(payload["trabajo_id"])
+        saga = self.repo_saga.obtener_por_trabajo_id(trabajo_id)
+        if not saga:
+            logger.error(f"Saga no encontrada para trabajo {trabajo_id}")
+            return
+
+        franja = payload.get("franja") or {}
+        comandos = self.coordinador.on_proveedor_seleccionado(
+            saga=saga,
+            proveedor_id=payload["proveedor_id"],
+            tecnico_id=payload["tecnico_id"],
+            fecha_franja=franja.get("fecha", ""),
+            bloque=franja.get("bloque", ""),
+        )
+        await self._procesar_y_publicar(
+            saga, None, comandos, "ProveedorSeleccionado", payload, id_mensaje
         )
 
     async def handle_franja_rechazada(self, payload: dict, id_mensaje: str):
@@ -201,6 +238,45 @@ class SagaHandlers:
         self.coordinador.on_pago_liberado(saga, trabajo)
         await self._procesar_y_publicar(
             saga, trabajo, [], "PagoLiberado", payload, id_mensaje
+        )
+
+    async def handle_completar_sub_trabajo(
+        self, trabajo_id: uuid.UUID, id_mensaje: str
+    ):
+        """Paso 5 (§7.1 y §5.1 paso 5): 'Proveedor -API-> GT: CompletarSubTrabajo
+        -> Motor -async SubTrabajosCompletos-> Ciclo de Vida: CerrarTrabajo
+        (FINALIZADO)'. Disparado por `POST /trabajos/{id}/completar` (no por
+        un mensaje de Pulsar) -- por eso recibe `trabajo_id` directo en vez
+        de un `payload` de evento, pero sigue el mismo patrón de idempotencia
+        y saga log que los demás handlers (ver
+        `application/commands/completar_sub_trabajo.py`, que es quien genera
+        el `id_mensaje` para esta llamada).
+
+        Decisión sobre `pago_id` (tarea 4): no se agregó columna nueva a
+        `SagaInstancia`/`Trabajo` -- se lee del último `EVENTO_RECIBIDO` de
+        tipo `PagoRetenido` en el Saga Log (`obtener_pago_id_retenido`), que
+        ya lo guarda `handle_pago_retenido` en su payload."""
+        if self.es_mensaje_duplicado(id_mensaje):
+            logger.info(f"Mensaje {id_mensaje} ya procesado. Ignorando.")
+            return
+
+        saga = self.repo_saga.obtener_por_trabajo_id(trabajo_id)
+        trabajo = self.repo_trabajos.obtener_por_id(TrabajoId(trabajo_id))
+        if not saga or not trabajo:
+            logger.error(f"Saga o trabajo no encontrado para trabajo {trabajo_id}")
+            return
+
+        pago_id = self.repo_saga.obtener_pago_id_retenido(saga.id) or ""
+        comandos = self.coordinador.on_trabajo_completado_por_proveedor(
+            saga, trabajo, pago_id
+        )
+        await self._procesar_y_publicar(
+            saga,
+            trabajo,
+            comandos,
+            "CompletarSubTrabajo",
+            {"trabajo_id": str(trabajo_id), "pago_id": pago_id},
+            id_mensaje,
         )
 
     async def handle_pago_compensado(self, payload: dict, id_mensaje: str):

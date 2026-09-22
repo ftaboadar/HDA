@@ -98,6 +98,7 @@
                 "type": "number"
               },
               {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
               }
             ],
@@ -157,6 +158,7 @@
             "type": "string"
           },
           "monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Monto",
             "type": "string"
           },
@@ -432,6 +434,45 @@
           }
         },
         "summary": "Obtener Trabajo"
+      }
+    },
+    "/trabajos/{trabajo_id}/completar": {
+      "post": {
+        "description": "Paso 5 de la saga (§5.1 y §7.1 de 15-arquitectura-entrega-5.md):\n'Proveedor -API-> GT: CompletarSubTrabajo'. `202 Accepted` (no `200`):\nel efecto sobre el `Trabajo` (FINALIZADO) y el comando `LiberarPago` que\ndispara ocurren de forma asíncrona respecto a la saga -- misma\nconvención que `POST /novedades` (ver docstring de ese endpoint). Acepta\nun header `Idempotency-Key` opcional para reenvíos seguros del mismo\naviso del proveedor (si no llega, se genera un `id_mensaje` nuevo y la\nllamada NO es idempotente por sí sola; la protección real contra un\ndoble `finalizar()` la da igual el invariante del agregado `Trabajo`).",
+        "operationId": "completar_sub_trabajo_trabajos__trabajo_id__completar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trabajo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Trabajo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Completar Sub Trabajo"
       }
     }
   }

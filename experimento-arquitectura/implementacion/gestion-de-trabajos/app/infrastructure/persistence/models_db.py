@@ -30,7 +30,13 @@ class TrabajoORM(Base):
     __tablename__ = "trabajos"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    proveedor_id = Column(String, nullable=False, index=True)
+    # nullable=True (antes False): en la saga real (§6 de
+    # 15-arquitectura-entrega-5.md) un Trabajo nace SOLICITADO/
+    # ESPERANDO_ELEGIBLES sin proveedor -- `AsignarProveedor` solo ocurre en
+    # el paso 4, con `AgendaConfirmada`. El atajo de carga (A15,
+    # `POST /trabajos`) sigue exigiendo `proveedor_id` en el payload y lo
+    # asigna de inmediato, así que no se ve afectado por este cambio.
+    proveedor_id = Column(String, nullable=True, index=True)
     estado = Column(String, nullable=False, default="PENDIENTE", index=True)
     monto = Column(Numeric, nullable=False)
     moneda = Column(String, nullable=False)
