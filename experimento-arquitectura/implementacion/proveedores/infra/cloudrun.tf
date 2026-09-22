@@ -36,6 +36,26 @@ resource "google_cloud_run_v2_service" "api" {
     # adicionales a mitad de la ráfaga).
     max_instance_request_concurrency = 80
 
+    # Direct VPC egress — SOLO así el tráfico saliente de este servicio
+    # hacia la VM de Pulsar (pulsar-infra/gcp) sale realmente por la
+    # subred "default" de la VPC del proyecto; sin esto, el firewall de
+    # esa VM (restringido al rango de la subred, no 0.0.0.0/0) rechaza la
+    # conexión porque el egress serverless por defecto de Cloud Run se
+    # origina desde IPs de Google, no de la VPC del cliente. La API
+    # publica verificaciones al topic de "solicitudes" de Pulsar, así que
+    # también necesita esta ruta (mismo criterio que gestion-de-trabajos,
+    # ver service.tf ahí). egress = PRIVATE_RANGES_ONLY: solo el tráfico
+    # con destino RFC1918 (la IP interna de la VM de Pulsar) se enruta por
+    # la VPC — las llamadas a los mocks (Cloud Run público) siguen su
+    # camino normal de internet.
+    vpc_access {
+      egress = "PRIVATE_RANGES_ONLY"
+      network_interfaces {
+        network    = "default"
+        subnetwork = data.google_compute_subnetwork.default.id
+      }
+    }
+
     containers {
       image   = local.imagen_app
       command = ["uvicorn"]
@@ -51,7 +71,7 @@ resource "google_cloud_run_v2_service" "api" {
 
       env {
         name  = "TRANSPORTE"
-        value = "pubsub"
+        value = "pulsar"
       }
       env {
         name = "DATABASE_URL"
@@ -82,8 +102,9 @@ resource "google_cloud_run_v2_service" "api" {
         value = google_pubsub_topic.eventos_integracion.name
       }
       env {
-        # No lo usa ningún comando de la API hoy — mismo criterio que
-        # PUBSUB_TOPIC_EVENTOS arriba. Ver var.pulsar_service_url.
+        # TRANSPORTE=pulsar: la API SÍ usa esto para publicar la
+        # verificación al topic de "solicitudes" de Pulsar (ver
+        # app/api/main.py). Ver var.pulsar_service_url.
         name  = "PULSAR_SERVICE_URL"
         value = var.pulsar_service_url
       }
@@ -135,10 +156,25 @@ resource "google_cloud_run_v2_service" "worker" {
     # sola instancia caliente puede atender de sobra.
     max_instance_request_concurrency = 80
 
+    # Direct VPC egress hacia la VM de Pulsar — mismo criterio que el
+    # servicio api arriba. El worker es quien más lo necesita: arranca
+    # (app/worker/main.py) los dos consumidores Pulsar incondicionalmente
+    # (verificacion.solicitudes y trabajos.finalizado), así que sin esta
+    # ruta de red el hilo del consumidor crashea al intentar conectar al
+    # broker y /salud reporta 503 — exactamente el síntoma que dejaba las
+    # verificaciones en PENDIENTE para siempre.
+    vpc_access {
+      egress = "PRIVATE_RANGES_ONLY"
+      network_interfaces {
+        network    = "default"
+        subnetwork = data.google_compute_subnetwork.default.id
+      }
+    }
+
     containers {
       image   = local.imagen_app
       command = ["uvicorn"]
-      args    = ["app.worker.push_handler:app", "--host", "0.0.0.0", "--port", "8080"]
+      args    = ["app.worker.main:app", "--host", "0.0.0.0", "--port", "8080"]
 
       resources {
         startup_cpu_boost = true
@@ -189,9 +225,10 @@ resource "google_cloud_run_v2_service" "worker" {
         value = google_pubsub_topic.eventos_integracion.name
       }
       env {
-        # Ver var.pulsar_service_url — plumbing por simetría, sin uso
-        # real hoy (TRANSPORTE=pubsub sigue siendo el único transporte
-        # que el worker de Proveedores implementa).
+        # El worker arranca sus consumidores Pulsar incondicionalmente
+        # (app/worker/main.py, no depende de TRANSPORTE) — esta URL es la
+        # única forma de que apunten a la VM real en vez del default de
+        # desarrollo "pulsar://pulsar:6650" (app/common/config.py).
         name  = "PULSAR_SERVICE_URL"
         value = var.pulsar_service_url
       }

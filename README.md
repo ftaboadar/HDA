@@ -98,3 +98,12 @@ make local-run          # docker compose up + espera salud + pytest + reporte
 ```
 
 RabbitMQ management UI: `http://localhost:15672` (hda/hda). API: `http://localhost:8000/docs`.
+
+## Evaluación Entrega 5 — ¿Cómo probar el sistema?
+
+Toda la infraestructura en la nube está diseñada para apagarse y encenderse a demanda mediante código (Terraform) para proteger el presupuesto del equipo. Para levantar el proyecto y evaluarlo, sigue las instrucciones de la **Etapa 4 (Sustentación)**:
+
+1.  **Despliegue de la Nube:** Ejecuta `PROJECT=<tu-proyecto> bash experimento-arquitectura/implementacion/scripts/desplegar-todo.sh`.
+2.  **API Gateway (BFF):** Una vez desplegado, las peticiones deben enviarse a la URL de Cloud Run del BFF o usar las colecciones JSON en `/postman` configurando las variables de entorno.
+3.  **Documentación Oficial:** Revisa el documento consolidado de la entrega en `experimento-arquitectura/contexto/19-documento-entrega-5.md`.
+4.  **Runbook completo:** Visita `experimento-arquitectura/implementacion/RUNBOOK-SUSTENTACION.md` para las pruebas de k6, DBeaver y Logs Explorer.

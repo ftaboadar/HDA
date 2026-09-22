@@ -1,45 +1,444 @@
 asyncapi: 2.6.0
 info:
-  title: Hogar de los Alpes — API asíncrona (PoC)
-  version: 1.0.0
+  title: Hogar de los Alpes — API asíncrona (Entrega 5)
+  version: 2.0.0
   description: >
-    Contratos de los mensajes que cruzan Bounded Contexts en la PoC. Todos son
-    JSON (application/json). La versión del contrato (`version_esquema`) viaja
-    como metadata del mensaje (propiedad Pulsar / atributo Pub/Sub), no en el
-    cuerpo. Fuente de verdad del código: gestion-de-trabajos/app/infrastructure/
-    messaging/publicador_pulsar.py y proveedores/app/common/publicador.py.
+    Contrato ejecutable de TODOS los mensajes que cruzan servicios: los eventos de integración del
+    catálogo (15-arquitectura-entrega-5.md §7) y los comandos de la Saga del Trabajo (§7.1). La decisión
+    vive en el 15; este archivo es el contrato que usan las pruebas de contrato de cada servicio
+    (CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md §9): un publicador valida su cuerpo contra el `payload` del
+    mensaje y un consumidor publica en Pulsar local un mensaje con esta forma exacta.
+
+
+    Convenciones de lectura: en cada canal, `publish` lo hace el servicio de `x-productor` y
+    `subscribe` los de `x-consumidores` (una suscripción Shared `<servicio>-<evento>` por consumidor).
+    `x-tipo` = `comando` | `integracion_carga_estado` | `integracion_delgado` (§7.2).
+
+
+    Formato: cuerpo JSON (Schema Registry de Pulsar con `JsonSchema`, compatibilidad BACKWARD por
+    namespace, A21). Metadatos en las PROPIEDADES del mensaje Pulsar (`headers` de cada mensaje), nunca
+    en el cuerpo. Montos como string decimal (no float). Reglas de evolución: §14 del 15 y CONVENCIONES §3
+    — solo se agregan campos opcionales; un cambio que rompe crea un tópico `…v2`.
 servers:
-  pulsar-gcp:
-    url: pulsar://10.158.0.2:6650
+  pulsar-local:
+    url: pulsar://localhost:6650
     protocol: pulsar
-    description: Apache Pulsar en la VM pulsar-poc-vm (IP privada de la VPC; accesible por Direct VPC egress).
+    description: Cluster local (pulsar-infra/docker-compose.yml + scripts/pulsar-namespaces-local.sh).
+  pulsar-gcp:
+    url: pulsar://pulsar-poc-vm:6650
+    protocol: pulsar
+    description: Apache Pulsar en la VM de pulsar-infra/gcp (IP privada de la VPC; Direct VPC egress desde Cloud Run).
   pubsub-gcp:
     url: pubsub.googleapis.com
     protocol: googlepubsub
-    description: Cloud Pub/Sub del proyecto hogaralpes.
+    description: Cloud Pub/Sub — solo la cola interna de Verificación de DISP-03 (no es evento de integración, §7).
 
 channels:
+
+  # ───────────────────────── Paso 1: los canales crean el Trabajo ─────────────────────────
+
+  persistent://hda/marketplace/solicitud.diagnosticada:
+    description: El dueño describió su necesidad y Marketplace la diagnosticó. GT crea el Trabajo e inicia la saga.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: marketplace
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-solicitud.diagnosticada }]
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarSolicitudDiagnosticada
+      message: { $ref: '#/components/messages/SolicitudDiagnosticada' }
+    subscribe:
+      operationId: consumirSolicitudDiagnosticada
+      message: { $ref: '#/components/messages/SolicitudDiagnosticada' }
+
+  persistent://hda/siniestros/siniestro.aprobado:
+    description: El partner aprobó un siniestro. GT crea el Trabajo de origen SINIESTRO (sin retención de pago).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: siniestros
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-siniestro.aprobado }]
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarSiniestroAprobado
+      message: { $ref: '#/components/messages/SiniestroAprobado' }
+    subscribe:
+      operationId: consumirSiniestroAprobado
+      message: { $ref: '#/components/messages/SiniestroAprobado' }
+
+  persistent://hda/suscripciones/ciclo.suscripcion:
+    description: >
+      Inicio de un ciclo de suscripción. Primer ciclo sin proveedor (pasa por elegibles); ciclos siguientes
+      con `proveedor_id` y la franja recurrente ya reservada (A13, A14).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: suscripciones
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-ciclo.suscripcion }]
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarCicloSuscripcion
+      message: { $ref: '#/components/messages/CicloSuscripcion' }
+    subscribe:
+      operationId: consumirCicloSuscripcion
+      message: { $ref: '#/components/messages/CicloSuscripcion' }
+
+  persistent://hda/gestion-trabajos/trabajo.creado:
+    description: >
+      Trabajo creado (máquina de estados §6). Con la saga orquestada (A22) el coordinador le pide los
+      elegibles a Proveedores con el comando `PublicarElegibles` (mismos campos); este evento queda como
+      notificación, sin consumidor que avance la saga.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: gestion-de-trabajos
+    x-consumidores: []
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarTrabajoCreado
+      message: { $ref: '#/components/messages/TrabajoCreado' }
+
+  # ───────────────────────── Paso 2-3: elegibles, selección y agenda ─────────────────────────
+
+  persistent://hda/proveedores/elegibles.publicados:
+    description: Respuesta a `PublicarElegibles`. Lista ordenada (reputación, A10) con franja ofrecida por técnico; nunca vacía (A12).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: proveedores
+    x-consumidores:
+      - { servicio: marketplace, suscripcion: marketplace-elegibles.publicados, filtro: origen=MARKETPLACE }
+      - { servicio: siniestros, suscripcion: siniestros-elegibles.publicados, filtro: origen=SINIESTRO }
+      - { servicio: suscripciones, suscripcion: suscripciones-elegibles.publicados, filtro: "origen=SUSCRIPCION (primer ciclo)" }
+      - { servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-elegibles.publicados, filtro: "solo Saga Log (EVENTO_RECIBIDO)" }
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarElegiblesPublicados
+      message: { $ref: '#/components/messages/ElegiblesPublicados' }
+    subscribe:
+      operationId: consumirElegiblesPublicados
+      message: { $ref: '#/components/messages/ElegiblesPublicados' }
+
+  persistent://hda/marketplace/proveedor.seleccionado:
+    description: El dueño eligió proveedor y franja (A9). El coordinador de GT responde con `ReservarFranja`.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: marketplace
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-proveedor.seleccionado }]
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarProveedorSeleccionadoMarketplace
+      message: { $ref: '#/components/messages/ProveedorSeleccionado' }
+    subscribe:
+      operationId: consumirProveedorSeleccionadoMarketplace
+      message: { $ref: '#/components/messages/ProveedorSeleccionado' }
+
+  persistent://hda/siniestros/proveedor.seleccionado:
+    description: El partner aprobó al proveedor (A9). El coordinador de GT responde con `ReservarFranja`.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: siniestros
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-proveedor.seleccionado }]
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarProveedorSeleccionadoSiniestros
+      message: { $ref: '#/components/messages/ProveedorSeleccionado' }
+    subscribe:
+      operationId: consumirProveedorSeleccionadoSiniestros
+      message: { $ref: '#/components/messages/ProveedorSeleccionado' }
+
+  persistent://hda/suscripciones/proveedor.seleccionado:
+    description: El cliente de suscripción eligió proveedor con franja recurrente (A13, A14). El coordinador responde con `ReservarFranja`.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: suscripciones
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-proveedor.seleccionado }]
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarProveedorSeleccionadoSuscripciones
+      message: { $ref: '#/components/messages/ProveedorSeleccionado' }
+    subscribe:
+      operationId: consumirProveedorSeleccionadoSuscripciones
+      message: { $ref: '#/components/messages/ProveedorSeleccionado' }
+
+  persistent://hda/proveedores/agenda.confirmada:
+    description: Respuesta OK a `ReservarFranja` (reserva atómica de la franja del técnico, A14).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: proveedores
+    x-consumidores:
+      - { servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-agenda.confirmada }
+      - { servicio: marketplace, suscripcion: marketplace-agenda.confirmada, filtro: origen=MARKETPLACE }
+      - { servicio: siniestros, suscripcion: siniestros-agenda.confirmada, filtro: origen=SINIESTRO }
+      - { servicio: suscripciones, suscripcion: suscripciones-agenda.confirmada, filtro: origen=SUSCRIPCION }
+      - { servicio: reputacion, suscripcion: reputacion-agenda.confirmada }
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarAgendaConfirmada
+      message: { $ref: '#/components/messages/AgendaConfirmada' }
+    subscribe:
+      operationId: consumirAgendaConfirmada
+      message: { $ref: '#/components/messages/AgendaConfirmada' }
+
+  persistent://hda/proveedores/agenda.rechazada:
+    description: Respuesta de falla a `ReservarFranja` (la franja ya estaba tomada). La saga vuelve al paso 2.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: proveedores
+    x-consumidores:
+      - { servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-agenda.rechazada }
+      - { servicio: marketplace, suscripcion: marketplace-agenda.rechazada, filtro: origen=MARKETPLACE }
+      - { servicio: siniestros, suscripcion: siniestros-agenda.rechazada, filtro: origen=SINIESTRO }
+      - { servicio: suscripciones, suscripcion: suscripciones-agenda.rechazada, filtro: origen=SUSCRIPCION }
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarAgendaRechazada
+      message: { $ref: '#/components/messages/AgendaRechazada' }
+    subscribe:
+      operationId: consumirAgendaRechazada
+      message: { $ref: '#/components/messages/AgendaRechazada' }
+
+  persistent://hda/proveedores/agenda.liberada:
+    description: Respuesta a `LiberarFranja` (compensación, no-show, deshabilitado o fin de periodo). Informativo para el canal.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: proveedores
+    x-consumidores:
+      - { servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-agenda.liberada, filtro: "solo Saga Log" }
+      - { servicio: marketplace, suscripcion: marketplace-agenda.liberada }
+      - { servicio: siniestros, suscripcion: siniestros-agenda.liberada }
+      - { servicio: suscripciones, suscripcion: suscripciones-agenda.liberada }
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarAgendaLiberada
+      message: { $ref: '#/components/messages/AgendaLiberada' }
+    subscribe:
+      operationId: consumirAgendaLiberada
+      message: { $ref: '#/components/messages/AgendaLiberada' }
+
+  # ───────────────────────── Comandos de la saga (§7.1) ─────────────────────────
+
+  persistent://hda/proveedores/comandos:
+    description: Comandos del coordinador (GT·Motor de Workflow) hacia Proveedores. Punto a punto; idempotentes por `id_comando`.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: gestion-de-trabajos
+    x-consumidores: [{ servicio: proveedores, suscripcion: proveedores-comandos }]
+    x-tipo: comando
+    publish:
+      operationId: enviarComandoProveedores
+      message:
+        oneOf:
+          - $ref: '#/components/messages/PublicarElegibles'
+          - $ref: '#/components/messages/ReservarFranja'
+          - $ref: '#/components/messages/LiberarFranja'
+    subscribe:
+      operationId: recibirComandoProveedores
+      message:
+        oneOf:
+          - $ref: '#/components/messages/PublicarElegibles'
+          - $ref: '#/components/messages/ReservarFranja'
+          - $ref: '#/components/messages/LiberarFranja'
+
+  persistent://hda/pagos/comandos:
+    description: Comandos del coordinador hacia Pagos (A18). Punto a punto; idempotentes por `id_comando`.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: gestion-de-trabajos
+    x-consumidores: [{ servicio: pagos, suscripcion: pagos-comandos }]
+    x-tipo: comando
+    publish:
+      operationId: enviarComandoPagos
+      message:
+        oneOf:
+          - $ref: '#/components/messages/RetenerPago'
+          - $ref: '#/components/messages/LiberarPago'
+          - $ref: '#/components/messages/CompensarPago'
+    subscribe:
+      operationId: recibirComandoPagos
+      message:
+        oneOf:
+          - $ref: '#/components/messages/RetenerPago'
+          - $ref: '#/components/messages/LiberarPago'
+          - $ref: '#/components/messages/CompensarPago'
+
+  persistent://hda/siniestros/comandos:
+    description: Comandos del coordinador hacia Siniestros (paso 6 de siniestro y aprobación de novedades, A11).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: gestion-de-trabajos
+    x-consumidores: [{ servicio: siniestros, suscripcion: siniestros-comandos }]
+    x-tipo: comando
+    publish:
+      operationId: enviarComandoSiniestros
+      message:
+        oneOf:
+          - $ref: '#/components/messages/FacturarAPartner'
+          - $ref: '#/components/messages/SolicitarAprobacionNovedad'
+    subscribe:
+      operationId: recibirComandoSiniestros
+      message:
+        oneOf:
+          - $ref: '#/components/messages/FacturarAPartner'
+          - $ref: '#/components/messages/SolicitarAprobacionNovedad'
+
+  # ───────────────────────── Paso 4 y 6: pagos ─────────────────────────
+
+  persistent://hda/pagos/pago.retenido:
+    description: Respuesta OK a `RetenerPago`. El Trabajo pasa a EN_CURSO.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: pagos
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-pago.retenido }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarPagoRetenido
+      message: { $ref: '#/components/messages/PagoRetenido' }
+    subscribe:
+      operationId: consumirPagoRetenido
+      message: { $ref: '#/components/messages/PagoRetenido' }
+
+  persistent://hda/pagos/pago.retencion-fallida:
+    description: Respuesta de falla a `RetenerPago` (pasarela en modo falla). El coordinador compensa con `LiberarFranja` y cancela el Trabajo.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: pagos
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-pago.retencion-fallida }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarPagoRetencionFallida
+      message: { $ref: '#/components/messages/PagoRetencionFallida' }
+    subscribe:
+      operationId: consumirPagoRetencionFallida
+      message: { $ref: '#/components/messages/PagoRetencionFallida' }
+
+  persistent://hda/pagos/pago.liberado:
+    description: Respuesta OK a `LiberarPago`. El Trabajo pasa a PAGADO y la saga a COMPLETADA.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: pagos
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-pago.liberado }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarPagoLiberado
+      message: { $ref: '#/components/messages/PagoLiberado' }
+    subscribe:
+      operationId: consumirPagoLiberado
+      message: { $ref: '#/components/messages/PagoLiberado' }
+
+  persistent://hda/pagos/pago.fallido:
+    description: Respuesta de falla a `LiberarPago` o `CompensarPago`.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: pagos
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-pago.fallido }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarPagoFallido
+      message: { $ref: '#/components/messages/PagoFallido' }
+    subscribe:
+      operationId: consumirPagoFallido
+      message: { $ref: '#/components/messages/PagoFallido' }
+
+  persistent://hda/pagos/pago.compensado:
+    description: Respuesta OK a `CompensarPago` (disputa). El Trabajo pasa de EN_DISPUTA a CANCELADO.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: pagos
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-pago.compensado }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarPagoCompensado
+      message: { $ref: '#/components/messages/PagoCompensado' }
+    subscribe:
+      operationId: consumirPagoCompensado
+      message: { $ref: '#/components/messages/PagoCompensado' }
+
+  persistent://hda/siniestros/factura.emitida:
+    description: >
+      Respuesta a `FacturarAPartner` (paso 6 de un siniestro, §7.1). PROPUESTO: §7.1 nombra la respuesta
+      `FacturaEmitida` pero el catálogo §7 no le asigna tópico; se usa el patrón `hda/<productor>/<evento>`
+      hasta que el equipo lo confirme en el 15.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: siniestros
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-factura.emitida }]
+    x-tipo: integracion_delgado
+    x-estado: propuesto
+    publish:
+      operationId: publicarFacturaEmitida
+      message: { $ref: '#/components/messages/FacturaEmitida' }
+    subscribe:
+      operationId: consumirFacturaEmitida
+      message: { $ref: '#/components/messages/FacturaEmitida' }
+
+  # ───────────────────────── Fan-out y caminos alternos ─────────────────────────
+
   persistent://hda/gestion-trabajos/trabajos.finalizado:
     description: >
-      Evento de INTEGRACIÓN TrabajoFinalizado. Propiedad de ContextoGestionDeTrabajos.
-      Nace como evento de dominio dentro del agregado Trabajo y se traduce a
-      integración en application/dispatcher_eventos_dominio.py.
-    servers: [pulsar-gcp]
+      Fan-out fuera de la saga (coreografía). Se conserva el nombre plural para no romper la evidencia de
+      ESC-01. `origen` y `origen_id` son aditivos (opcionales para no romper a consumidores de la Entrega 4).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: gestion-de-trabajos
+    x-consumidores:
+      - { servicio: reputacion, suscripcion: reputacion-trabajos.finalizado }
+      - { servicio: scoring, suscripcion: scoring-trabajos.finalizado }
+      - { servicio: suscripciones, suscripcion: suscripciones-trabajos.finalizado }
+      - { servicio: proveedores, suscripcion: proveedores-trabajos.finalizado }
+    x-tipo: integracion_carga_estado
     publish:
       operationId: publicarTrabajoFinalizado
-      summary: Gestión de Trabajos publica al finalizar un trabajo (POST /trabajos).
       message: { $ref: '#/components/messages/TrabajoFinalizado' }
     subscribe:
       operationId: consumirTrabajoFinalizado
-      summary: >
-        Suscriptores previstos (suscripción Shared): ContextoReputacion
-        ("reputacion-trabajos-finalizado") y ContextoProveedores
-        ("proveedores-trabajos-finalizado"). NO desplegados en Cloud Run
-        (loop de consumo pull no encaja con Cloud Run sin HTTP).
       message: { $ref: '#/components/messages/TrabajoFinalizado' }
 
+  persistent://hda/gestion-trabajos/novedad.registrada:
+    description: Novedad de un trabajo de origen SINIESTRO; el partner decide (A11).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: gestion-de-trabajos
+    x-consumidores: [{ servicio: siniestros, suscripcion: siniestros-novedad.registrada, filtro: origen=SINIESTRO }]
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarNovedadRegistrada
+      message: { $ref: '#/components/messages/NovedadRegistrada' }
+    subscribe:
+      operationId: consumirNovedadRegistrada
+      message: { $ref: '#/components/messages/NovedadRegistrada' }
+
+  persistent://hda/siniestros/decision.partner:
+    description: Respuesta a `SolicitarAprobacionNovedad`. GT aplica la resolución solo si APROBADA.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: siniestros
+    x-consumidores: [{ servicio: gestion-de-trabajos, suscripcion: gestion-trabajos-decision.partner }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarDecisionPartner
+      message: { $ref: '#/components/messages/DecisionPartner' }
+    subscribe:
+      operationId: consumirDecisionPartner
+      message: { $ref: '#/components/messages/DecisionPartner' }
+
+  persistent://hda/gestion-trabajos/novedad.resuelta:
+    description: Resolución de una novedad (no-show, disputa, garantía).
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: gestion-de-trabajos
+    x-consumidores:
+      - { servicio: reputacion, suscripcion: reputacion-novedad.resuelta, filtro: "resolucion in (NO_SHOW, GARANTIA)" }
+    x-tipo: integracion_carga_estado
+    publish:
+      operationId: publicarNovedadResuelta
+      message: { $ref: '#/components/messages/NovedadResuelta' }
+    subscribe:
+      operationId: consumirNovedadResuelta
+      message: { $ref: '#/components/messages/NovedadResuelta' }
+
+  persistent://hda/reputacion/reputacion.publicada:
+    description: Reputación compuesta de un proveedor (A10). Proveedores la usa para ordenar elegibles.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: reputacion
+    x-consumidores: [{ servicio: proveedores, suscripcion: proveedores-reputacion.publicada }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarReputacionPublicada
+      message: { $ref: '#/components/messages/ReputacionPublicada' }
+    subscribe:
+      operationId: consumirReputacionPublicada
+      message: { $ref: '#/components/messages/ReputacionPublicada' }
+
+  persistent://hda/scoring/scoring.actualizado:
+    description: Puntaje crediticio del proveedor recalculado a partir de TrabajoFinalizado.
+    servers: [pulsar-local, pulsar-gcp]
+    x-productor: scoring
+    x-consumidores: [{ servicio: reputacion, suscripcion: reputacion-scoring.actualizado }]
+    x-tipo: integracion_delgado
+    publish:
+      operationId: publicarScoringActualizado
+      message: { $ref: '#/components/messages/ScoringActualizado' }
+    subscribe:
+      operationId: consumirScoringActualizado
+      message: { $ref: '#/components/messages/ScoringActualizado' }
+
+  # ───────────────────────── DISP-03: cola interna de Verificación (no cambia, §7) ─────────────────────────
+
   disp03-poc-verificacion-solicitudes:
-    description: Comando/solicitud de verificación de proveedor (cola de trabajo, DISP-03).
+    description: Cola de trabajo de Verificación (interna de Proveedores, no es evento de integración).
     servers: [pubsub-gcp]
     publish:
       operationId: publicarSolicitudVerificacion
@@ -60,185 +459,135 @@ channels:
       message: { $ref: '#/components/messages/VerificacionFallida' }
 
   disp03-poc-verificacion-eventos-integracion:
-    description: >
-      Evento de integración ProveedorHabilitado. Topic físicamente separado del de
-      solicitudes (bug de producción 2026-09-06: compartirlos hacía llegar el evento
-      al handler push como si fuera una solicitud). Sin suscriptores hoy.
+    description: Evento ProveedorHabilitado (§7, "existe"). Sin consumidor obligatorio.
     servers: [pubsub-gcp]
     publish:
       operationId: publicarProveedorHabilitado
       message: { $ref: '#/components/messages/ProveedorHabilitado' }
 
-
-  persistent://hda/gestion-trabajos/novedad.registrada:
-    description: Evento NovedadRegistrada.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarNovedadRegistrada
-      message: { $ref: '#/components/messages/NovedadRegistrada' }
-
-  persistent://hda/siniestros/decision.partner:
-    description: Evento DecisionPartner.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarDecisionPartner
-      message: { $ref: '#/components/messages/DecisionPartner' }
-
-  persistent://hda/gestion-trabajos/novedad.resuelta:
-    description: Evento NovedadResuelta.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarNovedadResuelta
-      message: { $ref: '#/components/messages/NovedadResuelta' }
-
-  persistent://hda/proveedores/agenda.liberada:
-    description: Evento AgendaLiberada.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarAgendaLiberada
-      message: { $ref: '#/components/messages/AgendaLiberada' }
-
-  persistent://hda/reputacion/reputacion.publicada:
-    description: Evento ReputacionPublicada.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarReputacionPublicada
-      message: { $ref: '#/components/messages/ReputacionPublicada' }
-
-  persistent://hda/scoring/scoring.actualizado:
-    description: Evento ScoringActualizado.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarScoringActualizado
-      message: { $ref: '#/components/messages/ScoringActualizado' }
-
-  persistent://hda/proveedores/comandos:
-    description: Comandos hacia Proveedores.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: enviarComandoProveedores
-      message: { $ref: '#/components/messages/ComandoProveedores' }
-
-  persistent://hda/pagos/comandos:
-    description: Comandos hacia Pagos.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: enviarComandoPagos
-      message: { $ref: '#/components/messages/ComandoPagos' }
-
-  persistent://hda/siniestros/comandos:
-    description: Comandos hacia Siniestros.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: enviarComandoSiniestros
-      message: { $ref: '#/components/messages/ComandoSiniestros' }
-
-  persistent://hda/pagos/pago.retenido:
-    description: Evento PagoRetenido.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarPagoRetenido
-      message: { $ref: '#/components/messages/PagoRetenido' }
-
-  persistent://hda/pagos/pago.retencion-fallida:
-    description: Evento PagoRetencionFallida.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarPagoRetencionFallida
-      message: { $ref: '#/components/messages/PagoRetencionFallida' }
-
-  persistent://hda/pagos/pago.liberado:
-    description: Evento PagoLiberado.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarPagoLiberado
-      message: { $ref: '#/components/messages/PagoLiberado' }
-
-  persistent://hda/pagos/pago.fallido:
-    description: Evento PagoFallido.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarPagoFallido
-      message: { $ref: '#/components/messages/PagoFallido' }
-
-  persistent://hda/pagos/pago.compensado:
-    description: Evento PagoCompensado.
-    servers: [pulsar-gcp]
-    publish:
-      operationId: publicarPagoCompensado
-      message: { $ref: '#/components/messages/PagoCompensado' }
-
 components:
-  messages:
+  messageTraits:
+    PropiedadesPulsar:
+      headers: { $ref: '#/components/schemas/PropiedadesPulsar' }
+      contentType: application/json
 
+  messages:
+    SolicitudDiagnosticada:
+      name: SolicitudDiagnosticada
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/SolicitudDiagnosticada' }
+    SiniestroAprobado:
+      name: SiniestroAprobado
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/SiniestroAprobado' }
+    CicloSuscripcion:
+      name: CicloSuscripcion
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/CicloSuscripcion' }
+    TrabajoCreado:
+      name: TrabajoCreado
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/TrabajoCreado' }
+    ElegiblesPublicados:
+      name: ElegiblesPublicados
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/ElegiblesPublicados' }
+    ProveedorSeleccionado:
+      name: ProveedorSeleccionado
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/ProveedorSeleccionado' }
+    AgendaConfirmada:
+      name: AgendaConfirmada
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/AgendaConfirmada' }
+    AgendaRechazada:
+      name: AgendaRechazada
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/AgendaRechazada' }
+    AgendaLiberada:
+      name: AgendaLiberada
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/AgendaLiberada' }
+    PublicarElegibles:
+      name: PublicarElegibles
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/PublicarElegibles' }
+    ReservarFranja:
+      name: ReservarFranja
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/ReservarFranja' }
+    LiberarFranja:
+      name: LiberarFranja
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/LiberarFranja' }
+    RetenerPago:
+      name: RetenerPago
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/RetenerPago' }
+    LiberarPago:
+      name: LiberarPago
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/LiberarPago' }
+    CompensarPago:
+      name: CompensarPago
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/CompensarPago' }
+    FacturarAPartner:
+      name: FacturarAPartner
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/FacturarAPartner' }
+    SolicitarAprobacionNovedad:
+      name: SolicitarAprobacionNovedad
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/SolicitarAprobacionNovedad' }
+    PagoRetenido:
+      name: PagoRetenido
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/RespuestaPago' }
+    PagoRetencionFallida:
+      name: PagoRetencionFallida
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/RespuestaPago' }
+    PagoLiberado:
+      name: PagoLiberado
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/RespuestaPago' }
+    PagoFallido:
+      name: PagoFallido
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/RespuestaPago' }
+    PagoCompensado:
+      name: PagoCompensado
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/RespuestaPago' }
+    FacturaEmitida:
+      name: FacturaEmitida
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/FacturaEmitida' }
+    TrabajoFinalizado:
+      name: TrabajoFinalizado
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
+      payload: { $ref: '#/components/schemas/TrabajoFinalizado' }
     NovedadRegistrada:
       name: NovedadRegistrada
-      contentType: application/json
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
       payload: { $ref: '#/components/schemas/NovedadRegistrada' }
     DecisionPartner:
       name: DecisionPartner
-      contentType: application/json
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
       payload: { $ref: '#/components/schemas/DecisionPartner' }
     NovedadResuelta:
       name: NovedadResuelta
-      contentType: application/json
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
       payload: { $ref: '#/components/schemas/NovedadResuelta' }
-    AgendaLiberada:
-      name: AgendaLiberada
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/AgendaLiberada' }
     ReputacionPublicada:
       name: ReputacionPublicada
-      contentType: application/json
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
       payload: { $ref: '#/components/schemas/ReputacionPublicada' }
     ScoringActualizado:
       name: ScoringActualizado
-      contentType: application/json
+      traits: [{ $ref: '#/components/messageTraits/PropiedadesPulsar' }]
       payload: { $ref: '#/components/schemas/ScoringActualizado' }
-    ComandoProveedores:
-      name: ComandoProveedores
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/ComandoProveedores' }
-    ComandoPagos:
-      name: ComandoPagos
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/ComandoPagos' }
-    ComandoSiniestros:
-      name: ComandoSiniestros
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/ComandoSiniestros' }
-    PagoRetenido:
-      name: PagoRetenido
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/PagoRetenido' }
-    PagoRetencionFallida:
-      name: PagoRetencionFallida
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/PagoRetencionFallida' }
-    PagoLiberado:
-      name: PagoLiberado
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/PagoLiberado' }
-    PagoFallido:
-      name: PagoFallido
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/PagoFallido' }
-    PagoCompensado:
-      name: PagoCompensado
-      contentType: application/json
-      payload: { $ref: '#/components/schemas/PagoCompensado' }
-
-    TrabajoFinalizado:
-      name: TrabajoFinalizado
-      contentType: application/json
-      headers:
-        type: object
-        properties:
-          tipo_evento: { type: string, const: TrabajoFinalizado }
-          version_esquema: { type: string, example: "1" }
-          content_type: { type: string, const: application/json }
-          productor: { type: string, example: gestion-de-trabajos }
-      payload: { $ref: '#/components/schemas/TrabajoFinalizado' }
     SolicitudVerificacion:
       name: SolicitudVerificacion
       contentType: application/json
@@ -256,6 +605,18 @@ components:
       payload: { $ref: '#/components/schemas/ProveedorHabilitado' }
 
   schemas:
+    # ── Metadatos (propiedades del mensaje Pulsar, CONVENCIONES §3) ──
+    PropiedadesPulsar:
+      type: object
+      required: [tipo_evento, version_esquema, content_type, productor, id_evento, correlation_id]
+      properties:
+        tipo_evento: { type: string, description: "Nombre del evento o comando, ej. TrabajoFinalizado, ReservarFranja." }
+        version_esquema: { type: string, example: "1", description: "Sube solo con un cambio que rompe (y el tópico pasa a …v2)." }
+        content_type: { type: string, const: application/json }
+        productor: { type: string, description: "Carpeta del servicio que publica, ej. gestion-de-trabajos." }
+        id_evento: { type: string, format: uuid, description: "Único por publicación; clave de idempotencia del consumidor." }
+        correlation_id: { type: string, description: "trabajo_id en todo el journey (paso 0: proveedor_id)." }
+        causation_id: { type: string, description: "id_evento del mensaje que provocó este, si lo hay." }
     AtributosPubSub:
       type: object
       properties:
@@ -263,16 +624,329 @@ components:
         version_esquema: { type: string, example: "1" }
         content_type: { type: string, const: application/json }
         productor: { type: string, example: disp03-poc-api }
+
+    # ── Tipos reutilizables ──
+    Uuid: { type: string, format: uuid }
+    Monto: { type: string, pattern: '^-?[0-9]+(\.[0-9]+)?$', description: "Decimal como string, nunca float.", example: "150000.00" }
+    Moneda: { type: string, enum: [COP, BRL] }
+    Region: { type: string, enum: [CO, BR] }
+    Origen: { type: string, enum: [MARKETPLACE, SINIESTRO, SUSCRIPCION] }
+    Bloque: { type: string, enum: [MANANA, TARDE], description: "MANANA 8-12, TARDE 14-18 (A14)." }
+    Franja:
+      type: object
+      required: [fecha, bloque]
+      properties:
+        fecha: { type: string, format: date }
+        bloque: { $ref: '#/components/schemas/Bloque' }
+    FranjaRecurrente:
+      type: object
+      required: [dia_semana, bloque, vigente_hasta]
+      properties:
+        dia_semana: { type: integer, minimum: 0, maximum: 6, description: "0 = lunes." }
+        bloque: { $ref: '#/components/schemas/Bloque' }
+        vigente_hasta: { type: string, format: date }
+    Ubicacion:
+      type: object
+      required: [ciudad]
+      properties:
+        ciudad: { type: string }
+        direccion: { type: string }
+    CamposComando:
+      type: object
+      description: Todo comando de la saga lleva estos campos (§7.1).
+      required: [id_comando, saga_id, correlation_id, trabajo_id]
+      properties:
+        id_comando: { $ref: '#/components/schemas/Uuid' }
+        saga_id: { $ref: '#/components/schemas/Uuid' }
+        correlation_id: { type: string, description: "= trabajo_id" }
+        trabajo_id: { $ref: '#/components/schemas/Uuid' }
+    CamposRespuesta:
+      type: object
+      description: >
+        Respuesta a un comando. `saga_id` e `id_comando` son opcionales (el coordinador encuentra la saga
+        por `trabajo_id`), pero todo servicio que responde los copia del comando para unir el Saga Log.
+      required: [trabajo_id]
+      properties:
+        trabajo_id: { $ref: '#/components/schemas/Uuid' }
+        saga_id: { $ref: '#/components/schemas/Uuid' }
+        id_comando: { $ref: '#/components/schemas/Uuid' }
+
+    # ── Paso 1 ──
+    SolicitudDiagnosticada:
+      type: object
+      required: [solicitud_id, cliente_id, categoria, urgencia, ubicacion, region, descripcion]
+      properties:
+        solicitud_id: { $ref: '#/components/schemas/Uuid' }
+        cliente_id: { type: string }
+        categoria: { type: string, example: plomeria }
+        urgencia: { type: string, enum: [BAJA, MEDIA, ALTA] }
+        ubicacion: { $ref: '#/components/schemas/Ubicacion' }
+        region: { $ref: '#/components/schemas/Region' }
+        descripcion: { type: string }
+        franja: { $ref: '#/components/schemas/Franja' }
+    SiniestroAprobado:
+      type: object
+      required: [siniestro_id, partner_id, categoria, urgencia, ubicacion, region, monto_maximo, moneda]
+      properties:
+        siniestro_id: { $ref: '#/components/schemas/Uuid' }
+        partner_id: { type: string }
+        categoria: { type: string }
+        urgencia: { type: string, enum: [BAJA, MEDIA, ALTA] }
+        ubicacion: { $ref: '#/components/schemas/Ubicacion' }
+        region: { $ref: '#/components/schemas/Region' }
+        monto_maximo: { $ref: '#/components/schemas/Monto' }
+        moneda: { $ref: '#/components/schemas/Moneda' }
+    CicloSuscripcion:
+      type: object
+      required: [suscripcion_id, cliente_id, tipo_servicio, ciclo, region, monto, moneda]
+      properties:
+        suscripcion_id: { $ref: '#/components/schemas/Uuid' }
+        cliente_id: { type: string }
+        tipo_servicio: { type: string }
+        ciclo: { type: integer, minimum: 1 }
+        region: { $ref: '#/components/schemas/Region' }
+        monto: { $ref: '#/components/schemas/Monto' }
+        moneda: { $ref: '#/components/schemas/Moneda' }
+        proveedor_id: { type: string, description: "Solo en ciclos siguientes (A13)." }
+        tecnico_id: { type: string }
+        recurrente: { $ref: '#/components/schemas/FranjaRecurrente' }
+    TrabajoCreado:
+      type: object
+      required: [trabajo_id, origen, origen_id, categoria, ubicacion, region, nivel_verificacion_requerido]
+      properties:
+        trabajo_id: { $ref: '#/components/schemas/Uuid' }
+        origen: { $ref: '#/components/schemas/Origen' }
+        origen_id: { type: string }
+        partner_id: { type: string }
+        categoria: { type: string }
+        ubicacion: { $ref: '#/components/schemas/Ubicacion' }
+        region: { $ref: '#/components/schemas/Region' }
+        nivel_verificacion_requerido: { type: string, enum: [BASICO, COMPLETO] }
+        franja: { $ref: '#/components/schemas/Franja' }
+        primera_libre: { type: boolean, description: "true si no se pidió franja: se ofrece la primera libre." }
+        excluidos: { type: array, items: { type: string }, description: "proveedor_id excluidos (reasignación por no-show)." }
+
+    # ── Paso 2-3 ──
+    Elegible:
+      type: object
+      required: [proveedor_id, tecnico_id, franja_ofrecida, reputacion, nivel_verificacion]
+      properties:
+        proveedor_id: { type: string }
+        tecnico_id: { type: string }
+        franja_ofrecida: { $ref: '#/components/schemas/Franja' }
+        reputacion: { type: number }
+        nivel_verificacion: { type: string, enum: [BASICO, COMPLETO] }
+    ElegiblesPublicados:
+      allOf:
+        - $ref: '#/components/schemas/CamposRespuesta'
+        - type: object
+          required: [origen, origen_id, excluidos, elegibles]
+          properties:
+            origen: { $ref: '#/components/schemas/Origen' }
+            origen_id: { type: string }
+            excluidos: { type: array, items: { type: string } }
+            elegibles: { type: array, minItems: 1, items: { $ref: '#/components/schemas/Elegible' } }
+    ProveedorSeleccionado:
+      type: object
+      required: [trabajo_id, origen, origen_id, proveedor_id, tecnico_id, monto, moneda]
+      description: Lleva `franja` (una fecha) o `recurrente` (suscripción).
+      properties:
+        trabajo_id: { $ref: '#/components/schemas/Uuid' }
+        origen: { $ref: '#/components/schemas/Origen' }
+        origen_id: { type: string }
+        proveedor_id: { type: string }
+        tecnico_id: { type: string }
+        franja: { $ref: '#/components/schemas/Franja' }
+        recurrente: { $ref: '#/components/schemas/FranjaRecurrente' }
+        cotizacion_id: { type: string }
+        monto: { $ref: '#/components/schemas/Monto' }
+        moneda: { $ref: '#/components/schemas/Moneda' }
+    AgendaConfirmada:
+      allOf:
+        - $ref: '#/components/schemas/ProveedorSeleccionado'
+        - $ref: '#/components/schemas/CamposRespuesta'
+        - type: object
+          required: [reserva_id]
+          properties:
+            reserva_id: { $ref: '#/components/schemas/Uuid' }
+    AgendaRechazada:
+      allOf:
+        - $ref: '#/components/schemas/ProveedorSeleccionado'
+        - $ref: '#/components/schemas/CamposRespuesta'
+        - type: object
+          required: [motivo]
+          properties:
+            motivo: { type: string, example: FRANJA_OCUPADA }
+    AgendaLiberada:
+      allOf:
+        - $ref: '#/components/schemas/CamposRespuesta'
+        - type: object
+          required: [reserva_id, tecnico_id, franjas, motivo]
+          properties:
+            reserva_id: { $ref: '#/components/schemas/Uuid' }
+            tecnico_id: { type: string }
+            franjas: { type: array, items: { $ref: '#/components/schemas/Franja' } }
+            motivo: { type: string, enum: [NO_SHOW, DESHABILITADO, CANCELACION, FIN_PERIODO] }
+
+    # ── Comandos (§7.1) ──
+    PublicarElegibles:
+      description: Mismos campos que TrabajoCreado.
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - $ref: '#/components/schemas/TrabajoCreado'
+    ReservarFranja:
+      description: Mismos campos que ProveedorSeleccionado.
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - $ref: '#/components/schemas/ProveedorSeleccionado'
+    LiberarFranja:
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - type: object
+          required: [reserva_id, motivo]
+          properties:
+            reserva_id: { $ref: '#/components/schemas/Uuid' }
+            motivo: { type: string, enum: [NO_SHOW, DESHABILITADO, CANCELACION, FIN_PERIODO] }
+    RetenerPago:
+      description: Región y moneda salen del Trabajo (MOD-02); la pasarela la elige la regla regional de Pagos si no viene.
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - type: object
+          required: [proveedor_id, monto, moneda, region]
+          properties:
+            proveedor_id: { type: string }
+            reserva_id: { $ref: '#/components/schemas/Uuid' }
+            monto: { $ref: '#/components/schemas/Monto' }
+            moneda: { $ref: '#/components/schemas/Moneda' }
+            region: { $ref: '#/components/schemas/Region' }
+            pasarela: { type: string, enum: [stripe, mercadopago] }
+    LiberarPago:
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - type: object
+          required: [pago_id]
+          properties:
+            pago_id: { $ref: '#/components/schemas/Uuid' }
+    CompensarPago:
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - type: object
+          required: [pago_id, motivo]
+          properties:
+            pago_id: { $ref: '#/components/schemas/Uuid' }
+            novedad_id: { $ref: '#/components/schemas/Uuid' }
+            motivo: { type: string, example: DISPUTA }
+    FacturarAPartner:
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - type: object
+          required: [partner_id, siniestro_id, monto, moneda]
+          properties:
+            partner_id: { type: string }
+            siniestro_id: { $ref: '#/components/schemas/Uuid' }
+            monto: { $ref: '#/components/schemas/Monto' }
+            moneda: { $ref: '#/components/schemas/Moneda' }
+    SolicitarAprobacionNovedad:
+      allOf:
+        - $ref: '#/components/schemas/CamposComando'
+        - type: object
+          required: [novedad_id, partner_id, tipo_novedad, descripcion]
+          properties:
+            novedad_id: { $ref: '#/components/schemas/Uuid' }
+            partner_id: { type: string }
+            tipo_novedad: { type: string, enum: [NO_SHOW, DISPUTA, GARANTIA, OTRA] }
+            impacto_monto: { $ref: '#/components/schemas/Monto' }
+            descripcion: { type: string }
+
+    # ── Respuestas (delgadas) ──
+    RespuestaPago:
+      description: Mismo cuerpo para PagoRetenido, PagoRetencionFallida, PagoLiberado, PagoFallido y PagoCompensado (catálogo §7).
+      allOf:
+        - $ref: '#/components/schemas/CamposRespuesta'
+        - type: object
+          required: [pago_id, monto, moneda, pasarela, regla_regional]
+          properties:
+            pago_id: { $ref: '#/components/schemas/Uuid' }
+            monto: { $ref: '#/components/schemas/Monto' }
+            moneda: { $ref: '#/components/schemas/Moneda' }
+            pasarela: { type: string, enum: [stripe, mercadopago] }
+            regla_regional: { $ref: '#/components/schemas/Region' }
+            motivo: { type: string }
+    FacturaEmitida:
+      allOf:
+        - $ref: '#/components/schemas/CamposRespuesta'
+        - type: object
+          required: [factura_id, partner_id, monto, moneda]
+          properties:
+            factura_id: { $ref: '#/components/schemas/Uuid' }
+            partner_id: { type: string }
+            monto: { $ref: '#/components/schemas/Monto' }
+            moneda: { $ref: '#/components/schemas/Moneda' }
+
+    # ── Fan-out y alternos ──
     TrabajoFinalizado:
       type: object
       required: [trabajo_id, proveedor_id, monto, moneda, region, ocurrido_en]
       properties:
-        trabajo_id: { type: string, format: uuid }
+        trabajo_id: { $ref: '#/components/schemas/Uuid' }
         proveedor_id: { type: string }
-        monto: { type: string, description: "Decimal como string (no float) para no perder precisión.", example: "200.00" }
-        moneda: { type: string, example: COP }
-        region: { type: string, enum: [CO, BR] }
+        monto: { $ref: '#/components/schemas/Monto' }
+        moneda: { $ref: '#/components/schemas/Moneda' }
+        region: { $ref: '#/components/schemas/Region' }
         ocurrido_en: { type: string, format: date-time }
+        origen: { $ref: '#/components/schemas/Origen' }
+        origen_id: { type: string }
+    NovedadRegistrada:
+      type: object
+      required: [trabajo_id, novedad_id, origen, origen_id, tipo_novedad, descripcion]
+      properties:
+        trabajo_id: { $ref: '#/components/schemas/Uuid' }
+        novedad_id: { $ref: '#/components/schemas/Uuid' }
+        origen: { $ref: '#/components/schemas/Origen' }
+        origen_id: { type: string }
+        partner_id: { type: string }
+        tipo_novedad: { type: string, enum: [NO_SHOW, DISPUTA, GARANTIA, OTRA] }
+        impacto_monto: { $ref: '#/components/schemas/Monto' }
+        descripcion: { type: string }
+    DecisionPartner:
+      allOf:
+        - $ref: '#/components/schemas/CamposRespuesta'
+        - type: object
+          required: [novedad_id, partner_id, decision, regla_aplicada, automatica]
+          properties:
+            novedad_id: { $ref: '#/components/schemas/Uuid' }
+            partner_id: { type: string }
+            decision: { type: string, enum: [APROBADA, RECHAZADA] }
+            regla_aplicada: { type: string }
+            automatica: { type: boolean }
+    NovedadResuelta:
+      type: object
+      required: [trabajo_id, novedad_id, proveedor_id, resolucion]
+      properties:
+        trabajo_id: { $ref: '#/components/schemas/Uuid' }
+        novedad_id: { $ref: '#/components/schemas/Uuid' }
+        proveedor_id: { type: string }
+        resolucion: { type: string, enum: [NO_SHOW, DISPUTA, GARANTIA] }
+        pago_id: { $ref: '#/components/schemas/Uuid' }
+    ReputacionPublicada:
+      type: object
+      required: [proveedor_id, reputacion, promedio, total_calificaciones, tasa_cumplimiento, garantias_reclamadas]
+      properties:
+        proveedor_id: { type: string }
+        reputacion: { type: number }
+        promedio: { type: number }
+        total_calificaciones: { type: integer }
+        tasa_cumplimiento: { type: number, minimum: 0, maximum: 1 }
+        garantias_reclamadas: { type: integer }
+    ScoringActualizado:
+      type: object
+      required: [proveedor_id, puntaje_crediticio, trabajos_contados]
+      properties:
+        proveedor_id: { type: string }
+        puntaje_crediticio: { type: number }
+        trabajos_contados: { type: integer }
+
+    # ── DISP-03 (Pub/Sub, sin cambios) ──
     SolicitudVerificacion:
       type: object
       required: [verificacion_id, proveedor_id, tipo_verificador]
@@ -295,33 +969,3 @@ components:
         proveedor_id: { type: string }
         evento: { type: string, const: ProveedorHabilitado }
         routing_key: { type: string, const: proveedor.habilitado }
-
-
-    NovedadRegistrada:
-      type: object
-    DecisionPartner:
-      type: object
-    NovedadResuelta:
-      type: object
-    AgendaLiberada:
-      type: object
-    ReputacionPublicada:
-      type: object
-    ScoringActualizado:
-      type: object
-    ComandoProveedores:
-      type: object
-    ComandoPagos:
-      type: object
-    ComandoSiniestros:
-      type: object
-    PagoRetenido:
-      type: object
-    PagoRetencionFallida:
-      type: object
-    PagoLiberado:
-      type: object
-    PagoFallido:
-      type: object
-    PagoCompensado:
-      type: object

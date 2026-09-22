@@ -6,10 +6,10 @@ from decimal import Decimal
 
 import pytest
 
-from app.domain.ciclo_vida.eventos import TrabajoFinalizado
-from app.domain.ciclo_vida.fabrica import FabricaTrabajo
-from app.domain.ciclo_vida.trabajo import ErrorTransicionInvalida
-from app.domain.ciclo_vida.value_objects import EstadoTrabajo, ProveedorId, Region
+from app.ciclo_vida.domain.eventos import TrabajoFinalizado
+from app.ciclo_vida.domain.fabrica import FabricaTrabajo
+from app.ciclo_vida.domain.trabajo import ErrorTransicionInvalida
+from app.ciclo_vida.domain.value_objects import EstadoTrabajo, ProveedorId, Region
 
 
 def _crear_trabajo():
@@ -18,6 +18,17 @@ def _crear_trabajo():
         region=Region.COLOMBIA,
         proveedor_id=ProveedorId(str(uuid.uuid4())),
     )
+
+
+def _crear_trabajo_en_curso():
+    """Camina la máquina de estados real (15-arquitectura-entrega-5.md §6)
+    hasta EN_CURSO -- precondición de `finalizar()` -- en vez de llamar
+    `finalizar()` directo sobre un trabajo recién creado en SOLICITADO
+    (eso lanzaba `ErrorTransicionInvalida`, ver coordinador.py bug #6)."""
+    trabajo = _crear_trabajo()
+    trabajo.asignar_proveedor(trabajo.proveedor_id)
+    trabajo.iniciar_workflow()
+    return trabajo
 
 
 def test_fabrica_crea_trabajo_solicitado_sin_eventos():
@@ -29,7 +40,7 @@ def test_fabrica_crea_trabajo_solicitado_sin_eventos():
 
 
 def test_finalizar_transiciona_a_finalizado_y_registra_evento_de_dominio():
-    trabajo = _crear_trabajo()
+    trabajo = _crear_trabajo_en_curso()
 
     trabajo.finalizar()
 
@@ -42,7 +53,7 @@ def test_finalizar_transiciona_a_finalizado_y_registra_evento_de_dominio():
 
 
 def test_recoger_eventos_limpia_el_buffer():
-    trabajo = _crear_trabajo()
+    trabajo = _crear_trabajo_en_curso()
     trabajo.finalizar()
 
     primera_recoleccion = trabajo.recoger_eventos()
@@ -53,8 +64,11 @@ def test_recoger_eventos_limpia_el_buffer():
 
 
 def test_no_se_puede_finalizar_un_trabajo_ya_finalizado():
-    """Invariante real protegido dentro del agregado — Regla 5, criterio 1."""
-    trabajo = _crear_trabajo()
+    """Invariante real protegido dentro del agregado — Regla 5, criterio 1.
+    Sigue probando que un SEGUNDO `finalizar()` falla (no se debilita la
+    cobertura de la invariante al ajustar el helper al camino real de
+    estados)."""
+    trabajo = _crear_trabajo_en_curso()
     trabajo.finalizar()
 
     with pytest.raises(ErrorTransicionInvalida):

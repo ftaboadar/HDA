@@ -4,11 +4,11 @@ import threading
 import json
 import pulsar
 from app.common.config import settings
-from app.application.handlers_saga import SagaHandlers
-from app.infrastructure.persistence.saga_repository_sqlalchemy import (
+from app.workflow.application.handlers_saga import SagaHandlers
+from app.workflow.infrastructure.persistence.saga_repository_sqlalchemy import (
     SagaRepositorySQLAlchemy,
 )
-from app.infrastructure.persistence.trabajo_repository_sqlalchemy import (
+from app.ciclo_vida.infrastructure.persistence.trabajo_repository_sqlalchemy import (
     TrabajoRepositorySQLAlchemy,
 )
 from app.infrastructure.messaging.publicador_pulsar import PublicadorPulsar
@@ -30,13 +30,25 @@ def start_worker():
     handlers = SagaHandlers(repo_saga, repo_trabajos, publicador)
 
     topics = [
-        "hda/proveedores/agenda.reservada",
-        "hda/proveedores/agenda.rechazada",
-        "hda/pagos/pago.retenido",
-        "hda/pagos/pago.retencion_fallida",
+        "persistent://hda/proveedores/agenda.confirmada",
+        "persistent://hda/proveedores/agenda.rechazada",
+        "persistent://hda/pagos/pago.retenido",
+        "persistent://hda/pagos/pago.retencion-fallida",
+        "persistent://hda/pagos/pago.liberado",
+        "persistent://hda/pagos/pago.compensado",
+        # Paso 3 (§7.1): el canal dueño del origen publica ProveedorSeleccionado
+        # en SU propio namespace -- son 3 tópicos distintos, uno por canal
+        # (catálogo §7, fila ProveedorSeleccionado), no uno solo.
+        "persistent://hda/marketplace/proveedor.seleccionado",
+        "persistent://hda/siniestros/proveedor.seleccionado",
+        "persistent://hda/suscripciones/proveedor.seleccionado",
     ]
 
-    consumer = client.subscribe(topics, subscription_name="saga-worker-sub")
+    consumer = client.subscribe(
+        topics,
+        subscription_name="gestion-trabajos-saga-worker",
+        consumer_type=pulsar.ConsumerType.Shared,
+    )
 
     print("Worker consumiendo eventos de saga...")
 
@@ -48,19 +60,45 @@ def start_worker():
         try:
             msg = consumer.receive()
             props = msg.properties()
-            # Asumimos contenido JSON plano
             payload = json.loads(msg.data().decode("utf-8"))
 
             tipo = props.get("tipo_evento", "")
+            id_evento = props.get("id_evento", "")
 
-            if tipo == "FranjaReservada":
-                loop.run_until_complete(handlers.handle_franja_reservada(payload))
-            elif tipo == "FranjaRechazada":
-                loop.run_until_complete(handlers.handle_franja_rechazada(payload))
-            elif tipo == "PagoRetenido":
-                loop.run_until_complete(handlers.handle_pago_retenido(payload))
-            elif tipo == "PagoRetencionFallida":
-                loop.run_until_complete(handlers.handle_pago_retencion_fallida(payload))
+            if tipo == "AgendaConfirmada" or "agenda.confirmada" in msg.topic_name():
+                loop.run_until_complete(
+                    handlers.handle_franja_reservada(payload, id_evento)
+                )
+            elif tipo == "AgendaRechazada" or "agenda.rechazada" in msg.topic_name():
+                loop.run_until_complete(
+                    handlers.handle_franja_rechazada(payload, id_evento)
+                )
+            elif tipo == "PagoRetenido" or "pago.retenido" in msg.topic_name():
+                loop.run_until_complete(
+                    handlers.handle_pago_retenido(payload, id_evento)
+                )
+            elif (
+                tipo == "PagoRetencionFallida"
+                or "pago.retencion-fallida" in msg.topic_name()
+            ):
+                loop.run_until_complete(
+                    handlers.handle_pago_retencion_fallida(payload, id_evento)
+                )
+            elif tipo == "PagoLiberado" or "pago.liberado" in msg.topic_name():
+                loop.run_until_complete(
+                    handlers.handle_pago_liberado(payload, id_evento)
+                )
+            elif tipo == "PagoCompensado" or "pago.compensado" in msg.topic_name():
+                loop.run_until_complete(
+                    handlers.handle_pago_compensado(payload, id_evento)
+                )
+            elif (
+                tipo == "ProveedorSeleccionado"
+                or "proveedor.seleccionado" in msg.topic_name()
+            ):
+                loop.run_until_complete(
+                    handlers.handle_proveedor_seleccionado(payload, id_evento)
+                )
 
             consumer.acknowledge(msg)
         except Exception as e:
@@ -75,4 +113,29 @@ def startup_event():
 
     Base.metadata.create_all(bind=engine)
     thread = threading.Thread(target=start_worker, daemon=True)
+    thread.start()
+
+
+def start_deadline_checker():
+    repo_saga = SagaRepositorySQLAlchemy()
+    repo_trabajos = TrabajoRepositorySQLAlchemy()
+    publicador = PublicadorPulsar()
+    handlers = SagaHandlers(repo_saga, repo_trabajos, publicador)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    while True:
+        try:
+            loop.run_until_complete(handlers.check_deadlines())
+        except Exception as e:
+            print(f"Error revisando plazos: {e}")
+        import time
+
+        time.sleep(60)  # Revisar cada 60 segundos
+
+
+@app.on_event("startup")
+def startup_event_deadlines():
+    thread = threading.Thread(target=start_deadline_checker, daemon=True)
     thread.start()

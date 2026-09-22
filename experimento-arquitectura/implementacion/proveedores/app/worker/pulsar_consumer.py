@@ -27,18 +27,18 @@ import json
 
 import pulsar
 
-from app.application.commands.registrar_intento import RegistrarIntento
-from app.application.queries.consultar_verificacion import ConsultarVerificacion
 from app.common.config import settings
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.publicador import PublicadorPulsar
 from app.common.pulsar_topology import construir_dead_letter_policy
-from app.domain.verificacion.value_objects import EstadoVerificacion, ResultadoIntento
-from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
+from app.verificacion.application.commands.registrar_intento import RegistrarIntento
+from app.verificacion.application.procesar_verificacion import procesar_verificacion
+from app.verificacion.application.queries.consultar_verificacion import ConsultarVerificacion
+from app.verificacion.domain.value_objects import EstadoVerificacion, ResultadoIntento
+from app.verificacion.infrastructure.persistence.verificacion_repository_sqlalchemy import (
     VerificacionRepositorySQLAlchemy,
 )
-from app.worker.core import procesar_verificacion
 
 logger = configurar_logging("worker.pulsar_consumer")
 CONCURRENCIA = 10

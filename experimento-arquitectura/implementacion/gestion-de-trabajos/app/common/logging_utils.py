@@ -12,6 +12,14 @@ de diseño y no solo por nombre de servicio:
 - `logging.googleapis.com/trace`: correlaciona el log de aplicación con el
   log de la petición HTTP de Cloud Run (requiere env GCP_PROJECT).
 
+Campos del journey (Entrega 5, 15-arquitectura-entrega-5.md §13): cada línea
+lleva además `servicio` (nombre estable de la carpeta, igual en api y worker),
+`correlation_id` (= trabajo_id), `saga_id` y `paso_saga` — tomados del contexto
+de la petición o del mensaje con `contexto_journey(...)` — y, cuando el
+llamador los pasa, `modulo`, `agregado` y `tipo_comunicacion` (uno de
+`TIPOS_COMUNICACION`). Así una sola query por `jsonPayload.correlation_id`
+muestra el journey completo a través de los servicios.
+
 `LOG_DETALLE=minimo` desactiva los eventos marcados `detalle=True` (los de
 trazado fino por petición) — para corridas de carga (ESC-01 real), donde un
 log extra por request cuesta CPU y dinero en Cloud Logging.
@@ -25,6 +33,13 @@ import logging
 import os
 import sys
 import time
+from contextlib import contextmanager
+from typing import Iterator
+
+# Nombre estable del servicio (la carpeta en implementacion/). Es lo que se
+# filtra en Logs Explorer; K_SERVICE (nombre del servicio de Cloud Run, distinto
+# para api y worker) va aparte en `servicio_cloud_run`.
+SERVICIO = "gestion-de-trabajos"
 
 CONTEXTO_DDD = {
     "dominio": "MarketplaceDeServicios",
@@ -37,6 +52,45 @@ _CAPAS = ("api", "application", "domain", "infrastructure", "worker", "mocks", "
 _trace_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "trace_id", default=None
 )
+
+# Valores válidos de `tipo_comunicacion` (15-…md §13).
+TIPOS_COMUNICACION = (
+    "intra_modulo",
+    "entre_modulos_sync",
+    "entre_modulos_async",
+    "entre_servicios_comando",
+    "entre_servicios_evento",
+    "rest_bff",
+    "externo",
+)
+
+# correlation_id / saga_id / paso_saga del journey en curso (petición HTTP o
+# mensaje Pulsar). Se ponen una vez en la entrada y aparecen en cada línea.
+_CAMPOS_JOURNEY = ("correlation_id", "saga_id", "paso_saga")
+_contexto_journey: contextvars.ContextVar[dict[str, str]] = contextvars.ContextVar(
+    "contexto_journey", default={}
+)
+
+
+@contextmanager
+def contexto_journey(**campos: str | None) -> Iterator[None]:
+    """Agrega `correlation_id`, `saga_id` y/o `paso_saga` a todas las líneas
+    de log emitidas dentro del bloque (se combinan con los que ya había)."""
+    desconocidos = set(campos) - set(_CAMPOS_JOURNEY)
+    if desconocidos:
+        raise ValueError(f"campos de journey desconocidos: {sorted(desconocidos)}")
+    nuevo = {**_contexto_journey.get()}
+    nuevo.update({k: str(v) for k, v in campos.items() if v is not None})
+    token = _contexto_journey.set(nuevo)
+    try:
+        yield
+    finally:
+        _contexto_journey.reset(token)
+
+
+def contexto_journey_actual() -> dict[str, str]:
+    """Para propagar el contexto a otro hilo o a un mensaje saliente."""
+    return dict(_contexto_journey.get())
 
 
 def _detalle_completo() -> bool:
@@ -64,6 +118,8 @@ def _capa(nombre_logger: str) -> str:
 def _tipo_mensaje(evento: str) -> str:
     if evento.startswith("evento_dominio_"):
         return "evento_de_dominio"
+    if evento.startswith("compensacion_"):
+        return "compensacion"
     if evento.startswith("evento_integracion_"):
         return "evento_de_integracion"
     if evento.startswith("comando_"):
@@ -84,10 +140,12 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "mensaje": record.getMessage(),
             "message": record.getMessage(),
-            "servicio": os.environ.get("K_SERVICE", "local"),
+            "servicio": SERVICIO,
+            "servicio_cloud_run": os.environ.get("K_SERVICE", "local"),
             "revision": os.environ.get("K_REVISION", "local"),
             "capa": _capa(record.name),
             **CONTEXTO_DDD,
+            **_contexto_journey.get(),
         }
         extra = getattr(record, "campos", None)
         if extra:
@@ -123,9 +181,15 @@ def log_evento(
     **campos,
 ) -> None:
     """`nivel` por defecto "info". `detalle=True` marca un evento de trazado
-    fino que se omite con LOG_DETALLE=minimo."""
+    fino que se omite con LOG_DETALLE=minimo. Campos reconocidos del §13:
+    `modulo`, `agregado`, `tipo_comunicacion` (validado contra
+    TIPOS_COMUNICACION) y `tipo_mensaje` (si no se pasa, se infiere del nombre
+    del evento)."""
     if detalle and not _detalle_completo():
         return
+    tipo = campos.get("tipo_comunicacion")
+    if tipo is not None and tipo not in TIPOS_COMUNICACION:
+        raise ValueError(f"tipo_comunicacion inválido: {tipo!r}")
     metodo = getattr(logger, nivel, logger.info)
     metodo(evento, extra={"campos": {"evento": evento, **campos}})
 

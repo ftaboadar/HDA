@@ -47,8 +47,22 @@ resource "google_project_iam_member" "grafana_logging_viewer" {
   member  = "serviceAccount:${google_service_account.grafana.email}"
 }
 
+# Los nombres de bucket de GCS son globales y cada componente separado por
+# "." está limitado a 63 caracteres (sin dominio aquí, así que el nombre
+# completo cae bajo ese límite). Un `project_id` auto-generado por GCP (sin
+# nombre corto elegido, ej. "project-b68c032a-000b-4601-8bd", 31 caracteres)
+# hace que "${project_id}-${entorno}-grafana-provisioning" supere el
+# límite y el `apply` falle con "name value must contain 3-63 characters" —
+# encontrado desplegando contra ese proyecto real (2026-09-22). Se
+# reemplaza el prefijo de `project_id` (largo variable, no acotado) por un
+# sufijo corto y estable de `random_id`, que solo necesita ser único dentro
+# de GCS, no legible.
+resource "random_id" "grafana_bucket_suffix" {
+  byte_length = 4
+}
+
 resource "google_storage_bucket" "grafana_provisioning" {
-  name                        = "${var.project_id}-${var.entorno}-grafana-provisioning"
+  name                        = "${var.entorno}-grafana-provisioning-${random_id.grafana_bucket_suffix.hex}"
   location                    = var.region
   uniform_bucket_level_access = true
   force_destroy               = true # PoC — sin protección contra borrado accidental

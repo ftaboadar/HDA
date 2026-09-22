@@ -37,14 +37,14 @@ import asyncio
 
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.publicador import Publicador
-from app.domain.seedwork.domain_event import DomainEvent
-from app.domain.verificacion.eventos import (
+from app.seedwork.dominio.domain_event import DomainEvent
+from app.verificacion.domain.eventos import (
     IntentoRegistrado,
     VerificacionAgotoReintentos,
     VerificacionCompletada,
 )
-from app.domain.verificacion.repository import IVerificacionRepository
-from app.domain.verificacion.servicio_elegibilidad import ServicioDeElegibilidad
+from app.verificacion.domain.repository import IVerificacionRepository
+from app.verificacion.domain.servicio_elegibilidad import ServicioDeElegibilidad
 
 logger = configurar_logging("application.dispatcher_eventos_dominio")
 

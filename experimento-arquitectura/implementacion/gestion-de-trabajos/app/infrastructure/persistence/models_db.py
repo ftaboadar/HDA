@@ -30,7 +30,13 @@ class TrabajoORM(Base):
     __tablename__ = "trabajos"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    proveedor_id = Column(String, nullable=False, index=True)
+    # nullable=True (antes False): en la saga real (§6 de
+    # 15-arquitectura-entrega-5.md) un Trabajo nace SOLICITADO/
+    # ESPERANDO_ELEGIBLES sin proveedor -- `AsignarProveedor` solo ocurre en
+    # el paso 4, con `AgendaConfirmada`. El atajo de carga (A15,
+    # `POST /trabajos`) sigue exigiendo `proveedor_id` en el payload y lo
+    # asigna de inmediato, así que no se ve afectado por este cambio.
+    proveedor_id = Column(String, nullable=True, index=True)
     estado = Column(String, nullable=False, default="PENDIENTE", index=True)
     monto = Column(Numeric, nullable=False)
     moneda = Column(String, nullable=False)
@@ -79,17 +85,15 @@ class NovedadORM(Base):
 class SagaInstanciaORM(Base):
     __tablename__ = "saga_instancia"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    correlation_id = Column(String, nullable=False, unique=True)
+    saga_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trabajo_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    origen = Column(String, nullable=False)
     estado = Column(String, nullable=False, default="INICIADA")
     paso_actual = Column(String, nullable=False)
-    creado_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
-    actualizado_en = Column(
+    iniciada_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
+    actualizada_en = Column(
         DateTime(timezone=True), default=_ahora_utc, onupdate=_ahora_utc, nullable=False
     )
-    datos_contexto = Column(
-        String, nullable=True
-    )  # JSON para estado interno de la saga
 
 
 class SagaLogORM(Base):
@@ -97,8 +101,15 @@ class SagaLogORM(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     saga_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    secuencia = Column(Integer, nullable=False)
     paso = Column(String, nullable=False)
-    evento = Column(String, nullable=False)
-    mensaje_id = Column(String, nullable=True)  # ID del mensaje en Pulsar si aplica
+    tipo = Column(
+        String, nullable=False
+    )  # COMANDO_ENVIADO | EVENTO_RECIBIDO | COMPENSACION_ENVIADA | PASO_EXPIRADO | SAGA_COMPLETADA | SAGA_COMPENSADA
+    servicio = Column(String, nullable=False)
+    mensaje = Column(String, nullable=False)
+    id_mensaje = Column(String, nullable=True)
+    payload = Column(
+        String, nullable=True
+    )  # jsonb (usamos String para compatibilidad aquí)
     ocurrido_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
-    detalles = Column(String, nullable=True)  # JSON para datos extra

@@ -1,17 +1,58 @@
 services:
-  rabbitmq:
-    image: rabbitmq:3.13-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+  # Pulsar STANDALONE (un solo contenedor: broker + bookie + zookeeper
+  # embebidos en la misma JVM) — deliberadamente distinto del cluster de
+  # 3 servicios de pulsar-infra/docker-compose.yml (zookeeper+bookie+broker
+  # separados), que es el que cuenta para la rúbrica como "cluster real".
+  # Este servicio existe SOLO para que el CI de este microservicio pueda
+  # correr los CP-1..7 de DISP-03 contra Pulsar real sin levantar los 3
+  # contenedores completos por cada corrida de PR. No reemplaza al cluster
+  # real para ningún otro propósito (despliegue, demo, otros experimentos).
+  pulsar:
+    image: apachepulsar/pulsar:3.2.2
+    command: bin/pulsar standalone --no-functions-worker
     environment:
-      RABBITMQ_DEFAULT_USER: hda
-      RABBITMQ_DEFAULT_PASS: hda
+      # Memoria acotada para correr cómodo en un runner de GitHub Actions
+      # (mismo patrón que pulsar-infra/docker-compose.yml, ajustado un poco
+      # al alza porque standalone combina broker+bookie+zk en un solo JVM).
+      PULSAR_MEM: "-Xms512m -Xmx512m -XX:MaxDirectMemorySize=512m"
+    # Sin publicar puertos al host: api/worker/pulsar-init lo alcanzan por
+    # DNS interno de compose (`pulsar:6650`/`pulsar:8080`), nada fuera del
+    # stack necesita tocarlo. Publicar 6650/8080 chocaría en dev local con
+    # pulsar-infra/docker-compose.yml (el cluster real) si ambos stacks
+    # corren a la vez en la misma máquina.
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
+      test: ["CMD", "curl", "-f", "http://localhost:8080/admin/v2/brokers/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 45s
+
+  # Servicio "one-shot" (equivalente a scripts/pulsar-namespaces-local.sh,
+  # pero contra el standalone de este compose en vez del cluster de
+  # pulsar-infra): crea el tenant `hda` y el namespace `hda/proveedores`
+  # (ver app/common/pulsar_topology.py) antes de que api/worker arranquen.
+  # También crea `hda/gestion-trabajos` (vacío, sin nada de ese servicio
+  # desplegado aquí): el worker arranca un segundo consumidor pull sobre
+  # `persistent://hda/gestion-trabajos/trabajos.finalizado`
+  # (app/worker/consumidor_trabajos_finalizado.py) y revienta ese hilo si el
+  # namespace no existe (ver el bug corregido en
+  # app/common/pulsar_topology.py) — crearlo vacío aquí evita el
+  # crash-loop de ese hilo y deja /salud del worker realmente en verde en
+  # CI, aunque DISP-03 (CP-1..7) no dependa de ese segundo consumidor.
+  # Idempotente (`|| true`), así que reintentar `docker compose up` no falla.
+  pulsar-init:
+    image: apachepulsar/pulsar:3.2.2
+    depends_on:
+      pulsar:
+        condition: service_healthy
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        set -e
+        bin/pulsar-admin --admin-url http://pulsar:8080 tenants create hda || true
+        bin/pulsar-admin --admin-url http://pulsar:8080 namespaces create hda/proveedores || true
+        bin/pulsar-admin --admin-url http://pulsar:8080 namespaces create hda/gestion-trabajos || true
+        bin/pulsar-admin --admin-url http://pulsar:8080 namespaces list hda
 
   postgres:
     image: postgres:16-alpine
@@ -56,17 +97,20 @@ services:
     command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
     restart: on-failure:5
     environment:
-      TRANSPORTE: rabbitmq
+      TRANSPORTE: pulsar
+      PULSAR_SERVICE_URL: pulsar://pulsar:6650
+      PULSAR_ADMIN_URL: http://pulsar:8080
       DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/verificacion
-      RABBITMQ_URL: amqp://hda:hda@rabbitmq:5672/
       MOCK_POLICIA_URL: http://mock-policia:8000
       MOCK_RUES_URL: http://mock-rues:8000
       MOCK_CERTIFICADORA_URL: http://mock-certificadora:8000
     ports:
       - "8000:8000"
     depends_on:
-      rabbitmq:
+      pulsar:
         condition: service_healthy
+      pulsar-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
 
@@ -75,9 +119,10 @@ services:
     command: python -m app.worker.main
     restart: on-failure:5
     environment:
-      TRANSPORTE: rabbitmq
+      TRANSPORTE: pulsar
+      PULSAR_SERVICE_URL: pulsar://pulsar:6650
+      PULSAR_ADMIN_URL: http://pulsar:8080
       DATABASE_URL: postgresql+psycopg2://hda:hda@postgres:5432/verificacion
-      RABBITMQ_URL: amqp://hda:hda@rabbitmq:5672/
       MOCK_POLICIA_URL: http://mock-policia:8000
       MOCK_RUES_URL: http://mock-rues:8000
       MOCK_CERTIFICADORA_URL: http://mock-certificadora:8000
@@ -86,8 +131,10 @@ services:
       BACKOFF_BASE_S: "0.5"
       BACKOFF_MAX_S: "8.0"
     depends_on:
-      rabbitmq:
+      pulsar:
         condition: service_healthy
+      pulsar-init:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       mock-policia:

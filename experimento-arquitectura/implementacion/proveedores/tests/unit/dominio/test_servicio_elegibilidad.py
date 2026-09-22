@@ -3,11 +3,11 @@ repositorio falso en memoria (implementa IVerificacionRepository) en vez de
 Postgres: es lo que permite probar la lógica de negocio sin infraestructura,
 la ventaja concreta de que domain/ no dependa de SQLAlchemy."""
 
-from app.domain.verificacion.fabrica import FabricaVerificacion
-from app.domain.verificacion.repository import IVerificacionRepository
-from app.domain.verificacion.servicio_elegibilidad import ServicioDeElegibilidad
-from app.domain.verificacion.value_objects import ProveedorId, ResultadoIntento, TipoVerificador
-from app.domain.verificacion.verificacion import Verificacion
+from app.verificacion.domain.fabrica import FabricaVerificacion
+from app.verificacion.domain.repository import IVerificacionRepository
+from app.verificacion.domain.servicio_elegibilidad import ServicioDeElegibilidad
+from app.verificacion.domain.value_objects import ProveedorId, ResultadoIntento, TipoVerificador
+from app.verificacion.domain.verificacion import Verificacion
 
 
 class RepositorioEnMemoria(IVerificacionRepository):

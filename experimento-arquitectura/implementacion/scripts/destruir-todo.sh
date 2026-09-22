@@ -17,11 +17,24 @@ if ! bucket_state_existe; then
   exec "$SCRIPTS_DIR/verificar-nada-facturando.sh"
 fi
 
-# Orden inverso al despliegue. gestion-de-trabajos antes que pulsar-infra/gcp (depende de su IP).
+# Orden inverso al despliegue (ver desplegar-todo.sh). gestion-de-trabajos y proveedores antes
+# que pulsar-infra/gcp (dependen de su IP vía Direct VPC egress).
+#
+# [2026-09-22] bff/infra, marketplace/infra, siniestros/infra, suscripciones/infra y scoring/infra
+# faltaban de este ORDEN (el archivo se quedó con la lista de stacks previa a la Entrega 5) — un
+# `destruir-todo.sh` real los habría dejado desplegados y facturando en silencio, porque
+# `verificar-nada-facturando.sh` solo lista lo que YA no está en este ORDEN, no compara contra
+# `desplegar-todo.sh`. Encontrado corriendo el ciclo completo de verificación de esta sesión contra
+# project-b68c032a-000b-4601-8bd, antes de ejecutar el destroy real.
 ORDEN=(
   observabilidad
+  bff/infra
+  siniestros/infra
   proveedores/infra
   reputacion/infra
+  marketplace/infra
+  scoring/infra
+  suscripciones/infra
   pagos/infra
   gestion-de-trabajos/infra
   mocks-crm/infra

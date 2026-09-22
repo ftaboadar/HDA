@@ -46,6 +46,7 @@ jobs:
             carpeta: experimento-arquitectura/implementacion/proveedores
             opcional: false
             compose_file: docker-compose.yml
+            db_name: verificacion
           - servicio: gestion-de-trabajos
             check: gestion-de-trabajos
             carpeta: experimento-arquitectura/implementacion/gestion-de-trabajos
@@ -55,11 +56,13 @@ jobs:
             # necesitan el stack completo de docker-compose.disp02.yml (api +
             # postgres + mock-crm), ver ese archivo para el detalle.
             compose_file: docker-compose.disp02.yml
+            db_name: gestion_trabajos
           - servicio: reputacion
             check: reputacion
             carpeta: experimento-arquitectura/implementacion/reputacion
             opcional: true
             compose_file: docker-compose.yml
+            db_name: reputacion
           # Pagos es microservicio propio desde la entrega parcial y no estaba en la matriz.
           # Lint, formato y unitarias verificados localmente el 2026-09-21; pasar a
           # opcional: false (igual que gestion y reputacion) tras la primera corrida verde en GitHub.
@@ -68,6 +71,7 @@ jobs:
             carpeta: experimento-arquitectura/implementacion/pagos
             opcional: true
             compose_file: docker-compose.yml
+            db_name: hda_pagos
     steps:
       - uses: actions/checkout@v4
 
@@ -129,6 +133,15 @@ jobs:
           echo "La API no quedó sana a tiempo"
           docker compose -f ${{ matrix.compose_file }} logs
           exit 1
+
+      - name: Exponer DATABASE_URL del Postgres del stack (para pruebas de integración fuera de la API)
+        if: steps.existe.outputs.ok == 'true'
+        working-directory: ${{ matrix.carpeta }}
+        run: |
+          DB_PORT=$(docker compose -f ${{ matrix.compose_file }} port postgres 5432 | head -n 1 | awk -F: '{print $NF}')
+          if [ -n "$DB_PORT" ]; then
+            echo "DATABASE_URL=postgresql+psycopg2://hda:hda@localhost:$DB_PORT/${{ matrix.db_name }}" >> $GITHUB_ENV
+          fi
 
       - name: Correr la suite de pruebas
         if: steps.existe.outputs.ok == 'true'

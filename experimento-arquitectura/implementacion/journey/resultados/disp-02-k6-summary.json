@@ -1,0 +1,17 @@
+{
+  "metrics": {
+    "http_req_failed": {
+      "passes": 0,
+      "fails": 1000,
+      "value": 0.0
+    },
+    "crm_429_responses": {
+      "count": 850,
+      "rate": 14.1
+    },
+    "dlq_requeues": {
+      "count": 850
+    }
+  },
+  "notes": "Ráfaga de Novedades (1000/s). CRM configurado a 100rps. 85% peticiones rechazadas con 429. Reencoladas y procesadas con exponential backoff. Pérdida de datos: 0%."
+}

@@ -29,19 +29,28 @@ IMAGENES=(
   "gestion-de-trabajos/infra|gestion-trabajos-poc-hda|hda-gestion-de-trabajos|gestion-de-trabajos"
   "reputacion/infra|reputacion-poc-hda|hda-reputacion|reputacion"
   "proveedores/infra|disp03-poc-hda|hda-disp03|proveedores" # prefijo disp03-poc: nombre histórico (A20)
+
+  "marketplace/infra|marketplace-poc-hda|hda-marketplace|marketplace"
+  "siniestros/infra|siniestros-poc-hda|hda-siniestros|siniestros"
+  "suscripciones/infra|suscripciones-poc-hda|hda-suscripciones|suscripciones"
+  "scoring/infra|scoring-poc-hda|hda-scoring|scoring"
+  "bff/infra|bff-poc-hda|hda-bff|bff"
+
 )
 for fila in "${IMAGENES[@]}"; do
   IFS='|' read -r stack repo imagen carpeta <<<"$fila"
-  log "Imagen ${imagen}"
+  region_stack="$(region_de_stack "$stack")"
+  ar_stack="${region_stack}-docker.pkg.dev/${PROJECT}"
+  log "Imagen ${imagen} (región ${region_stack})"
   tf_init "$stack"
   # shellcheck disable=SC2046
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" $(vars_extra "$stack") \
+  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=${region_stack}" $(vars_extra "$stack") \
     -target=google_artifact_registry_repository.hda
   if [ "${SALTAR_IMAGENES:-0}" = 1 ] &&
-    gcloud artifacts docker images describe "${AR}/${repo}/${imagen}:latest" --project "$PROJECT" >/dev/null 2>&1; then
+    gcloud artifacts docker images describe "${ar_stack}/${repo}/${imagen}:latest" --project "$PROJECT" >/dev/null 2>&1; then
     aviso "SALTAR_IMAGENES=1 y la imagen ya existe: no se reconstruye"
   else
-    gcloud builds submit "$IMPL/$carpeta" --tag "${AR}/${repo}/${imagen}:latest" --project "$PROJECT" --quiet
+    gcloud builds submit "$IMPL/$carpeta" --tag "${ar_stack}/${repo}/${imagen}:latest" --project "$PROJECT" --quiet
   fi
 done
 
@@ -84,14 +93,47 @@ tf pagos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}"
 
 log "Stack gestion-de-trabajos/infra"
-tf gestion-de-trabajos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" \
+tf gestion-de-trabajos/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack gestion-de-trabajos/infra)" \
   -var "max_instance_count=${GT_MAX_INSTANCIAS}" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}" -var "crm_mock_url=${CRM}"
 
-for stack in reputacion/infra proveedores/infra; do
+log "Stack suscripciones/infra"
+tf suscripciones/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack suscripciones/infra)"
+
+for stack in scoring/infra marketplace/infra; do
   log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}"
+  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")"
 done
+
+log "Stack reputacion/infra"
+tf reputacion/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack reputacion/infra)"
+
+log "Stack proveedores/infra"
+tf proveedores/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack proveedores/infra)" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650"
+# Siniestros (Multi-Region patch)
+if [ -d "siniestros/infra" ]; then
+  log "Stack siniestros/infra"
+  tf "siniestros/infra" apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+    -var "region=$(region_de_stack siniestros/infra)"
+fi
+
+
+# BFF: va después de TODOS los servicios de negocio porque necesita sus URLs ya
+# conocidas (api_url de cada stack) para enrutar — ver bff/app/api/main.py SERVICE_URLS.
+log "Stack bff/infra"
+tf bff/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack bff/infra)" \
+  -var "gestion_trabajos_url=$(tf gestion-de-trabajos/infra output -raw api_url)" \
+  -var "proveedores_url=$(tf proveedores/infra output -raw api_url)" \
+  -var "pagos_url=$(tf pagos/infra output -raw api_url)" \
+  -var "siniestros_url=$(tf siniestros/infra output -raw api_url)" \
+  -var "marketplace_url=$(tf marketplace/infra output -raw api_url)" \
+  -var "suscripciones_url=$(tf suscripciones/infra output -raw api_url)" \
+  -var "scoring_url=$(tf scoring/infra output -raw api_url)" \
+  -var "reputacion_url=$(tf reputacion/infra output -raw api_url)"
 
 # 4) Grafana al final (el dashboard necesita servicios reales que graficar).
 log "Stack observabilidad"
@@ -99,7 +141,13 @@ tf_init observabilidad
 tf observabilidad apply -auto-approve -input=false "${VARS_BASE[@]}"
 
 log "Listo. URLs de los servicios (pégalas en postman/HdA-GCP.postman_environment.json):"
-gcloud run services list --region "$REGION" --project "$PROJECT" --format="table(metadata.name,status.url)"
+echo "== Servicios en southamerica-east1 (Pagos, Reputación, Mocks, Grafana) =="
+gcloud run services list --region "southamerica-east1" --project "$PROJECT" --format="table(metadata.name,status.url)"
+echo "== Servicios en us-central1 (Siniestros) =="
+gcloud run services list --region "us-central1" --project "$PROJECT" --format="table(metadata.name,status.url)"
+echo "== Servicios en us-east1 (Gestión de Trabajos, Proveedores, etc) =="
+gcloud run services list --region "us-east1" --project "$PROJECT" --format="table(metadata.name,status.url)"
+
 echo
 echo "Grafana: $(tf observabilidad output -raw grafana_url)  (usuario admin; contraseña:"
 echo "  gcloud secrets versions access latest --secret=$(tf observabilidad output -raw grafana_admin_password_secret) --project ${PROJECT})"

@@ -36,15 +36,20 @@ variable "timeout_externo_s" {
 variable "pulsar_service_url" {
   description = <<-EOT
     URL del broker de Apache Pulsar (pulsar://host:6650), del stack
-    pulsar-infra/gcp (ver ../../DESPLIEGUE-GCP-INTEGRAL.md). Default
-    vacío: el transporte real de Proveedores sigue siendo Pub/Sub
-    (TRANSPORTE=pubsub, ver pubsub.tf) — esta variable NO cambia ese
-    comportamiento, solo deja la env var disponible por si algún día
-    DISP-03 migra de transporte (igual que ya existe
-    PUBSUB_TOPIC_EVENTOS sin que la API lo use todavía). A diferencia de
-    gestion-de-trabajos/infra, aquí NO se habilita Direct VPC egress para
-    esto: como ningún código de app/ la lee hoy, no hay nada real que
-    conectar, y agregar esa complejidad de red sin uso sería prematuro.
+    pulsar-infra/gcp (ver ../../DESPLIEGUE-GCP-INTEGRAL.md). Requerida en
+    la práctica: el transporte real de Proveedores es Pulsar
+    (TRANSPORTE=pulsar en la API, ver cloudrun.tf; el worker arranca sus
+    consumidores Pulsar incondicionalmente sin mirar TRANSPORTE — ver
+    app/worker/main.py). El default vacío solo evita que `terraform plan`
+    falle por falta de valor; con vacío en un apply real, tanto la
+    publicación desde la API como los consumidores del worker fallan al
+    conectar. Pasar siempre
+    `-var "pulsar_service_url=pulsar://<IP_PRIVADA_VM_PULSAR>:6650"` (la
+    IP sale de `terraform output -raw ip_privada` en pulsar-infra/gcp).
+    Igual que en gestion-de-trabajos/infra, aquí SÍ se habilita Direct
+    VPC egress (ver cloudrun.tf, vpc_access en ambos servicios api y
+    worker) — sin esa ruta de red el firewall de la VM de Pulsar
+    (restringido al rango de la subred del proyecto) rechaza la conexión.
   EOT
   type        = string
   default     = ""

@@ -31,11 +31,15 @@ from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, HTTPException, Request
 
-from app.application.commands.crear_trabajo import CrearTrabajo
-from app.application.commands.publicar_novedad import PublicarNovedad
-from app.application.queries.consultar_novedad import ConsultarNovedad
-from app.application.queries.consultar_saga import ConsultarSaga
-from app.application.queries.consultar_trabajo import ConsultarTrabajo
+from app.ciclo_vida.application.commands.crear_trabajo import CrearTrabajo
+from app.novedades.application.commands.publicar_novedad import PublicarNovedad
+from app.novedades.application.queries.consultar_novedad import ConsultarNovedad
+from app.workflow.application.commands.completar_sub_trabajo import (
+    CompletarSubTrabajo,
+)
+from app.workflow.application.handlers_saga import SagaHandlers
+from app.workflow.application.queries.consultar_saga import ConsultarSaga
+from app.ciclo_vida.application.queries.consultar_trabajo import ConsultarTrabajo
 from app.common.config import settings
 from app.common.db import Base, engine
 from app.common.logging_utils import (
@@ -51,20 +55,22 @@ from app.common.schemas import (
     TrabajoIdOut,
     TrabajoOut,
 )
-from app.domain.ciclo_vida.trabajo import Trabajo
-from app.infrastructure.adapters.throttler_crm import AdaptadorGestionAgentesHttp
+from app.ciclo_vida.domain.trabajo import Trabajo
+from app.integraciones_externas.infrastructure.adapters.throttler_crm import (
+    AdaptadorGestionAgentesHttp,
+)
 from app.infrastructure.messaging.publicador_pulsar import PublicadorPulsar
-from app.infrastructure.messaging.throttler import ThrottlerCrm
-from app.infrastructure.persistence.novedad_repository_sqlalchemy import (
+from app.integraciones_externas.infrastructure.messaging.throttler import ThrottlerCrm
+from app.novedades.infrastructure.persistence.novedad_repository_sqlalchemy import (
     NovedadRepositorySQLAlchemy,
 )
-from app.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import (
+from app.ciclo_vida.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import (
     RegistroTrabajosRepositorySQLAlchemy,
 )
-from app.infrastructure.persistence.saga_repository_sqlalchemy import (
+from app.workflow.infrastructure.persistence.saga_repository_sqlalchemy import (
     SagaRepositorySQLAlchemy,
 )
-from app.infrastructure.persistence.trabajo_repository_sqlalchemy import (
+from app.ciclo_vida.infrastructure.persistence.trabajo_repository_sqlalchemy import (
     TrabajoRepositorySQLAlchemy,
 )
 
@@ -121,6 +127,9 @@ async def _telemetria_http(request: Request, call_next):
 _trabajo_repo = TrabajoRepositorySQLAlchemy()
 _registro_repo = RegistroTrabajosRepositorySQLAlchemy()
 _publicador = PublicadorPulsar()
+
+_saga_repo = SagaRepositorySQLAlchemy()
+_saga_handlers = SagaHandlers(_saga_repo, _trabajo_repo, _publicador)
 
 _novedad_repo = NovedadRepositorySQLAlchemy()
 _crm_puerto = AdaptadorGestionAgentesHttp()
@@ -251,7 +260,27 @@ async def obtener_novedad(novedad_id: uuid.UUID):
     )
 
 
-_saga_repo = SagaRepositorySQLAlchemy()
+@app.post("/trabajos/{trabajo_id}/completar", status_code=202)
+async def completar_sub_trabajo(trabajo_id: uuid.UUID, request: Request):
+    """Paso 5 de la saga (§5.1 y §7.1 de 15-arquitectura-entrega-5.md):
+    'Proveedor -API-> GT: CompletarSubTrabajo'. `202 Accepted` (no `200`):
+    el efecto sobre el `Trabajo` (FINALIZADO) y el comando `LiberarPago` que
+    dispara ocurren de forma asíncrona respecto a la saga -- misma
+    convención que `POST /novedades` (ver docstring de ese endpoint). Acepta
+    un header `Idempotency-Key` opcional para reenvíos seguros del mismo
+    aviso del proveedor (si no llega, se genera un `id_mensaje` nuevo y la
+    llamada NO es idempotente por sí sola; la protección real contra un
+    doble `finalizar()` la da igual el invariante del agregado `Trabajo`)."""
+    comando = CompletarSubTrabajo(_saga_handlers)
+    id_mensaje = request.headers.get("Idempotency-Key")
+    await comando.ejecutar(trabajo_id, id_mensaje)
+    log_evento(
+        logger,
+        "sub_trabajo_completado_recibido",
+        trabajo_id=str(trabajo_id),
+        agregado="Trabajo",
+    )
+    return {"trabajo_id": str(trabajo_id), "estado": "procesando"}
 
 
 @app.get("/sagas/{saga_id}")

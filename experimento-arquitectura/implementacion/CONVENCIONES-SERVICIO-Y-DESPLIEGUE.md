@@ -41,6 +41,20 @@ Cada servicio vive en `implementacion/<servicio>/` y sigue la plantilla de `repu
 └── infra/                    Terraform del stack (ver §6)
 ```
 
+**Archivos de plantilla (Fase 0, se copian tal cual; viven en `gestion-de-trabajos/`):**
+
+| Archivo | Qué resuelve |
+|---|---|
+| `app/common/logging_utils.py` | Campos de log del §2 (cambiar solo `SERVICIO` y `CONTEXTO_DDD`) |
+| `app/seedwork/infraestructura/pulsar/mensajeria.py` | `PublicadorPulsar` y `ConsumidorPulsar` con todo el §3 |
+| `app/seedwork/infraestructura/pulsar/idempotencia.py` | Tabla `eventos_procesados` y su registro |
+| `app/seedwork/infraestructura/worker.py` | `crear_app_worker(...)`: worker con `/salud` del §5 |
+| `tests/unit/test_arquitectura.py` | Imports prohibidos del dominio y entre módulos (15-…md §14) |
+| `tests/contrato/asyncapi.py` | `validar_cuerpo(...)` contra `asyncapi/hda-asyncapi.yaml` (§9) |
+| `tests/test_openapi_exportado.py` | `openapi/openapi.json` al día con el código; se genera con `scripts/exportar-openapi.sh <servicio>` |
+
+`requirements-dev.txt` suma `pyyaml` y `jsonschema` (pruebas de contrato).
+
 **Servicios que ya existen con otro layout** (`app/domain/<agregado>/`, `app/application/…` en la
 raíz): al agregarles un módulo nuevo se migran al layout por módulos **en ese mismo PR**, moviendo
 código sin cambiar comportamiento, y con los tests existentes pasando antes y después. No mezclar dos
@@ -74,8 +88,17 @@ Nombres de módulos por servicio (de la vista de módulos, en `snake_case`):
   `asyncio.to_thread(...)` / `run_in_executor`. Sin esto, bajo carga el event loop se serializa (bug
   real de ESC-01, ver `DESPLIEGUE-GCP-INTEGRAL.md` "Estado real", punto 6).
 - **Logs** JSON con `logging_utils.log_evento(...)`: cada línea lleva `dominio`, `subdominio`,
-  `tipo_subdominio`, `bounded_context`, `capa`, `tipo_mensaje` y, desde Entrega 5, `correlation_id`.
-  Copia el `logging_utils.py` de `gestion-de-trabajos/` y cambia solo las 4 constantes de contexto.
+  `tipo_subdominio`, `bounded_context`, `capa`, `tipo_mensaje` y, desde Entrega 5 (15-…md §13):
+  - `servicio` (nombre de la carpeta, igual en api y worker; el de Cloud Run va en `servicio_cloud_run`);
+  - `correlation_id`, `saga_id`, `paso_saga`: se ponen una vez en la entrada (petición o mensaje) con
+    `with contexto_journey(correlation_id=..., saga_id=...)` y aparecen en todas las líneas del bloque
+    (el `ConsumidorPulsar` ya lo hace);
+  - `modulo`, `agregado` y `tipo_comunicacion` (`intra_modulo` | `entre_modulos_sync` |
+    `entre_modulos_async` | `entre_servicios_comando` | `entre_servicios_evento` | `rest_bff` |
+    `externo`; un valor fuera de la lista lanza error), pasados en cada `log_evento(...)`;
+  - `tipo_mensaje` = `compensacion` para eventos cuyo nombre empieza por `compensacion_`.
+
+  Copia el `logging_utils.py` de `gestion-de-trabajos/` y cambia solo `SERVICIO` y `CONTEXTO_DDD`.
 
 ## 3. Mensajería con Pulsar (entre servicios)
 
@@ -103,11 +126,30 @@ Nombres de módulos por servicio (de la vista de módulos, en `snake_case`):
 - Error no recuperable al procesar → `negative_acknowledge` + `DeadLetterPolicy` nativa de la
   suscripción (`max_redeliver_count=3`, tópico `<topico>-<suscripcion>-DLQ`). Mismo patrón que
   `proveedores/app/common/pulsar_topology.py::construir_dead_letter_policy`.
+- **Esquema en el Schema Registry (A21):** cada tópico tiene una clase `Record` en
+  `infrastructure/messaging/esquemas.py` y se publica con `PublicadorPulsar.publicar(topico, record, ...)`,
+  que registra `JsonSchema` en el broker. Un tópico = una clase `Record`; en los tópicos de comandos la
+  clase une los campos de todos sus comandos (opcionales salvo `id_comando`, `saga_id`,
+  `correlation_id`, `trabajo_id`). El cuerpo omite los campos vacíos (el `JsonSchema` de pulsar-client
+  los escribiría como `null` y no validarían contra el AsyncAPI). El consumidor se suscribe **sin**
+  esquema y lee `json.loads(msg.data())` (*tolerant reader*: ignora campos que no conoce).
+- **Comandos de la saga** (15-…md §7.1): tópico `persistent://hda/<servicio-destino>/comandos`,
+  un tipo por `tipo_evento`; la respuesta es un evento en el namespace del que responde y copia
+  `saga_id` e `id_comando` del comando.
 - Al implementar un evento del catálogo, agrega su canal y mensaje a `asyncapi/hda-asyncapi.yaml` en el
   mismo PR (el catálogo de 15-…md §7 es la decisión; AsyncAPI es el contrato ejecutable).
 - Log obligatorio: `mensaje_publicado` (canal, topico, message_id, tipo_evento) al publicar y
   `mensaje_recibido` (suscripcion, message_id, id_evento) al consumir, así se unen publicador y
   consumidor por `message_id`.
+
+### 3.1 Retrocompatibilidad de contratos (15-…md §14)
+
+| Frontera | Regla | Cómo se hace cumplir |
+|---|---|---|
+| Pulsar (eventos y comandos) | Solo se agregan campos **opcionales**; nunca se borra, renombra ni cambia el tipo de un campo. Un cambio que rompe crea el tópico `…v2`, que convive con `…v1` hasta que migre el último consumidor, y sube `version_esquema` | Compatibilidad BACKWARD por namespace en el broker (`scripts/pulsar-namespaces-local.sh` y el startup de la VM); pruebas de contrato contra el AsyncAPI (§9) |
+| REST (BFF y cada servicio) | Dentro de `/v1` solo se agregan endpoints, campos opcionales de entrada y campos de salida; nunca se quita un campo ni se cambia un código de respuesta. `/v2` convive con `/v1` y se anuncia con el header `Deprecation` | `openapi/openapi.json` versionado (`scripts/exportar-openapi.sh`), prueba `tests/test_openapi_exportado.py` y job **oasdiff** del CI (`oasdiff breaking` contra `main`) |
+| Entre módulos de un servicio | Un módulo usa de otro solo su `application/`; si una firma cambia, se actualizan sus usuarios en el mismo PR | `tests/unit/test_arquitectura.py` |
+| Datos (BD por servicio) | Migraciones *expand/contract*: primero se agrega lo nuevo, se migra el código y después se quita lo viejo; nunca un cambio destructivo en la misma versión | La suite de integración crea el esquema desde cero contra el Postgres del compose |
 
 ## 4. Pulsar: namespaces
 
@@ -199,6 +241,13 @@ Reglas de despliegue que ya costaron errores reales (no repetir):
    `.github/workflows/pr-quality-gate.yml`).
 7. **Costo**: cada stack con Cloud SQL factura aunque no haya tráfico. Apaga con `terraform destroy`
    (orden inverso del despliegue) cuando termines de medir; ver el checklist de "nada facturando" en
+   `DESPLIEGUE-GCP-INTEGRAL.md`.
+8. **Si el stack se despliega en una región distinta a la región por defecto** (ej. `gestion-de-trabajos`,
+   `proveedores`, `scoring`, `marketplace` en `us-east1`; `siniestros` en `us-central1` — Regla 3, reparte
+   cuota de vCPU entre regiones): construye y sube la imagen a esa MISMA región (Artifact Registry es
+   regional). `scripts/comun.sh::region_de_stack()` es la única fuente de verdad; si el bootstrap de
+   imágenes y el `apply` final usan regiones distintas, Terraform recrea el repo en la región nueva
+   (borrando la imagen) y Cloud Run falla con `Image ... not found` — bug real, ver
    `DESPLIEGUE-GCP-INTEGRAL.md`.
 
 ## 7. CI

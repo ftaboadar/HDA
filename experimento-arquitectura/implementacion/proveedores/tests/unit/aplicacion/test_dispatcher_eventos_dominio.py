@@ -10,11 +10,11 @@ módulo)."""
 import pytest
 
 from app.application.dispatcher_eventos_dominio import despachar
-from app.domain.verificacion.eventos import VerificacionAgotoReintentos, VerificacionCompletada
-from app.domain.verificacion.fabrica import FabricaVerificacion
-from app.domain.verificacion.repository import IVerificacionRepository
-from app.domain.verificacion.value_objects import ProveedorId, TipoVerificador, VerificacionId
-from app.domain.verificacion.verificacion import Verificacion
+from app.verificacion.domain.eventos import VerificacionAgotoReintentos, VerificacionCompletada
+from app.verificacion.domain.fabrica import FabricaVerificacion
+from app.verificacion.domain.repository import IVerificacionRepository
+from app.verificacion.domain.value_objects import ProveedorId, TipoVerificador, VerificacionId
+from app.verificacion.domain.verificacion import Verificacion
 
 
 class RepositorioEnMemoria(IVerificacionRepository):

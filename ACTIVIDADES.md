@@ -1,34 +1,29 @@
-# Actividades por miembro del equipo — Entrega Parcial
----
+# Registro de Actividades del Equipo
 
-## Frans Taboada (`ftaboadar` en GitHub; identidades de git `frans` / `FRANS.TABOADA`)
+## Entrega 5 (Arquitectura por Escenarios y Journeys)
 
-- **Componentes a cargo:** Proveedores/DISP-03 (implementación DDD original, fixes de GCP/IAM/idempotencia), integración del plan de Entrega 4, separación de Pagos como microservicio, DISP-02 (throttler), validación de MOD-02, investigación y corrección iterativa de ESC-01 (10 corridas documentadas, causa raíz en cadena: sobresuscripción de conexiones → cold start → CPU de Cloud SQL → CPU de Cloud Run/GIL de Python).
-- **Qué implementé (63 commits, el volumen más alto del equipo):**
-  - Agregado `Verificacion` (DDD/hexagonal) y su ciclo de vida completo en Proveedores, con los 3 bugs reales de GCP corregidos vía `terraform plan` (`ca76f60`, `4a586c6`, `0a36054`).
-  - Corrección de las métricas CP-2/CP-7 para medir el criterio real del plan, no un proxy (`ef391c5`, `180a32d`).
-  - Separación de Pagos en microservicio independiente (`567604e`), construcción de DISP-02 (`09dd4e5`), validación documentada de MOD-02 (`ea895bd`).
-  - Eliminación de ESC-02/ESC-03 al confirmarse fuera del alcance acordado (`c0d3fa0`).
-  - Las 10 corridas de diagnóstico de ESC-01, cada una aislando y confirmando un cuello de botella distinto, hasta bajar el p95 de 14.2s a 5.2s (sin llegar aún al umbral de 2s) — documentado en detalle en `RESULTADOS-ESCALABILIDAD-GCP.md`.
-  - Integró la mayoría de los Pull Requests del equipo a `main` (merges de los PRs #1-#5, #9-#15).
-- **Cómo colaboré con el resto del equipo:** integró y mergeó el trabajo de Daniel (PR #7, Reputación + Pulsar infra) y de Jhoan (PR #9 y #16) hacia `main`. 
+En esta entrega final, el equipo dividió las labores para cubrir el ciclo completo de diseño, implementación y experimentación sobre la arquitectura consolidada de Hogar de los Alpes.
 
----
+### Jhoan
+*   **Rol:** Implementación, Integración y Pruebas de Carga.
+*   **Actividades:**
+    *   Lideró la implementación (Pasos 1.2 al 1.11) de los microservicios usando DDD y Arquitectura Hexagonal.
+    *   Configuró los scripts automatizados de despliegue y apagado (`desplegar-todo.sh`, `destruir-todo.sh`) hacia Google Cloud.
+    *   Creó y desplegó el BFF (API Gateway) como fachada central.
+    *   Ejecutó y analizó el experimento **ESC-01 (JRN-02)** inyectando el pico de Siniestros mediante `k6`.
 
-## Jhoan Felipe Sarmiento Ortiz
+### Frans
+*   **Rol:** Orquestación (Sagas) y Experimentos de Disponibilidad.
+*   **Actividades:**
+    *   Diseñó la máquina de estados y el motor de Workflow (Saga Orquestada) en Gestión de Trabajos.
+    *   Consolidó el almacenamiento del *Saga Log* en Cloud SQL y documentó el acceso seguro vía Auth Proxy.
+    *   Planteó y validó las hipótesis H1/H0 del plan de experimentación.
+    *   Ejecutó y analizó el experimento **DISP-02 (JRN-03)** con el CRM limitado, comprobando el Circuit Breaker.
 
-- **Componentes a cargo:** migración del publicador de Proveedores a Apache Pulsar, mocks externos (Policía/RUES/Certificadora), observabilidad (Grafana) y escenarios adicionales de GCP.
-- **Qué implementé (2 commits, ambos PRs grandes integrados como squash — no es poco trabajo, es que cada uno representa un PR completo):**
-  - `e90b7eb` "Feature/proveedores pulsar y mocks" (#9) — 207 archivos, +4771/-304 líneas: migró el publicador de Proveedores de RabbitMQ/Pub-Sub a Pulsar, aisló la latencia de aceptación con threadpool para SQLAlchemy, y ajustó el manejo asíncrono del push handler.
-  - `0c13f0e` "Feature/gcp observabilidad y escenarios" (#16) — infraestructura de observabilidad (Grafana) y trabajo adicional de escenarios en GCP.
-- **Cómo colaboré con el resto del equipo:** su trabajo en Proveedores es la base sobre la que Frans construyó el consumidor de `trabajos.finalizado` y el job de reproceso de DLQ.
-
----
-
-## Daniel Felipe Urrego
-
-- **Componentes a cargo:** microservicio Reputación (desde cero) e infraestructura inicial del cluster de Apache Pulsar.
-- **Qué implementé (2 commits, PR #7 "reputacion-y-pulsar-infra"):**
-  - `41801da` "Agregado flujo reputacional" — esqueleto completo del microservicio Reputación (Dockerfile, README, estructura de la app).
-  - `ce14774` "Agregada funcionalidad apache pulsar" — infraestructura base del cluster (docker-compose, Helm chart para GKE).
-- **Cómo colaboré con el resto del equipo:** mergeó su propio PR #7 a `main`. Este trabajo (Reputación + Pulsar) es la base que Jhoan y Frans extendieron después (migración de Proveedores a Pulsar, consumidor de `trabajos.finalizado` en Reputación).
+### Daniel
+*   **Rol:** Arquitectura, Documentación y Contratos.
+*   **Actividades:**
+    *   Consolidó el esquema asíncrono y el versionamiento (`hda-asyncapi.yaml`) usando JSON Schema en Pulsar.
+    *   Refinó las vistas CML y UML para la Entrega 5 (BFF y Coordinador de Sagas).
+    *   Redactó el Documento Final y supervisó la estructura DDD por servicio (repositorios, puertos y módulos).
+    *   Ejecutó y analizó el experimento **MOD-02 (JRN-04)** (Pasarela Brasil), demostrando el patrón Strategy.

@@ -10,16 +10,16 @@ import uuid
 
 import pytest
 
-from app.application.ports.gestion_agentes import (
+from app.integraciones_externas.application.ports.gestion_agentes import (
     IGestionAgentesPort,
     ResultadoEnvioWebhook,
 )
-from app.domain.novedades.fabrica import FabricaNovedad
-from app.domain.novedades.novedad import Novedad
-from app.domain.novedades.repository import INovedadRepository
-from app.domain.novedades.value_objects import EstadoNovedad, NovedadId
-from app.domain.ciclo_vida.value_objects import TrabajoId
-from app.infrastructure.messaging.throttler import ThrottlerCrm
+from app.novedades.domain.fabrica import FabricaNovedad
+from app.novedades.domain.novedad import Novedad
+from app.novedades.domain.repository import INovedadRepository
+from app.novedades.domain.value_objects import EstadoNovedad, NovedadId
+from app.ciclo_vida.domain.value_objects import TrabajoId
+from app.integraciones_externas.infrastructure.messaging.throttler import ThrottlerCrm
 
 
 class _RepoNovedadFalso(INovedadRepository):

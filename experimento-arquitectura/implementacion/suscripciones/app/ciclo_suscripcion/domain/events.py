@@ -4,7 +4,7 @@ import uuid
 from app.seedwork.domain_event import DomainEvent
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class SuscripcionCreada(DomainEvent):
     id_evento: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = field(default_factory=datetime.utcnow)
@@ -14,7 +14,7 @@ class SuscripcionCreada(DomainEvent):
     bloque: str
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class CicloSuscripcionGenerado(DomainEvent):
     id_evento: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = field(default_factory=datetime.utcnow)

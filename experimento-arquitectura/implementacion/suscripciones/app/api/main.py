@@ -14,9 +14,16 @@ from app.ciclo_suscripcion.infrastructure.persistence.repository import (
     SuscripcionRepositorySQLAlchemy,
 )
 
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Suscripciones API")
+
+
+@app.on_event("startup")
+def startup() -> None:
+    # Se crea el esquema al arrancar (no al importar el módulo), para que
+    # uvicorn pueda bindear el puerto y /salud responda aunque la conexión a
+    # la base de datos tarde en estar lista (mismo patrón que
+    # gestion-de-trabajos/app/api/main.py).
+    Base.metadata.create_all(bind=engine)
 
 
 def get_db():

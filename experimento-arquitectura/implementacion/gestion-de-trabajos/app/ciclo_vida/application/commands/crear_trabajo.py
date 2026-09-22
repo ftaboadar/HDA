@@ -1,0 +1,118 @@
+"""Comando `CrearTrabajo` — reemplaza el cuerpo de `POST /trabajos`; la ruta
+HTTP nunca toca el ORM ni el agregado directo (ver app/api/main.py).
+
+CQS: `ejecutar()` retorna solo el `id` del trabajo creado, nunca el
+agregado completo ni su estado de negocio — una consulta posterior
+(`ConsultarTrabajo`) es quien expone ese estado.
+
+Dominio vs. integración (Regla 4, ver docstring de
+`domain/trabajo/eventos.py`): el agregado `Trabajo.finalizar()` produce el
+evento de DOMINIO `TrabajoFinalizado`, puramente interno. Este comando
+guarda el agregado y le pasa sus eventos a
+`application/dispatcher_eventos_dominio.py` — nunca publica ni notifica
+directamente. El dispatcher es quien decide traducir ese evento de dominio
+en un evento de INTEGRACIÓN hacia Pulsar Y en la reacción intra-servicio
+del módulo Pagos (ver docstring del dispatcher).
+
+CORRECCIÓN (encontrada corriendo k6 real contra GCP, no en tests): `_repo.guardar`
+es una llamada SÍNCRONA de SQLAlchemy — invocarla directo dentro de un
+`async def` bloquea el event loop entero de ese worker de Uvicorn durante
+el round-trip a Cloud SQL. Bajo carga (ESC-01), esto serializa
+efectivamente todas las requests de una instancia sin importar
+`containerConcurrency`, causando colas de segundos y timeouts (p95 medido:
+14.2s, 20% de requests fallidas). Se envuelve en `asyncio.to_thread`, mismo
+patrón ya establecido y auditado en
+`proveedores/app/application/commands/registrar_intento.py`."""
+
+from __future__ import annotations
+
+import asyncio
+import time
+import uuid
+from decimal import Decimal
+
+from app.application.dispatcher_eventos_dominio import despachar
+from app.application.ports.publicador import IPublicador
+from app.ciclo_vida.application.ports.registro_trabajos import (
+    IRegistroTrabajosRepository,
+)
+from app.common.logging_utils import configurar_logging, log_evento
+from app.ciclo_vida.domain.fabrica import FabricaTrabajo
+from app.ciclo_vida.domain.repository import ITrabajoRepository
+from app.ciclo_vida.domain.value_objects import ProveedorId, Region
+
+logger = configurar_logging("application.commands.crear_trabajo")
+
+
+class CrearTrabajo:
+    def __init__(
+        self,
+        repo: ITrabajoRepository,
+        publicador: IPublicador,
+        registro_repo: IRegistroTrabajosRepository,
+    ) -> None:
+        self._repo = repo
+        self._publicador = publicador
+        self._registro_repo = registro_repo
+
+    async def ejecutar(
+        self, proveedor_id: str, monto: Decimal, region: str
+    ) -> uuid.UUID:
+        inicio = time.perf_counter()
+        trabajo = FabricaTrabajo.crear(
+            proveedor_id=ProveedorId(proveedor_id),
+            monto=monto,
+            region=Region(region),
+        )
+
+        # Atajo de carga de ESC-01 (A15, 15-arquitectura-entrega-5.md): no
+        # pasa por la Saga real (Motor de Workflow), pero SÍ debe respetar
+        # el invariante de máquina de estados del agregado -- `finalizar()`
+        # exige EN_CURSO, no SOLICITADO. Antes de este fix llamaba
+        # `trabajo.finalizar()` directo sobre un trabajo recién creado en
+        # SOLICITADO, lo que lanzaba `ErrorTransicionInvalida` siempre.
+        # Camina la máquina de estados completa en un solo comando síncrono
+        # para simular, de punta a punta, el mismo resultado de negocio que
+        # produce la saga real (SOLICITADO -> ASIGNADO -> EN_CURSO ->
+        # FINALIZADO), sin coordinador ni eventos de integración
+        # intermedios -- solo el evento de dominio final `TrabajoFinalizado`.
+        trabajo.asignar_proveedor(trabajo.proveedor_id)
+        trabajo.iniciar_workflow()
+        trabajo.finalizar()
+        await asyncio.to_thread(self._repo.guardar, trabajo)
+        t_persistido = time.perf_counter()
+
+        eventos = trabajo.recoger_eventos()
+        for evento in eventos:
+            log_evento(
+                logger,
+                "evento_dominio_trabajo_finalizado_emitido",
+                detalle=True,
+                evento_tipo=type(evento).__name__,
+                agregado="Trabajo",
+                trabajo_id=str(trabajo.id),
+                region=region,
+                ocurrido_en=evento.ocurrido_en.isoformat(),
+            )
+
+        await despachar(
+            eventos,
+            publicador=self._publicador,
+            registro_repo=self._registro_repo,
+        )
+        fin = time.perf_counter()
+
+        log_evento(
+            logger,
+            "comando_crear_trabajo_ejecutado",
+            detalle=True,
+            comando="CrearTrabajo",
+            agregado="Trabajo",
+            trabajo_id=str(trabajo.id),
+            estado=trabajo.estado.value,
+            eventos_de_dominio=len(eventos),
+            duracion_persistencia_ms=round((t_persistido - inicio) * 1000, 1),
+            duracion_despacho_ms=round((fin - t_persistido) * 1000, 1),
+            duracion_total_ms=round((fin - inicio) * 1000, 1),
+        )
+        return trabajo.id
