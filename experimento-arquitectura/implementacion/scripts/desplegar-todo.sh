@@ -98,24 +98,22 @@ tf gestion-de-trabajos/infra apply -auto-approve -input=false -var "project_id=$
   -var "max_instance_count=${GT_MAX_INSTANCIAS}" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}" -var "crm_mock_url=${CRM}"
 
-for stack in suscripciones/infra; do
-  log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")"
-done
+log "Stack suscripciones/infra"
+tf suscripciones/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack suscripciones/infra)"
+
 for stack in scoring/infra marketplace/infra; do
   log "Stack ${stack}"
   tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")"
 done
 
-for stack in reputacion/infra; do
-  log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")"
-done
-for stack in proveedores/infra; do
-  log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")" \
-    -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650"
-done
+log "Stack reputacion/infra"
+tf reputacion/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack reputacion/infra)"
+
+log "Stack proveedores/infra"
+tf proveedores/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack proveedores/infra)" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650"
 # Siniestros (Multi-Region patch)
 if [ -d "siniestros/infra" ]; then
   log "Stack siniestros/infra"
