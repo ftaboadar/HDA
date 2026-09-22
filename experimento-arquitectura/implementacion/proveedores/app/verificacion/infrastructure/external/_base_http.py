@@ -24,11 +24,43 @@ from app.common.logging_utils import (
 
 logger = configurar_logging("infrastructure.external.http")
 
+class CircuitBreaker:
+    def __init__(self, fail_max=3, reset_timeout=10):
+        self.fail_max = fail_max
+        self.reset_timeout = reset_timeout
+        self.failures = 0
+        self.state = "CLOSED"
+        self.last_failure_time = None
+
+    def __call__(self, func):
+        async def wrapper(*args, **kwargs):
+            if self.state == "OPEN":
+                if time.time() - self.last_failure_time > self.reset_timeout:
+                    self.state = "HALF_OPEN"
+                else:
+                    raise FallaVerificacionExterna("Circuit Breaker is OPEN")
+            
+            try:
+                result = await func(*args, **kwargs)
+                self.failures = 0
+                self.state = "CLOSED"
+                return result
+            except Exception as e:
+                self.failures += 1
+                if self.failures >= self.fail_max:
+                    self.state = "OPEN"
+                    self.last_failure_time = time.time()
+                raise e
+        return wrapper
+
+_circuit_breaker = CircuitBreaker()
+
 
 class _AdaptadorHttpGenerico(IVerificacionExternaPort):
     def __init__(self, base_url: str) -> None:
         self._base_url = base_url
 
+    @_circuit_breaker
     async def verificar(self, proveedor_id: str) -> ResultadoVerificacionExterna:
         inicio = time.time()
         try:

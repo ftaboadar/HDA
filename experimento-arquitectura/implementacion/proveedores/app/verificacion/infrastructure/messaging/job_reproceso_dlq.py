@@ -37,17 +37,16 @@ async def obtener_backlog(repo) -> int:
 
 
 async def _reprocesar_pendientes(repo, publicador: PublicadorPulsar) -> int:
-    """Reprocesa TODO lo que hoy está en DLQ (query ya existente
-    `ListarDLQ`), reutilizando el comando `ReprocesarDesdeDLQ` sin cambios —
-    ver sección 2.2 del plan: "revisa reprocesar_desde_dlq.py, ya existe,
-    reutilízalo, no lo reescribas"."""
+    """Reprocesa TODO lo que hoy está en DLQ con un rate limiter simple."""
     pendientes = await asyncio.to_thread(ListarDLQ(repo).ejecutar)
     comando = ReprocesarDesdeDLQ(repo, publicador)
     reprocesadas = 0
+    RATE_LIMIT_DELAY = 1.0 # 1 segundo por mensaje para no sobrecargar
     for verificacion in pendientes:
         try:
             await comando.ejecutar(str(verificacion.id))
             reprocesadas += 1
+            await asyncio.sleep(RATE_LIMIT_DELAY) # Rate limiter simple
         except Exception as exc:  # noqa: BLE001 — una falla individual no debe tumbar el job
             log_evento(
                 logger,
