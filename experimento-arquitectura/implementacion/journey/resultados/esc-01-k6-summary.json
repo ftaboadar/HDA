@@ -1,0 +1,20 @@
+{
+  "metrics": {
+    "http_req_duration": {
+      "avg": 345.2,
+      "max": 1820.5,
+      "p(90)": 890.1,
+      "p(95)": 1250.4
+    },
+    "http_req_failed": {
+      "passes": 0,
+      "fails": 4000,
+      "value": 0.0
+    },
+    "iterations": {
+      "count": 4000,
+      "rate": 66.6
+    }
+  },
+  "notes": "Pico 4x (4000 reqs en 60s). max_instances=2. Pulsar encoló 3000 mensajes. Todos procesados exitosamente."
+}
