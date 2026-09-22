@@ -44,7 +44,25 @@ TOPIC_SOLICITUDES_DLQ_NATIVO = f"{NAMESPACE}/verificacion.solicitudes-dlq-nativo
 # Namespace de Gestión de Trabajos (Frans, sección 8 del plan) — Proveedores
 # solo CONSUME de ahí (sección 2.1: "comunicación real en ambos sentidos"),
 # nunca publica ni administra su topología.
-TOPIC_TRABAJOS_FINALIZADO = "persistent://hda/trabajos/trabajos.finalizado"
+#
+# BUG REAL encontrado el 2026-09-22 migrando docker-compose.yml de este
+# servicio a Pulsar standalone para CI: este namespace estaba mal escrito
+# como "hda/trabajos". El namespace real (ver
+# gestion-de-trabajos/app/common/config.py y
+# CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md §4, lista de los 8 namespaces) es
+# "hda/gestion-trabajos" — "hda/trabajos" nunca existió ni en el cluster
+# local (pulsar-infra/docker-compose.yml) ni en GCP. Con el nombre viejo, la
+# suscripción de app/worker/consumidor_trabajos_finalizado.py fallaba SIEMPRE
+# al arrancar (namespace inexistente), el hilo del consumidor moría
+# (`consumidor_crasheo` en logs) y por tanto /salud del worker nunca
+# reportaba 200 — ver docstring de app/worker/main.py: Cloud Run reinicia la
+# instancia completa cuando /salud da 503, así que en producción esto
+# producía un crash-loop silencioso del segundo consumidor en cada
+# instancia del worker. Nunca se detectó antes porque hasta este cambio no
+# existía ningún stack donde el worker corriera contra Pulsar real con solo
+# el namespace `hda/proveedores` provisionado (el resto de las pruebas contra
+# GCP validaron `verificacion.solicitudes`, no este segundo consumidor).
+TOPIC_TRABAJOS_FINALIZADO = "persistent://hda/gestion-trabajos/trabajos.finalizado"
 
 
 def construir_dead_letter_policy(max_redeliver_count: int = 3):
