@@ -104,7 +104,7 @@ prueba lint, arranque y las pruebas que existen; no valida estos puntos de contr
 | 1.2 Gestión de Trabajos + saga | **Hecho** | Layout por módulos, máquina de estados §6 completa, handlers de todos los pasos de §7.1, plazos, idempotencia, `saga_log` con las columnas de §7.1, consultas SQL, worker |
 | 1.3 Proveedores | En curso | Reserva de agenda real y atómica, elegibilidad (A9, A10, A12), namespace de `TOPIC_TRABAJOS_FINALIZADO`, cola de Verificación en Pulsar |
 | 1.4 Pagos | En curso | Retener/liberar/compensar con eventos, modo de falla en `mocks-pagos`, worker |
-| 1.5 Reputación | En curso | Reputación compuesta (A10), `ReputacionPublicada`, worker |
+| 1.5 Reputación | **Hecho** | Reputación compuesta (A10), `ReputacionPublicada`, worker |
 | 1.6 Marketplace | En curso | Esqueleto existe; sin el contrato del AsyncAPI, sin pruebas que colecten |
 | 1.7 Siniestros | En curso | Ídem |
 | 1.8 Suscripciones | En curso | Ídem |
