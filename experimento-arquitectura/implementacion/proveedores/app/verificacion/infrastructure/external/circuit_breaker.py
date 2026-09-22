@@ -1,6 +1,7 @@
 import time
 from functools import wraps
 
+
 class CircuitBreaker:
     def __init__(self, fallos_maximos=3, tiempo_reset=60):
         self.fallos_maximos = fallos_maximos
@@ -8,7 +9,7 @@ class CircuitBreaker:
         self.fallos = 0
         self.ultimo_fallo = None
         self.estado = "CERRADO"
-        
+
     def __call__(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -28,4 +29,5 @@ class CircuitBreaker:
                 if self.fallos >= self.fallos_maximos:
                     self.estado = "ABIERTO"
                 raise e
+
         return wrapper

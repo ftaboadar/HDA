@@ -89,6 +89,7 @@ class SagaInstanciaORM(Base):
         DateTime(timezone=True), default=_ahora_utc, onupdate=_ahora_utc, nullable=False
     )
 
+
 class SagaLogORM(Base):
     __tablename__ = "saga_log"
 
@@ -96,9 +97,13 @@ class SagaLogORM(Base):
     saga_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     secuencia = Column(Integer, nullable=False)
     paso = Column(String, nullable=False)
-    tipo = Column(String, nullable=False) # COMANDO_ENVIADO | EVENTO_RECIBIDO | COMPENSACION_ENVIADA | PASO_EXPIRADO | SAGA_COMPLETADA | SAGA_COMPENSADA
+    tipo = Column(
+        String, nullable=False
+    )  # COMANDO_ENVIADO | EVENTO_RECIBIDO | COMPENSACION_ENVIADA | PASO_EXPIRADO | SAGA_COMPLETADA | SAGA_COMPENSADA
     servicio = Column(String, nullable=False)
     mensaje = Column(String, nullable=False)
     id_mensaje = Column(String, nullable=True)
-    payload = Column(String, nullable=True) # jsonb (usamos String para compatibilidad aquí)
+    payload = Column(
+        String, nullable=True
+    )  # jsonb (usamos String para compatibilidad aquí)
     ocurrido_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)

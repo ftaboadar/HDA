@@ -75,7 +75,10 @@ class Trabajo(AggregateRoot):
         self.estado = EstadoTrabajo.ESPERANDO_ELEGIBLES
 
     def asignar_proveedor(self, proveedor_id: ProveedorId) -> None:
-        if self.estado not in (EstadoTrabajo.ESPERANDO_ELEGIBLES, EstadoTrabajo.SOLICITADO):
+        if self.estado not in (
+            EstadoTrabajo.ESPERANDO_ELEGIBLES,
+            EstadoTrabajo.SOLICITADO,
+        ):
             raise ErrorTransicionInvalida(
                 f"Transición inválida de {self.estado} a ASIGNADO"
             )

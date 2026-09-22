@@ -79,6 +79,5 @@ class OutboxEventORM(Base):
     event_type = Column(String, nullable=False)
     payload = Column(Text, nullable=False)  # JSON string
     correlation_id = Column(String, nullable=True)
-    published = Column(String, default="FALSE", nullable=False) # 'TRUE' or 'FALSE'
+    published = Column(String, default="FALSE", nullable=False)  # 'TRUE' or 'FALSE'
     created_at = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
-

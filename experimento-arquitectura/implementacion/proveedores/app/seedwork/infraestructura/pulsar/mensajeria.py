@@ -1,5 +1,6 @@
 import pulsar
 
+
 class Mensajeria:
     def __init__(self, service_url="pulsar://localhost:6650"):
         self.client = pulsar.Client(service_url)

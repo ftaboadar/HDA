@@ -1,8 +1,9 @@
 from app.evaluaciones.domain.entidades import ReputacionPartner
 
+
 class ReputacionRepository:
     def __init__(self):
-        self.db = {} # Simulación de persistencia real
+        self.db = {}  # Simulación de persistencia real
 
     def obtener(self, partner_id: str) -> ReputacionPartner:
         if partner_id in self.db:

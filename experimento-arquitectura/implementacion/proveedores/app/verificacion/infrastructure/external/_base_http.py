@@ -24,6 +24,7 @@ from app.common.logging_utils import (
 
 logger = configurar_logging("infrastructure.external.http")
 
+
 class CircuitBreaker:
     def __init__(self, fail_max=3, reset_timeout=10):
         self.fail_max = fail_max
@@ -39,7 +40,7 @@ class CircuitBreaker:
                     self.state = "HALF_OPEN"
                 else:
                     raise FallaVerificacionExterna("Circuit Breaker is OPEN")
-            
+
             try:
                 result = await func(*args, **kwargs)
                 self.failures = 0
@@ -51,7 +52,9 @@ class CircuitBreaker:
                     self.state = "OPEN"
                     self.last_failure_time = time.time()
                 raise e
+
         return wrapper
+
 
 _circuit_breaker = CircuitBreaker()
 

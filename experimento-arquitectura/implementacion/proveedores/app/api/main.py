@@ -132,9 +132,7 @@ def _a_out(v: Verificacion) -> VerificacionOut:
     falla del ÚLTIMO intento — la misma proyección que ya hacía
     `VerificacionRepositorySQLAlchemy.guardar` sobre `VerificacionORM`."""
     ultimo = v.ultimo_intento
-    motivo_falla = (
-        ultimo.error if (v.estado == EstadoVerificacion.FALLIDA_DLQ and ultimo) else None
-    )
+    motivo_falla = ultimo.error if (v.estado == EstadoVerificacion.FALLIDA_DLQ and ultimo) else None
     return VerificacionOut(
         id=v.id,
         proveedor_id=str(v.proveedor_id),

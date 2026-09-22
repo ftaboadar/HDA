@@ -41,12 +41,12 @@ async def _reprocesar_pendientes(repo, publicador: PublicadorPulsar) -> int:
     pendientes = await asyncio.to_thread(ListarDLQ(repo).ejecutar)
     comando = ReprocesarDesdeDLQ(repo, publicador)
     reprocesadas = 0
-    RATE_LIMIT_DELAY = 1.0 # 1 segundo por mensaje para no sobrecargar
+    RATE_LIMIT_DELAY = 1.0  # 1 segundo por mensaje para no sobrecargar
     for verificacion in pendientes:
         try:
             await comando.ejecutar(str(verificacion.id))
             reprocesadas += 1
-            await asyncio.sleep(RATE_LIMIT_DELAY) # Rate limiter simple
+            await asyncio.sleep(RATE_LIMIT_DELAY)  # Rate limiter simple
         except Exception as exc:  # noqa: BLE001 — una falla individual no debe tumbar el job
             log_evento(
                 logger,

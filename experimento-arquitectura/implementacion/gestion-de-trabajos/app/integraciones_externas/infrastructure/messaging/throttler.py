@@ -50,7 +50,9 @@ from datetime import datetime, timezone
 
 from tenacity import wait_exponential_jitter
 
-from app.integraciones_externas.application.ports.gestion_agentes import IGestionAgentesPort
+from app.integraciones_externas.application.ports.gestion_agentes import (
+    IGestionAgentesPort,
+)
 from app.common.config import settings
 from app.common.logging_utils import configurar_logging, log_evento
 from app.novedades.domain.novedad import Novedad

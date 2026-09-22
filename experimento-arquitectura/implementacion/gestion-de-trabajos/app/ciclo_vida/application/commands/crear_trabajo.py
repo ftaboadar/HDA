@@ -33,7 +33,9 @@ from decimal import Decimal
 
 from app.application.dispatcher_eventos_dominio import despachar
 from app.application.ports.publicador import IPublicador
-from app.ciclo_vida.application.ports.registro_trabajos import IRegistroTrabajosRepository
+from app.ciclo_vida.application.ports.registro_trabajos import (
+    IRegistroTrabajosRepository,
+)
 from app.common.logging_utils import configurar_logging, log_evento
 from app.ciclo_vida.domain.fabrica import FabricaTrabajo
 from app.ciclo_vida.domain.repository import ITrabajoRepository

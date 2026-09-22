@@ -15,6 +15,7 @@ from app.infrastructure.persistence.models_db import SagaLogORM
 
 logger = logging.getLogger(__name__)
 
+
 class SagaHandlers:
     def __init__(
         self,
@@ -39,7 +40,7 @@ class SagaHandlers:
     ):
         if trabajo:
             self.repo_trabajos.guardar(trabajo)
-            
+
         # 1. Guardar evento recibido
         self.repo_saga.guardar(
             saga,
@@ -54,11 +55,11 @@ class SagaHandlers:
             await self.publicador.publicar_comando(cmd)
             self.repo_saga.guardar(
                 saga,
-                secuencia=i+2,
+                secuencia=i + 2,
                 tipo="COMANDO_ENVIADO",
                 mensaje=cmd.__class__.__name__,
                 id_mensaje=getattr(cmd, "comando_id", None),
-                payload=cmd.__dict__
+                payload=cmd.__dict__,
             )
 
     async def handle_franja_reservada(self, payload: dict, id_mensaje: str):
@@ -131,21 +132,24 @@ class SagaHandlers:
     async def check_deadlines(self):
         from datetime import datetime, timezone, timedelta
         from app.workflow.domain.value_objects import PasoSaga
-        
+
         # Plazos arbitrarios para este POC
         plazos = {
             PasoSaga.PUBLICAR_ELEGIBLES.value: 5,  # 5 minutos
             PasoSaga.RESERVAR_FRANJA.value: 2,
             PasoSaga.RETENER_PAGO.value: 5,
         }
-        
+
         with SessionLocal() as sesion:
             from app.infrastructure.persistence.models_db import SagaInstanciaORM
+
             ahora = datetime.now(timezone.utc)
-            sagas_activas = sesion.query(SagaInstanciaORM).filter(
-                SagaInstanciaORM.estado == "INICIADA"
-            ).all()
-            
+            sagas_activas = (
+                sesion.query(SagaInstanciaORM)
+                .filter(SagaInstanciaORM.estado == "INICIADA")
+                .all()
+            )
+
             for saga_orm in sagas_activas:
                 paso = saga_orm.paso_actual
                 if paso in plazos:
@@ -153,18 +157,20 @@ class SagaHandlers:
                     tiempo_transcurrido = ahora - saga_orm.actualizada_en
                     if tiempo_transcurrido > timedelta(minutes=limite_minutos):
                         # Expirado
-                        logger.warning(f"Saga {saga_orm.saga_id} expiró en el paso {paso}")
+                        logger.warning(
+                            f"Saga {saga_orm.saga_id} expiró en el paso {paso}"
+                        )
                         saga = self.repo_saga.obtener_por_id(saga_orm.saga_id)
                         trabajo = self.repo_trabajos.obtener_por_id(saga.trabajo_id)
-                        
+
                         # Guardar expiración en el log
                         self.repo_saga.guardar(
                             saga,
                             tipo="PASO_EXPIRADO",
                             mensaje=f"Expiró en el paso {paso}",
-                            payload={}
+                            payload={},
                         )
-                        
+
                         # Ejecutar compensación genérica (ejemplo: cancelar)
                         if trabajo:
                             try:
@@ -172,13 +178,13 @@ class SagaHandlers:
                                 self.repo_trabajos.guardar(trabajo)
                             except Exception as e:
                                 logger.error(f"Error cancelando trabajo: {e}")
-                        
+
                         saga.compensar()
                         self.repo_saga.guardar(
                             saga,
                             tipo="SAGA_COMPENSADA",
                             mensaje="Saga compensada por timeout",
-                            payload={}
+                            payload={},
                         )
 
     async def handle_pago_liberado(self, payload: dict, id_mensaje: str):
@@ -190,7 +196,7 @@ class SagaHandlers:
         trabajo = self.repo_trabajos.obtener_por_id(TrabajoId(trabajo_id))
         if not saga or not trabajo:
             return
-        
+
         # Ocurre como respuesta al paso 6
         self.coordinador.on_pago_liberado(saga, trabajo)
         await self._procesar_y_publicar(
@@ -206,7 +212,7 @@ class SagaHandlers:
         trabajo = self.repo_trabajos.obtener_por_id(TrabajoId(trabajo_id))
         if not saga or not trabajo:
             return
-        
+
         self.coordinador.on_pago_compensado(saga, trabajo)
         await self._procesar_y_publicar(
             saga, trabajo, [], "PagoCompensado", payload, id_mensaje

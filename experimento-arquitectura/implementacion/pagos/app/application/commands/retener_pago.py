@@ -75,6 +75,7 @@ class RetenerPago:
             # Registrar transaccion de RETENCION y Outbox
             import json
             from app.infrastructure.persistence.models_db import OutboxEventORM
+
             payload_dict = {
                 "pago_id": str(pago.id),
                 "trabajo_id": trabajo_id,
@@ -89,7 +90,7 @@ class RetenerPago:
                 event_type="PagoRetenido",
                 payload=json.dumps(payload_dict),
                 correlation_id=trabajo_id,
-                published="FALSE"
+                published="FALSE",
             )
 
             with SessionLocal() as db:

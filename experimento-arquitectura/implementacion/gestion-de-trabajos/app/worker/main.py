@@ -15,9 +15,11 @@ from app.infrastructure.messaging.publicador_pulsar import PublicadorPulsar
 
 app = FastAPI()
 
+
 @app.get("/salud")
 def salud():
     return {"status": "ok", "service": "gestion-de-trabajos-worker"}
+
 
 def start_worker():
     client = pulsar.Client(settings.pulsar_service_url)
@@ -36,7 +38,11 @@ def start_worker():
         "persistent://hda/pagos/pago.compensado",
     ]
 
-    consumer = client.subscribe(topics, subscription_name="gestion-trabajos-saga-worker", consumer_type=pulsar.ConsumerType.Shared)
+    consumer = client.subscribe(
+        topics,
+        subscription_name="gestion-trabajos-saga-worker",
+        consumer_type=pulsar.ConsumerType.Shared,
+    )
 
     print("Worker consumiendo eventos de saga...")
 
@@ -54,17 +60,32 @@ def start_worker():
             id_evento = props.get("id_evento", "")
 
             if tipo == "AgendaConfirmada" or "agenda.confirmada" in msg.topic_name():
-                loop.run_until_complete(handlers.handle_franja_reservada(payload, id_evento))
+                loop.run_until_complete(
+                    handlers.handle_franja_reservada(payload, id_evento)
+                )
             elif tipo == "AgendaRechazada" or "agenda.rechazada" in msg.topic_name():
-                loop.run_until_complete(handlers.handle_franja_rechazada(payload, id_evento))
+                loop.run_until_complete(
+                    handlers.handle_franja_rechazada(payload, id_evento)
+                )
             elif tipo == "PagoRetenido" or "pago.retenido" in msg.topic_name():
-                loop.run_until_complete(handlers.handle_pago_retenido(payload, id_evento))
-            elif tipo == "PagoRetencionFallida" or "pago.retencion-fallida" in msg.topic_name():
-                loop.run_until_complete(handlers.handle_pago_retencion_fallida(payload, id_evento))
+                loop.run_until_complete(
+                    handlers.handle_pago_retenido(payload, id_evento)
+                )
+            elif (
+                tipo == "PagoRetencionFallida"
+                or "pago.retencion-fallida" in msg.topic_name()
+            ):
+                loop.run_until_complete(
+                    handlers.handle_pago_retencion_fallida(payload, id_evento)
+                )
             elif tipo == "PagoLiberado" or "pago.liberado" in msg.topic_name():
-                loop.run_until_complete(handlers.handle_pago_liberado(payload, id_evento))
+                loop.run_until_complete(
+                    handlers.handle_pago_liberado(payload, id_evento)
+                )
             elif tipo == "PagoCompensado" or "pago.compensado" in msg.topic_name():
-                loop.run_until_complete(handlers.handle_pago_compensado(payload, id_evento))
+                loop.run_until_complete(
+                    handlers.handle_pago_compensado(payload, id_evento)
+                )
 
             consumer.acknowledge(msg)
         except Exception as e:
@@ -72,12 +93,15 @@ def start_worker():
             if msg:
                 consumer.negative_acknowledge(msg)
 
+
 @app.on_event("startup")
 def startup_event():
     from app.common.db import Base, engine
+
     Base.metadata.create_all(bind=engine)
     thread = threading.Thread(target=start_worker, daemon=True)
     thread.start()
+
 
 def start_deadline_checker():
     repo_saga = SagaRepositorySQLAlchemy()
@@ -94,7 +118,9 @@ def start_deadline_checker():
         except Exception as e:
             print(f"Error revisando plazos: {e}")
         import time
-        time.sleep(60) # Revisar cada 60 segundos
+
+        time.sleep(60)  # Revisar cada 60 segundos
+
 
 @app.on_event("startup")
 def startup_event_deadlines():

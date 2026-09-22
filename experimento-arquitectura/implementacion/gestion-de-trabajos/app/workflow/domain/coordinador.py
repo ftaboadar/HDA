@@ -140,6 +140,7 @@ class CoordinadorSaga:
         """Alt: Novedad disputa -> CompensarPago"""
         trabajo.disputar()
         from app.workflow.domain.eventos import CompensarPago
+
         comando = CompensarPago(
             comando_id=str(uuid.uuid4()),
             saga_id=str(saga.id),
@@ -156,7 +157,11 @@ class CoordinadorSaga:
 
     @staticmethod
     def on_novedad_no_show(
-        saga: SagaInstancia, trabajo: Trabajo, reserva_id: str, origen: str, origen_id: str
+        saga: SagaInstancia,
+        trabajo: Trabajo,
+        reserva_id: str,
+        origen: str,
+        origen_id: str,
     ) -> List[ComandoSaga]:
         """Alt: Novedad no-show -> LiberarFranja y pedir elegibles de nuevo"""
         trabajo.reasignar_proveedor()

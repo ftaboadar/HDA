@@ -19,7 +19,7 @@ class SagaRepositorySQLAlchemy:
         mensaje: str = "Comando",
         id_mensaje: Optional[str] = None,
         payload: Optional[dict] = None,
-        guardar_log: bool = True
+        guardar_log: bool = True,
     ) -> None:
         with SessionLocal() as sesion:
             fila = sesion.get(SagaInstanciaORM, saga.id)
@@ -57,9 +57,7 @@ class SagaRepositorySQLAlchemy:
     def obtener_por_trabajo_id(self, trabajo_id: uuid.UUID) -> Optional[SagaInstancia]:
         with SessionLocal() as sesion:
             fila = (
-                sesion.query(SagaInstanciaORM)
-                .filter_by(trabajo_id=trabajo_id)
-                .first()
+                sesion.query(SagaInstanciaORM).filter_by(trabajo_id=trabajo_id).first()
             )
             if not fila:
                 return None

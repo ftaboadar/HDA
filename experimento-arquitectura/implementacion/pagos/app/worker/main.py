@@ -8,8 +8,12 @@ from app.infrastructure.adapters.pasarela_mercadopago import PasarelaMercadoPago
 from app.infrastructure.adapters.pasarela_stripe import PasarelaStripe
 from app.infrastructure.adapters.regla_brasil import ReglaBrasil
 from app.infrastructure.adapters.regla_colombia import ReglaColombia
-from app.infrastructure.persistence.pago_repository_sqlalchemy import PagoRepositorySQLAlchemy
-from app.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import RegistroTrabajosRepositorySQLAlchemy
+from app.infrastructure.persistence.pago_repository_sqlalchemy import (
+    PagoRepositorySQLAlchemy,
+)
+from app.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import (
+    RegistroTrabajosRepositorySQLAlchemy,
+)
 
 # Importar el consumidor (que crearemos / moveremos)
 from app.worker.consumidor_pulsar import ConsumidorComandosSaga
@@ -24,6 +28,7 @@ from app.application.commands.compensar import CompensarPago
 from app.worker.outbox_publisher import OutboxPublisher
 
 logger = configurar_logging("worker.main")
+
 
 async def main():
     logger.info("Iniciando Worker de Pagos...")
@@ -60,7 +65,7 @@ async def main():
     try:
         # Iniciar consumidor en background
         asyncio.create_task(consumidor.iniciar())
-        
+
         # Iniciar outbox loop
         await outbox_publisher.iniciar()
     except asyncio.CancelledError:
@@ -69,6 +74,7 @@ async def main():
         logger.error(f"Error en worker: {e}")
     finally:
         consumidor.detener()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

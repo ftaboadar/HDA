@@ -52,7 +52,9 @@ from app.common.schemas import (
     TrabajoOut,
 )
 from app.ciclo_vida.domain.trabajo import Trabajo
-from app.integraciones_externas.infrastructure.adapters.throttler_crm import AdaptadorGestionAgentesHttp
+from app.integraciones_externas.infrastructure.adapters.throttler_crm import (
+    AdaptadorGestionAgentesHttp,
+)
 from app.infrastructure.messaging.publicador_pulsar import PublicadorPulsar
 from app.integraciones_externas.infrastructure.messaging.throttler import ThrottlerCrm
 from app.novedades.infrastructure.persistence.novedad_repository_sqlalchemy import (

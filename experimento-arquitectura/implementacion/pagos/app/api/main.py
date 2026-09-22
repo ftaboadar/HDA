@@ -106,6 +106,7 @@ async def startup() -> None:
         pasarelas=sorted(_pasarelas),
     )
 
+
 @app.on_event("shutdown")
 async def shutdown() -> None:
     pass
@@ -187,6 +188,7 @@ class WebhookPayload(BaseModel):
     event_type: str
     reference_id: str
     status: str
+
 
 @app.post("/webhooks/pasarela", status_code=200)
 async def webhook_pasarela(payload: WebhookPayload):

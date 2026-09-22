@@ -27,7 +27,10 @@ class CompensarPago:
 
         # En la realidad llamamos a la pasarela externa para hacer el refund.
         # Aquí simulamos y registramos la transaccion y el evento en Outbox.
-        from app.infrastructure.persistence.models_db import TransaccionORM, OutboxEventORM
+        from app.infrastructure.persistence.models_db import (
+            TransaccionORM,
+            OutboxEventORM,
+        )
         from app.common.db import SessionLocal
         import json
 
@@ -36,7 +39,7 @@ class CompensarPago:
             event_type="PagoCompensado",
             payload=json.dumps({"pago_id": str(pago.id), "trabajo_id": trabajo_id}),
             correlation_id=trabajo_id,
-            published="FALSE"
+            published="FALSE",
         )
 
         with SessionLocal() as db:

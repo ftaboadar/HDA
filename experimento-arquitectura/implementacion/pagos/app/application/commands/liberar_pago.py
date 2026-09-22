@@ -34,22 +34,22 @@ class LiberarPago:
         # Insertar evento en Outbox en la misma transacción
         import json
         from app.infrastructure.persistence.models_db import OutboxEventORM
-        
+
         payload_dict = {
             "pago_id": str(pago.id),
             "trabajo_id": trabajo_id,
             "monto": float(pago.monto.valor),
             "moneda": pago.monto.moneda,
         }
-        
+
         outbox_event = OutboxEventORM(
             topic="hda/pagos/pago.liberado",
             event_type="PagoLiberado",
             payload=json.dumps(payload_dict),
             correlation_id=trabajo_id,
-            published="FALSE"
+            published="FALSE",
         )
-        
+
         with SessionLocal() as db:
             tx = TransaccionORM(pago_id=pago.id, tipo="LIBERACION", estado="EXITOSA")
             db.add(tx)
