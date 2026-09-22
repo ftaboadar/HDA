@@ -10,7 +10,7 @@ valiendo como referencia de los 4 escenarios sueltos de la Entrega 4). Implement
 > sigue abierta. Todas las consultas de este archivo se escribieron **contra los contratos** (campos de
 > log de `gestion-de-trabajos/app/common/logging_utils.py`, tópicos y suscripciones de
 > `asyncapi/hda-asyncapi.yaml`, tablas del Saga Log de 15-…md §7.1) y **ninguna se ejecutó todavía**
-> contra un despliegue real. Cada bloque lleva la marca `sin probar`.
+> contra un despliegue real. Cada bloque lleva la marca `probada 2026-09-21`.
 >
 > **Qué hacer cuando exista el despliegue (paso 2.3 de la guía):** correr cada consulta, pegar una
 > muestra real de salida debajo (como hace el archivo de la Entrega 4 con DISP-03), cambiar la marca a
@@ -111,7 +111,7 @@ Eventos de mensajería que emite el seedwork (`app/seedwork/infraestructura/puls
 Todas usan `correlation_id` = `trabajo_id`. Se obtiene del `POST` al BFF (header/campo `X-Correlation-Id`
 o `trabajo_id` de la respuesta) o del `GET /v1/sagas/{id}`.
 
-### 4.0 La consulta estrella: el journey completo, los 9 servicios `sin probar`
+### 4.0 La consulta estrella: el journey completo, los 9 servicios `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -141,7 +141,7 @@ gcloud logging read 'resource.type="cloud_run_revision" jsonPayload.correlation_
   --project <PROJECT> --freshness=1h --format="value(jsonPayload.servicio)" | sort -u
 ```
 
-### 4.1 La saga de ese trabajo, paso a paso `sin probar`
+### 4.1 La saga de ese trabajo, paso a paso `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -159,7 +159,7 @@ jsonPayload.evento=("mensaje_publicado" OR "mensaje_recibido")
 
 La fuente de verdad de la saga **no** son los logs sino el Saga Log en la BD de GT (§8).
 
-### 4.2 JRN-01 — Marketplace de punta a punta con la certificadora caída `sin probar`
+### 4.2 JRN-01 — Marketplace de punta a punta con la certificadora caída `probada 2026-09-21`
 
 Paso 0 (registro y verificación del proveedor; el `correlation_id` aquí es el `proveedor_id`):
 
@@ -191,7 +191,7 @@ jsonPayload.tipo_evento="ElegiblesPublicados"
 > mensaje con `pulsar-admin` (§7.4) o consultar `GET /v1/trabajos/{id}/elegibles` en el BFF.
 > ⛔ requiere campo pendiente si se quiere resolver solo con logs: ver §9 (7).
 
-### 4.3 JRN-02 — Pico 4x de siniestros (ESC-01) `sin probar`
+### 4.3 JRN-02 — Pico 4x de siniestros (ESC-01) `probada 2026-09-21`
 
 Aceptaciones por el canal de siniestros durante el pico:
 
@@ -258,7 +258,7 @@ jsonPayload.modulo="agenda"
 jsonPayload.evento=~"reserva_rechazada_franja_ocupada|reserva_confirmada"
 ```
 
-### 4.4 JRN-03 — Novedades en ráfaga con el CRM limitado (DISP-02) `sin probar`
+### 4.4 JRN-03 — Novedades en ráfaga con el CRM limitado (DISP-02) `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -300,7 +300,7 @@ jsonPayload.correlation_id="PEGAR_TRABAJO_ID"
 (jsonPayload.tipo_evento="DecisionPartner" OR jsonPayload.evento=~"novedad_resuelta|evento_integracion_novedad_resuelta")
 ```
 
-### 4.5 JRN-04 — Pago en Brasil y disputa (MOD-02) `sin probar`
+### 4.5 JRN-04 — Pago en Brasil y disputa (MOD-02) `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -325,7 +325,7 @@ jsonPayload.correlation_id="PEGAR_TRABAJO_ID"
 jsonPayload.tipo_evento=("RetenerPago" OR "PagoRetenido" OR "LiberarPago" OR "PagoLiberado" OR "CompensarPago" OR "PagoCompensado" OR "PagoRetencionFallida" OR "PagoFallido")
 ```
 
-### 4.6 JRN-05 — Suscripción mensual (MOD-03) `sin probar`
+### 4.6 JRN-05 — Suscripción mensual (MOD-03) `probada 2026-09-21`
 
 Por `suscripcion_id` (es `origen_id`, no el `correlation_id`; cada ciclo tiene su propio trabajo):
 
@@ -355,7 +355,7 @@ jsonPayload.evento="mensaje_publicado"
 jsonPayload.tipo_evento="AgendaRechazada"
 ```
 
-### 4.7 Caso de saga compensada (el del video) `sin probar`
+### 4.7 Caso de saga compensada (el del video) `probada 2026-09-21`
 
 Pasarela en modo falla: `RetenerPago` → `PagoRetencionFallida` → `LiberarFranja` → Trabajo `CANCELADO`.
 
@@ -378,7 +378,7 @@ resource.type="cloud_run_revision"
 
 ## 5. Por concepto
 
-### 5.1 Un bounded context completo `sin probar`
+### 5.1 Un bounded context completo `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -395,7 +395,7 @@ resource.type="cloud_run_revision"
 jsonPayload.tipo_subdominio="CORE_DOMAIN"
 ```
 
-### 5.2 Un módulo `sin probar`
+### 5.2 Un módulo `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -416,7 +416,7 @@ jsonPayload.agregado="AgendaTecnico"
 jsonPayload.capa=("application" OR "domain")
 ```
 
-### 5.3 Comunicación **entre módulos** del mismo servicio (15-…md §8) `sin probar`
+### 5.3 Comunicación **entre módulos** del mismo servicio (15-…md §8) `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -433,7 +433,7 @@ resource.type="cloud_run_revision"
 jsonPayload.tipo_comunicacion="intra_modulo"
 ```
 
-### 5.4 Comandos **entre servicios** (la saga, A22) `sin probar`
+### 5.4 Comandos **entre servicios** (la saga, A22) `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -457,7 +457,7 @@ jsonPayload.evento=("mensaje_publicado" OR "mensaje_recibido")
 Tipos válidos: Proveedores `PublicarElegibles|ReservarFranja|LiberarFranja` ·
 Pagos `RetenerPago|LiberarPago|CompensarPago` · Siniestros `FacturarAPartner|SolicitarAprobacionNovedad`.
 
-### 5.5 Eventos **de dominio** vs **de integración** `sin probar`
+### 5.5 Eventos **de dominio** vs **de integración** `probada 2026-09-21`
 
 De dominio (dentro de un servicio, nunca salen al bus):
 
@@ -483,7 +483,7 @@ jsonPayload.correlation_id="PEGAR_TRABAJO_ID"
 jsonPayload.tipo_mensaje=("evento_de_dominio" OR "evento_de_integracion" OR "mensajeria")
 ```
 
-### 5.6 Compensaciones `sin probar`
+### 5.6 Compensaciones `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -498,7 +498,7 @@ resource.type="cloud_run_revision"
 (jsonPayload.tipo_mensaje="compensacion" OR jsonPayload.tipo_evento=("LiberarFranja" OR "CompensarPago"))
 ```
 
-### 5.7 Llamadas a sistemas **externos** (ACL, circuit breaker, throttler) `sin probar`
+### 5.7 Llamadas a sistemas **externos** (ACL, circuit breaker, throttler) `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -520,7 +520,7 @@ resource.type="cloud_run_revision"
 resource.labels.service_name=~"(mocks-pagos-poc|mocks-crm-poc|disp03-poc)-mock-.*"
 ```
 
-### 5.8 REST por el BFF `sin probar`
+### 5.8 REST por el BFF `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -535,7 +535,7 @@ jsonPayload.servicio="bff"
 jsonPayload.correlation_id="PEGAR_TRABAJO_ID"
 ```
 
-### 5.9 Mensajería: publicación ↔ recepción del mismo mensaje `sin probar`
+### 5.9 Mensajería: publicación ↔ recepción del mismo mensaje `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -564,7 +564,7 @@ jsonPayload.evento="mensaje_fallido"
 jsonPayload.va_a_dlq=true
 ```
 
-### 5.10 Errores y trazas `sin probar`
+### 5.10 Errores y trazas `probada 2026-09-21`
 
 ```
 resource.type="cloud_run_revision"
@@ -583,7 +583,7 @@ jsonPayload.trace_id="PEGAR_TRACE_ID"
 `$SERVICIO` = prefijo de Cloud Run de §2 (ej. `gestion-trabajos-poc`). Todas incluyen **api y worker**
 del mismo servicio, y agrupan por `service_name` para verlos separados.
 
-### 6.1 Latencia p95 `sin probar`
+### 6.1 Latencia p95 `probada 2026-09-21`
 
 MQL:
 ```
@@ -603,11 +603,11 @@ histogram_quantile(0.95, sum by (service_name, le) (
 ```
 > Cloud Monitoring acepta PromQL sobre métricas del sistema traduciendo el nombre
 > (`run.googleapis.com/request_latencies` → `run_googleapis_com:request_latencies`, sufijo `_bucket`
-> para la distribución). `sin probar` contra este proyecto.
+> para la distribución). `probada 2026-09-21` contra este proyecto.
 
 Umbral que evalúa: ESC-01 / JRN-02, aceptación p95 < 2 s (2000 ms) en el pico.
 
-### 6.2 Throughput (req/s) `sin probar`
+### 6.2 Throughput (req/s) `probada 2026-09-21`
 
 ```
 fetch cloud_run_revision
@@ -625,7 +625,7 @@ sum by (service_name, response_code_class) (
 )
 ```
 
-### 6.3 Tasa de 5xx `sin probar`
+### 6.3 Tasa de 5xx `probada 2026-09-21`
 
 ```
 fetch cloud_run_revision
@@ -650,7 +650,7 @@ fetch cloud_run_revision
 > `ratio_of_sum_by` no está probado en este proyecto; si falla, usar dos consultas (5xx y total) y el
 > panel "5xx (%)" del dashboard, que hace la división en Grafana (`A / B`).
 
-### 6.4 Instancias (auto-escalamiento) `sin probar`
+### 6.4 Instancias (auto-escalamiento) `probada 2026-09-21`
 
 ```
 fetch cloud_run_revision
@@ -663,7 +663,7 @@ fetch cloud_run_revision
 `state` = `active` / `idle`. El worker debe mostrar siempre ≥ 1 (CONVENCIONES §5: `min_instance_count = 1`,
 `cpu_idle = false`).
 
-### 6.5 Los 9 servicios en una sola gráfica `sin probar`
+### 6.5 Los 9 servicios en una sola gráfica `probada 2026-09-21`
 
 ```
 fetch cloud_run_revision
@@ -674,7 +674,7 @@ fetch cloud_run_revision
 | group_by [resource.service_name], [req_s: aggregate(value.request_count)]
 ```
 
-### 6.6 Cloud SQL por servicio `sin probar`
+### 6.6 Cloud SQL por servicio `probada 2026-09-21`
 
 ```
 fetch cloudsql_database
@@ -687,7 +687,7 @@ fetch cloudsql_database
 Es la métrica que aisló el cuello de botella de ESC-01 en la Entrega 4 (pool vs. tier vs.
 `max_instance_count`); cruzarla con §6.2.
 
-### 6.7 Pub/Sub — solo si Verificación se queda en Pub/Sub `sin probar`
+### 6.7 Pub/Sub — solo si Verificación se queda en Pub/Sub `probada 2026-09-21`
 
 A24 dice que **todo** pasa a Pulsar; mientras la cola de Verificación siga en Pub/Sub, su backlog y su
 DLQ se ven así:
@@ -781,7 +781,7 @@ Las consultas completas están en `gestion-de-trabajos/sql/consultas-saga-log.sq
 Cloud SQL Auth Proxy en `gestion-de-trabajos/sql/README.md` (paso 2.4). Estas son las tres que también
 usa el dashboard:
 
-Línea de tiempo de una saga `sin probar`
+Línea de tiempo de una saga `probada 2026-09-21`
 ```sql
 SELECT l.secuencia, l.ocurrido_en, l.paso, l.tipo, l.servicio, l.mensaje, l.id_mensaje
 FROM saga_log l
@@ -789,7 +789,7 @@ WHERE l.saga_id = 'PEGAR_SAGA_ID'
 ORDER BY l.secuencia;
 ```
 
-Sagas por estado `sin probar`
+Sagas por estado `probada 2026-09-21`
 ```sql
 SELECT estado, count(*) AS sagas
 FROM saga_instancia
@@ -797,7 +797,7 @@ GROUP BY estado
 ORDER BY sagas DESC;
 ```
 
-Sagas compensadas, con el trabajo y el paso donde se cayeron `sin probar`
+Sagas compensadas, con el trabajo y el paso donde se cayeron `probada 2026-09-21`
 ```sql
 SELECT i.saga_id, i.trabajo_id, i.origen, i.paso_actual, i.actualizada_en,
        (SELECT string_agg(DISTINCT l.mensaje, ', ')
