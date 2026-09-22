@@ -20,3 +20,31 @@ variable "sql_tier" {
   type        = string
   default     = "db-custom-1-3840"
 }
+
+# URLs de Cloud Run de los servicios downstream (salida `api_url` de cada stack).
+# El BFF es el último stack que aplica desplegar-todo.sh precisamente para poder
+# pasar estas URLs ya conocidas — ver bff/app/api/main.py SERVICE_URLS.
+variable "gestion_trabajos_url" {
+  type = string
+}
+variable "proveedores_url" {
+  type = string
+}
+variable "pagos_url" {
+  type = string
+}
+variable "siniestros_url" {
+  type = string
+}
+variable "marketplace_url" {
+  type = string
+}
+variable "suscripciones_url" {
+  type = string
+}
+variable "scoring_url" {
+  type = string
+}
+variable "reputacion_url" {
+  type = string
+}
