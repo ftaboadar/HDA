@@ -122,4 +122,5 @@ Etapa 2 en paralelo (solo lo que no depende del código):
  y 2.3 Observabilidad: **Hecho**
 (`QUERIES-GCP-JOURNEYS.md`, sin probar contra GCP). 2.2 GCP Deploy: **Hecho**
 - 2.5 Experimentos (k6): **Hecho**
-- 2.6 Veredicto: En curso
+- 2.6 Veredicto: **Hecho**
+- 2.7 Apagar GCP: **Hecho** (Infraestructura apagada 0$ costo)
