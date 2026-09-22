@@ -43,7 +43,7 @@ resource "google_sql_user" "hda" {
 }
 
 resource "google_secret_manager_secret" "db_url" {
-  secret_id = "${var.entorno}-database-url"
+  secret_id = "${var.entorno}-marketplace-database-url"
   replication {
     auto {}
   }
