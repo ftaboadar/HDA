@@ -1,22 +1,45 @@
-import threading
-from fastapi import FastAPI
-import uvicorn
-from app.ciclo_suscripcion.infrastructure.messaging.consumidor import iniciar_consumidor
+import pulsar
+from pulsar.schema import Record, String, Float, JsonSchema
+from app.aplicacion.comandos import RegistrarCargoTrabajoComando, ManejadorRegistrarCargoTrabajo
+from app.infraestructura.repositorio_suscripciones_sql import RepositorioSuscripcionesSQLite
+import json
 
-app = FastAPI()
+class TrabajoFinalizadoPayload(Record):
+    id_trabajo = String()
+    id_cliente = String()
+    costo_final = Float()
 
+def main():
+    client = pulsar.Client('pulsar://localhost:6650')
+    consumer = client.subscribe(
+        'trabajos.finalizado',
+        subscription_name='suscripciones-worker',
+        schema=JsonSchema(TrabajoFinalizadoPayload)
+    )
 
-@app.get("/salud")
-def salud():
-    # En un caso real se chequea la salud del thread del consumidor.
-    return {"status": "ok", "servicio": "suscripciones-worker"}
+    repositorio = RepositorioSuscripcionesSQLite()
+    manejador = ManejadorRegistrarCargoTrabajo(repositorio)
 
-
-def start_worker():
-    thread = threading.Thread(target=iniciar_consumidor, daemon=True)
-    thread.start()
-
+    print("Worker de Suscripciones iniciado. Esperando trabajos finalizados...")
+    try:
+        while True:
+            msg = consumer.receive()
+            try:
+                data = msg.value()
+                comando = RegistrarCargoTrabajoComando(
+                    id_cliente=data.id_cliente,
+                    id_trabajo=data.id_trabajo,
+                    costo=data.costo_final
+                )
+                manejador.manejar(comando)
+                consumer.acknowledge(msg)
+            except Exception as e:
+                print(f"Error procesando mensaje: {e}")
+                consumer.negative_acknowledge(msg)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        client.close()
 
 if __name__ == "__main__":
-    start_worker()
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    main()
