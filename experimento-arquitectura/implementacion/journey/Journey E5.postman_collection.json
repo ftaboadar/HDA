@@ -1,104 +1,218 @@
 {
   "info": {
-    "name": "Journey E5",
+    "name": "Hogar de los Alpes - Journeys E5",
+    "description": "Colección completa con los flujos (Journeys) definidos para la Entrega 5, interactuando a través del BFF.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Caso de Éxito",
+      "name": "JRN-01: Flujo Transaccional Principal (Saga Orquestada)",
+      "description": "El ciclo de vida estándar de un trabajo: solicitud, proveedores elegibles, selección, reserva, pago y finalización.",
       "item": [
         {
-          "name": "1. Crear Trabajo Exitoso",
+          "name": "1. Solicitar Trabajo (BFF -> Gestión de Trabajos)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"cliente_id\": \"1234\",\n    \"servicio\": \"plomeria\",\n    \"region\": \"CO\"\n}"
+              "raw": "{\n    \"cliente_id\": \"CLI-9876\",\n    \"tipo_servicio\": \"plomeria\",\n    \"region\": \"CO\",\n    \"detalles\": \"Fuga de agua en lavamanos\"\n}"
             },
             "url": {
-              "raw": "http://localhost:8000/v1/trabajos",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8000",
-              "path": [
-                "v1",
-                "trabajos"
-              ]
+              "raw": "{{BFF_URL}}/v1/trabajos",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "trabajos"]
+            }
+          }
+        },
+        {
+          "name": "2. Consultar Estado de la Saga (BFF -> Coordinador)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BFF_URL}}/v1/sagas/{{saga_id}}",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "sagas", "{{saga_id}}"]
+            }
+          }
+        },
+        {
+          "name": "3. Seleccionar Proveedor (BFF -> Marketplace)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"proveedor_id\": \"PROV-102\",\n    \"trabajo_id\": \"{{trabajo_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BFF_URL}}/v1/marketplace/seleccionar",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "marketplace", "seleccionar"]
+            }
+          }
+        },
+        {
+          "name": "4. Confirmar Finalización de Trabajo",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"estado\": \"FINALIZADO\",\n    \"comentarios\": \"Reparación exitosa\"\n}"
+            },
+            "url": {
+              "raw": "{{BFF_URL}}/v1/trabajos/{{trabajo_id}}/finalizar",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "trabajos", "{{trabajo_id}}", "finalizar"]
             }
           }
         }
       ]
     },
     {
-      "name": "Caso de Compensación",
+      "name": "JRN-02: Pico de Siniestros (Escalabilidad)",
       "item": [
         {
-          "name": "1. Crear Trabajo para Compensar",
+          "name": "1. Reportar Siniestro Masivo (BFF -> Siniestros)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"cliente_id\": \"5678\",\n    \"servicio\": \"electricidad\",\n    \"region\": \"BR\",\n    \"fallar_pago\": true\n}"
+              "raw": "{\n    \"cliente_id\": \"CLI-5555\",\n    \"propiedad_id\": \"PROP-999\",\n    \"tipo_siniestro\": \"INUNDACION\",\n    \"monto_estimado\": 1500000\n}"
             },
             "url": {
-              "raw": "http://localhost:8000/v1/trabajos",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8000",
-              "path": [
-                "v1",
-                "trabajos"
-              ]
+              "raw": "{{BFF_URL}}/v1/siniestros",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "siniestros"]
             }
           }
         },
         {
-          "name": "2. Compensar Pago Manualmente (BFF)",
+          "name": "2. Consultar Estado de Aprobación",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"motivo\": \"disputa\"\n}"
-            },
+            "method": "GET",
             "url": {
-              "raw": "http://localhost:8000/v1/pagos/{{pago_id}}/compensar",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "8000",
-              "path": [
-                "v1",
-                "pagos",
-                "{{pago_id}}",
-                "compensar"
-              ]
+              "raw": "{{BFF_URL}}/v1/siniestros/{{siniestro_id}}",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "siniestros", "{{siniestro_id}}"]
             }
           }
         }
       ]
+    },
+    {
+      "name": "JRN-03: Compensación y Dispute (Disponibilidad)",
+      "item": [
+        {
+          "name": "1. Reportar Novedad/Disputa (BFF -> Gestión de Trabajos)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"trabajo_id\": \"{{trabajo_id}}\",\n    \"tipo_novedad\": \"DISPUTA_CLIENTE\",\n    \"descripcion\": \"El proveedor no llegó a la hora acordada.\"\n}"
+            },
+            "url": {
+              "raw": "{{BFF_URL}}/v1/trabajos/{{trabajo_id}}/novedades",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "trabajos", "{{trabajo_id}}", "novedades"]
+            }
+          }
+        },
+        {
+          "name": "2. Verificar Compensación de Pago Retenido (BFF -> Pagos)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BFF_URL}}/v1/pagos/{{trabajo_id}}/estado",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "pagos", "{{trabajo_id}}", "estado"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "JRN-04: Pagos Internacionales (Modificabilidad)",
+      "item": [
+        {
+          "name": "1. Solicitar Trabajo en Brasil",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cliente_id\": \"BR-001\",\n    \"tipo_servicio\": \"limpieza\",\n    \"region\": \"BR\",\n    \"metodo_pago\": \"MERCADOPAGO\"\n}"
+            },
+            "url": {
+              "raw": "{{BFF_URL}}/v1/trabajos",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "trabajos"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "JRN-05: Actualización Background (Fan-Out)",
+      "item": [
+        {
+          "name": "1. Ver Reputación Actualizada (BFF -> Reputacion)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BFF_URL}}/v1/reputacion/proveedores/{{proveedor_id}}",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "reputacion", "proveedores", "{{proveedor_id}}"]
+            }
+          }
+        },
+        {
+          "name": "2. Ver Scoring Cliente (BFF -> Scoring)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{BFF_URL}}/v1/scoring/clientes/{{cliente_id}}",
+              "host": ["{{BFF_URL}}"],
+              "path": ["v1", "scoring", "clientes", "{{cliente_id}}"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "BFF_URL",
+      "value": "https://gestion-trabajos-poc-api-kgt57ziq4a-rj.a.run.app",
+      "type": "string"
+    },
+    {
+      "key": "trabajo_id",
+      "value": "TRB-00001",
+      "type": "string"
+    },
+    {
+      "key": "saga_id",
+      "value": "SAGA-99991",
+      "type": "string"
+    },
+    {
+      "key": "proveedor_id",
+      "value": "PROV-102",
+      "type": "string"
+    },
+    {
+      "key": "siniestro_id",
+      "value": "SIN-4040",
+      "type": "string"
+    },
+    {
+      "key": "cliente_id",
+      "value": "CLI-9876",
+      "type": "string"
     }
   ]
 }
