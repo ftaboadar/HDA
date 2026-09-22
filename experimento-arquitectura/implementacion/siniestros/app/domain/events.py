@@ -1,11 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 import uuid
 
-@dataclass
+@dataclass(kw_only=True)
 class DomainEvent:
-    id: str = str(uuid.uuid4())
-    timestamp: datetime = datetime.utcnow()
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: datetime = field(default_factory=datetime.utcnow)
 
 @dataclass
 class SiniestroAprobado(DomainEvent):

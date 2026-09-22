@@ -7,9 +7,21 @@ from app.application.commands import AprobarSiniestroCommand
 from app.application.queries import GetSiniestroQuery
 from app.domain.entities import Siniestro
 
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Siniestros API")
+
+
+@app.on_event("startup")
+def startup() -> None:
+    # Se crea el esquema al arrancar (no al importar el módulo), para que
+    # uvicorn pueda bindear el puerto y /salud responda aunque la conexión a
+    # la base de datos tarde en estar lista (mismo patrón que
+    # gestion-de-trabajos/app/api/main.py).
+    Base.metadata.create_all(bind=engine)
+
+
+@app.get("/salud")
+def salud():
+    return {"status": "ok"}
 
 def get_db():
     db = SessionLocal()

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DomainEvent:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     ocurrido_en: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
