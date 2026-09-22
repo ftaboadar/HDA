@@ -110,7 +110,7 @@ prueba lint, arranque y las pruebas que existen; no valida estos puntos de contr
 | 1.8 Suscripciones | **Hecho** | Ídem |
 | 1.9 Scoring | **Hecho** | Esqueleto existe; sin Dockerfile ni `requirements.txt` |
 | 1.10 BFF | **Hecho** | Rutas por actor, `/v1/trabajos`, `openapi.json`, pruebas |
-| 1.11 Journey local | Pendiente | Los 5 tests actuales aceptan `404`/`500`; hay que reescribirlos con aserciones reales |
+| 1.11 Journey local | **Hecho** | Los 5 tests actuales aceptan `404`/`500`; hay que reescribirlos con aserciones reales |
 | 1.12 Auditoría | Pendiente | Correr `rubrica-auditor` al terminar 1.2-1.11 |
 
 Etapa 2 en paralelo (solo lo que no depende del código): 2.1 (`journey/PLAN-EXPERIMENTOS.md`) y borrador de 2.3
