@@ -39,27 +39,18 @@ IMAGENES=(
 )
 for fila in "${IMAGENES[@]}"; do
   IFS='|' read -r stack repo imagen carpeta <<<"$fila"
-  log "Imagen ${imagen}"
+  region_stack="$(region_de_stack "$stack")"
+  ar_stack="${region_stack}-docker.pkg.dev/${PROJECT}"
+  log "Imagen ${imagen} (región ${region_stack})"
   tf_init "$stack"
   # shellcheck disable=SC2046
-
-  # Determinar región específica para este stack (estrategia multi-región)
-  STACK_REGION="${REGION}"
-  case "$stack" in
-    gestion-de-trabajos/infra|proveedores/infra|scoring/infra|marketplace/infra) STACK_REGION="us-east1" ;;
-    siniestros/infra) STACK_REGION="us-central1" ;;
-  esac
-  
-  # Sobrescribir AR con la región correcta para la imagen
-  STACK_AR="${STACK_REGION}-docker.pkg.dev/${PROJECT}"
-  
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=${STACK_REGION}" $(vars_extra "$stack") \
+  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=${region_stack}" $(vars_extra "$stack") \
     -target=google_artifact_registry_repository.hda
   if [ "${SALTAR_IMAGENES:-0}" = 1 ] &&
-    gcloud artifacts docker images describe "${STACK_AR}/${repo}/${imagen}:latest" --project "$PROJECT" >/dev/null 2>&1; then
+    gcloud artifacts docker images describe "${ar_stack}/${repo}/${imagen}:latest" --project "$PROJECT" >/dev/null 2>&1; then
     aviso "SALTAR_IMAGENES=1 y la imagen ya existe: no se reconstruye"
   else
-    gcloud builds submit "$IMPL/$carpeta" --tag "${STACK_AR}/${repo}/${imagen}:latest" --project "$PROJECT" --quiet
+    gcloud builds submit "$IMPL/$carpeta" --tag "${ar_stack}/${repo}/${imagen}:latest" --project "$PROJECT" --quiet
   fi
 done
 
@@ -102,35 +93,49 @@ tf pagos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}"
 
 log "Stack gestion-de-trabajos/infra"
-tf gestion-de-trabajos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-east1" \
+tf gestion-de-trabajos/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+  -var "region=$(region_de_stack gestion-de-trabajos/infra)" \
   -var "max_instance_count=${GT_MAX_INSTANCIAS}" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}" -var "crm_mock_url=${CRM}"
 
-
-
-for stack in suscripciones/infra bff/infra; do
+for stack in suscripciones/infra; do
   log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=southamerica-east1"
+  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")"
 done
 for stack in scoring/infra marketplace/infra; do
   log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-east1"
+  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")"
 done
 
 for stack in reputacion/infra; do
   log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=southamerica-east1"
+  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")"
 done
 for stack in proveedores/infra; do
   log "Stack ${stack}"
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-east1"
+  tf "$stack" apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack "$stack")" \
+    -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650"
 done
 # Siniestros (Multi-Region patch)
 if [ -d "siniestros/infra" ]; then
   log "Stack siniestros/infra"
-  tf "siniestros/infra" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-central1"
+  tf "siniestros/infra" apply -auto-approve -input=false -var "project_id=${PROJECT}" \
+    -var "region=$(region_de_stack siniestros/infra)"
 fi
 
+
+# BFF: va después de TODOS los servicios de negocio porque necesita sus URLs ya
+# conocidas (api_url de cada stack) para enrutar — ver bff/app/api/main.py SERVICE_URLS.
+log "Stack bff/infra"
+tf bff/infra apply -auto-approve -input=false -var "project_id=${PROJECT}" -var "region=$(region_de_stack bff/infra)" \
+  -var "gestion_trabajos_url=$(tf gestion-de-trabajos/infra output -raw api_url)" \
+  -var "proveedores_url=$(tf proveedores/infra output -raw api_url)" \
+  -var "pagos_url=$(tf pagos/infra output -raw api_url)" \
+  -var "siniestros_url=$(tf siniestros/infra output -raw api_url)" \
+  -var "marketplace_url=$(tf marketplace/infra output -raw api_url)" \
+  -var "suscripciones_url=$(tf suscripciones/infra output -raw api_url)" \
+  -var "scoring_url=$(tf scoring/infra output -raw api_url)" \
+  -var "reputacion_url=$(tf reputacion/infra output -raw api_url)"
 
 # 4) Grafana al final (el dashboard necesita servicios reales que graficar).
 log "Stack observabilidad"
