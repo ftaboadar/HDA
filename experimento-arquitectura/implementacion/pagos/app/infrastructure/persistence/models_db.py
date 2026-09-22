@@ -67,3 +67,18 @@ class TransaccionORM(Base):
     tipo = Column(String, nullable=False)  # RETENCION, LIBERACION, COMPENSACION
     estado = Column(String, nullable=False)  # EXITOSA, FALLIDA
     fecha = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
+
+
+class OutboxEventORM(Base):
+    """Eventos almacenados para el patrón Outbox (P-04)."""
+
+    __tablename__ = "outbox_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    topic = Column(String, nullable=False)
+    event_type = Column(String, nullable=False)
+    payload = Column(Text, nullable=False)  # JSON string
+    correlation_id = Column(String, nullable=True)
+    published = Column(String, default="FALSE", nullable=False) # 'TRUE' or 'FALSE'
+    created_at = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
+

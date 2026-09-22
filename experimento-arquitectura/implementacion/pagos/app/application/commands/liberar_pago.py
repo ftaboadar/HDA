@@ -2,7 +2,7 @@ import asyncio
 
 from app.domain.pagos.repository import IPagoRepository
 from app.domain.pagos.value_objects import TrabajoId
-from app.infrastructure.messaging.publicador import PublicadorPulsar
+from app.seedwork.infraestructura.pulsar.mensajeria import PublicadorPulsar
 from app.common.logging_utils import configurar_logging
 
 logger = configurar_logging("application.commands.liberar_pago")
@@ -33,21 +33,34 @@ class LiberarPago:
         from app.infrastructure.persistence.models_db import TransaccionORM
         from app.common.db import SessionLocal
 
-        with SessionLocal() as db:
-            tx = TransaccionORM(pago_id=pago.id, tipo="LIBERACION", estado="EXITOSA")
-            db.add(tx)
-            db.commit()
-
-        # Publicar PagoLiberado
         evento_msg = PagoLiberadoMensaje(
             pago_id=str(pago.id),
             trabajo_id=trabajo_id,
             monto=float(pago.monto.valor),
             moneda=pago.monto.moneda,
         )
-        self._publicador.publicar_evento(
-            evento_msg,
-            "hda/pagos/pago.liberado",
-            "PagoLiberado",
+
+        # Insertar evento en Outbox en la misma transacción
+        import json
+        from app.infrastructure.persistence.models_db import OutboxEventORM
+        
+        payload_dict = {
+            "pago_id": str(pago.id),
+            "trabajo_id": trabajo_id,
+            "monto": float(pago.monto.valor),
+            "moneda": pago.monto.moneda,
+        }
+        
+        outbox_event = OutboxEventORM(
+            topic="hda/pagos/pago.liberado",
+            event_type="PagoLiberado",
+            payload=json.dumps(payload_dict),
             correlation_id=trabajo_id,
+            published="FALSE"
         )
+        
+        with SessionLocal() as db:
+            tx = TransaccionORM(pago_id=pago.id, tipo="LIBERACION", estado="EXITOSA")
+            db.add(tx)
+            db.add(outbox_event)
+            db.commit()

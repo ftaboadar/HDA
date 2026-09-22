@@ -95,9 +95,6 @@ def _pago_a_schema(p: Pago) -> PagoOut:
     )
 
 
-_consumidor_saga = None
-
-
 @app.on_event("startup")
 async def startup() -> None:
     Base.metadata.create_all(bind=engine)
@@ -108,42 +105,9 @@ async def startup() -> None:
         pasarelas=sorted(_pasarelas),
     )
 
-    # Iniciar consumidor de saga
-    from app.infrastructure.messaging.consumidor import ConsumidorComandosSaga
-    from app.infrastructure.messaging.publicador import PublicadorPulsar
-    from app.application.commands.retener_pago import RetenerPago
-    from app.application.commands.liberar_pago import LiberarPago
-    from app.application.commands.compensar import CompensarPago
-
-    publicador = PublicadorPulsar()
-    retener_pago = RetenerPago(
-        _pago_repo, _registro_repo, _reglas_regionales, _pasarelas, publicador
-    )
-    liberar_pago = LiberarPago(_pago_repo, publicador)
-    compensar_pago = CompensarPago(_pago_repo, publicador)
-
-    global _consumidor_saga
-    _consumidor_saga = ConsumidorComandosSaga(
-        retener_pago=retener_pago,
-        liberar_pago=liberar_pago,
-        compensar_pago=compensar_pago,
-    )
-    # En segundo plano y sin tumbar la API: si Pulsar no está (ej. el
-    # docker-compose de CI, que solo trae Postgres), REST y /salud siguen vivos.
-    asyncio.create_task(_iniciar_consumidor_saga())
-
-
-async def _iniciar_consumidor_saga() -> None:
-    try:
-        await _consumidor_saga.iniciar()
-    except Exception as exc:
-        log_evento(logger, "consumidor_saga_no_disponible", error=str(exc))
-
-
 @app.on_event("shutdown")
 async def shutdown() -> None:
-    if _consumidor_saga:
-        _consumidor_saga.detener()
+    pass
 
 
 @app.get("/salud")
@@ -216,3 +180,27 @@ async def compensar_pago(pago_id: uuid.UUID):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     log_evento(logger, "pago_compensado_via_api", pago_id=str(pago_id))
     return PagoIdOut(id=id_compensado)
+
+
+from pydantic import BaseModel
+class WebhookPayload(BaseModel):
+    event_type: str
+    reference_id: str
+    status: str
+
+@app.post("/webhooks/pasarela", status_code=200)
+async def webhook_pasarela(payload: WebhookPayload):
+    """
+    Webhook para recibir notificaciones asíncronas de la pasarela de pagos
+    (ej. Stripe, MercadoPago) cuando un pago se procesa o falla.
+    """
+    log_evento(
+        logger,
+        "webhook_pasarela_recibido",
+        event_type=payload.event_type,
+        reference_id=payload.reference_id,
+        status=payload.status,
+    )
+    # En un sistema real, aquí buscaríamos el Pago por referencia externa
+    # y aplicaríamos un comando como PagoExitoso o PagoFallido.
+    return {"status": "recibido"}

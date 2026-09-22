@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from app.domain.pagos.repository import IPagoRepository
 from app.domain.pagos.value_objects import PagoId, TrabajoId
-from app.infrastructure.messaging.publicador import PublicadorPulsar
+from app.seedwork.infraestructura.pulsar.mensajeria import PublicadorPulsar
 from app.common.logging_utils import configurar_logging
 
 logger = configurar_logging("application.commands.compensar_pago")
@@ -27,26 +27,30 @@ class CompensarPago:
 
         pago = pagos[0]
 
+        evento_msg = PagoCompensadoMensaje(pago_id=str(pago.id), trabajo_id=trabajo_id)
+
         # En la realidad llamamos a la pasarela externa para hacer el refund.
-        # Aquí simulamos y registramos la transaccion.
-        from app.infrastructure.persistence.models_db import TransaccionORM
+        # Aquí simulamos y registramos la transaccion y el evento en Outbox.
+        from app.infrastructure.persistence.models_db import TransaccionORM, OutboxEventORM
         from app.common.db import SessionLocal
+        import json
+
+        outbox_event = OutboxEventORM(
+            topic="hda/pagos/pago.compensado",
+            event_type="PagoCompensado",
+            payload=json.dumps({"pago_id": str(pago.id), "trabajo_id": trabajo_id}),
+            correlation_id=trabajo_id,
+            published="FALSE"
+        )
 
         with SessionLocal() as db:
             tx = TransaccionORM(pago_id=pago.id, tipo="COMPENSACION", estado="EXITOSA")
             db.add(tx)
+            db.add(outbox_event)
             db.commit()
 
         pago.estado = "COMPENSADO"
         await asyncio.to_thread(self._pago_repo.guardar, pago)
-
-        evento_msg = PagoCompensadoMensaje(pago_id=str(pago.id), trabajo_id=trabajo_id)
-        self._publicador.publicar_evento(
-            evento_msg,
-            "hda/pagos/pago.compensado",
-            "PagoCompensado",
-            correlation_id=trabajo_id,
-        )
 
 
 class PagoNoEncontrado(Exception):
