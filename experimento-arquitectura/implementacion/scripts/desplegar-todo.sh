@@ -29,6 +29,13 @@ IMAGENES=(
   "gestion-de-trabajos/infra|gestion-trabajos-poc-hda|hda-gestion-de-trabajos|gestion-de-trabajos"
   "reputacion/infra|reputacion-poc-hda|hda-reputacion|reputacion"
   "proveedores/infra|disp03-poc-hda|hda-disp03|proveedores" # prefijo disp03-poc: nombre histórico (A20)
+
+  "marketplace/infra|marketplace-poc-hda|hda-marketplace|marketplace"
+  "siniestros/infra|siniestros-poc-hda|hda-siniestros|siniestros"
+  "suscripciones/infra|suscripciones-poc-hda|hda-suscripciones|suscripciones"
+  "scoring/infra|scoring-poc-hda|hda-scoring|scoring"
+  "bff/infra|bff-poc-hda|hda-bff|bff"
+
 )
 for fila in "${IMAGENES[@]}"; do
   IFS='|' read -r stack repo imagen carpeta <<<"$fila"
@@ -88,6 +95,16 @@ tf gestion-de-trabajos/infra apply -auto-approve -input=false "${VARS_BASE[@]}" 
   -var "max_instance_count=${GT_MAX_INSTANCIAS}" -var "pulsar_service_url=pulsar://${PULSAR_IP}:6650" \
   -var "stripe_mock_url=${STRIPE}" -var "mercadopago_mock_url=${MP}" -var "crm_mock_url=${CRM}"
 
+
+
+for stack in suscripciones/infra bff/infra; do
+  log "Stack ${stack}"
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=southamerica-east1"
+done
+for stack in scoring/infra marketplace/infra; do
+  log "Stack ${stack}"
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=us-east1"
+done
 
 for stack in reputacion/infra; do
   log "Stack ${stack}"
