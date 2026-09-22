@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from app.domain.seedwork.domain_event import DomainEvent
+from app.seedwork.dominio.domain_event import DomainEvent
 
 
 @dataclass(frozen=True)

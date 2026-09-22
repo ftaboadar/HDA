@@ -1,0 +1,438 @@
+{
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "NovedadCreate": {
+        "description": "Body de `POST /novedades` (DISP-02, ver `escenarios_calidad.md`).",
+        "properties": {
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "trabajo_id": {
+            "title": "Trabajo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajo_id",
+          "descripcion"
+        ],
+        "title": "NovedadCreate",
+        "type": "object"
+      },
+      "NovedadIdOut": {
+        "description": "Respuesta de un COMANDO (POST /novedades) — CQS: a lo sumo un id,\nnunca el estado de negocio completo del agregado. Se responde\n`202 Accepted` (ver api/main.py): la Novedad queda PENDIENTE y encolada\nen el Throttler, no se espera la entrega real al CRM.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "NovedadIdOut",
+        "type": "object"
+      },
+      "NovedadOut": {
+        "description": "Respuesta de una QUERY (GET /novedades/{id}) — sí expone el estado de\nnegocio completo (CQS), a diferencia de `NovedadIdOut`. Agregada para la\nprueba de carga de DISP-02\n(`tests/integracion/test_disp02_throttler.py`), que necesita sondear el\nestado del agregado desde fuera del proceso.",
+        "properties": {
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intentos": {
+            "title": "Intentos",
+            "type": "integer"
+          },
+          "trabajo_id": {
+            "format": "uuid",
+            "title": "Trabajo Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trabajo_id",
+          "descripcion",
+          "estado",
+          "intentos",
+          "creado_en"
+        ],
+        "title": "NovedadOut",
+        "type": "object"
+      },
+      "TrabajoCreate": {
+        "properties": {
+          "monto": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Monto"
+          },
+          "proveedor_id": {
+            "title": "Proveedor Id",
+            "type": "string"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proveedor_id",
+          "monto",
+          "region"
+        ],
+        "title": "TrabajoCreate",
+        "type": "object"
+      },
+      "TrabajoIdOut": {
+        "description": "Respuesta de un COMANDO (POST /trabajos) — CQS: a lo sumo un id, no\nel estado de negocio completo del agregado.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "TrabajoIdOut",
+        "type": "object"
+      },
+      "TrabajoOut": {
+        "description": "Respuesta de una QUERY (GET /trabajos/{id}) — solo lectura, sí puede\nexponer el estado completo.",
+        "properties": {
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_creacion": {
+            "format": "date-time",
+            "title": "Fecha Creacion",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "moneda": {
+            "title": "Moneda",
+            "type": "string"
+          },
+          "monto": {
+            "title": "Monto",
+            "type": "string"
+          },
+          "proveedor_id": {
+            "title": "Proveedor Id",
+            "type": "string"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "proveedor_id",
+          "estado",
+          "monto",
+          "moneda",
+          "region",
+          "fecha_creacion"
+        ],
+        "title": "TrabajoOut",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Gestión de Trabajos — API (Entrega 4 PoC, skeleton)",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/novedades": {
+      "post": {
+        "description": "202 Accepted, no 201 Created: la `Novedad` ya quedó persistida como\nPENDIENTE y encolada en el Throttler, pero su entrega real al CRM\n\"Gestión de Agentes\" es asíncrona (DISP-02) — el código de estado deja\nexplícito que la petición fue aceptada para proceso, no completada.",
+        "operationId": "publicar_novedad_novedades_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovedadCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovedadIdOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publicar Novedad"
+      }
+    },
+    "/novedades/{novedad_id}": {
+      "get": {
+        "description": "Agregado en esta tarea (DISP-02) — ver docstring de\n`application/queries/consultar_novedad.py`.",
+        "operationId": "obtener_novedad_novedades__novedad_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "novedad_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Novedad Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NovedadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Obtener Novedad"
+      }
+    },
+    "/sagas/{saga_id}": {
+      "get": {
+        "operationId": "obtener_saga_sagas__saga_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saga_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Saga Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Obtener Saga"
+      }
+    },
+    "/salud": {
+      "get": {
+        "operationId": "salud_salud_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Salud"
+      }
+    },
+    "/trabajos": {
+      "post": {
+        "operationId": "crear_trabajo_trabajos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrabajoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrabajoIdOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Crear Trabajo"
+      }
+    },
+    "/trabajos/{trabajo_id}": {
+      "get": {
+        "operationId": "obtener_trabajo_trabajos__trabajo_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trabajo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Trabajo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrabajoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Obtener Trabajo"
+      }
+    }
+  }
+}

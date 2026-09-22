@@ -32,7 +32,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from app.domain.seedwork.aggregate_root import AggregateRoot
+from app.seedwork.dominio.aggregate_root import AggregateRoot
 from app.domain.ciclo_vida.eventos import TrabajoFinalizado
 from app.domain.ciclo_vida.value_objects import (
     Dinero,

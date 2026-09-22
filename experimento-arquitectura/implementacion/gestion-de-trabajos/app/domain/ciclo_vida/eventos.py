@@ -8,7 +8,7 @@ el propio agregado."""
 from dataclasses import dataclass
 from decimal import Decimal
 
-from app.domain.seedwork.domain_event import DomainEvent
+from app.seedwork.dominio.domain_event import DomainEvent
 from app.domain.ciclo_vida.value_objects import ProveedorId, Region, TrabajoId
 
 

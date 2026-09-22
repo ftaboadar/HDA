@@ -312,7 +312,7 @@ del origen (Marketplace, Siniestros o Suscripciones) → ≥ 4.
 |---|---|---|---|
 | 1 | local `CrearTrabajo` (desde `SolicitudDiagnosticada` / `SiniestroAprobado` / `CicloSuscripcion`) | saga `INICIADA` | — |
 | 2 | Proveedores `PublicarElegibles` | `ElegiblesPublicados` → canal; canal publica `ProveedorSeleccionado` | — |
-| 3 | Proveedores `ReservarFranja` | `FranjaReservada` / `FranjaRechazada` (vuelve a 2) | `LiberarFranja` |
+| 3 | Proveedores `ReservarFranja` | `AgendaConfirmada` / `AgendaRechazada` (vuelve a 2; catálogo §7) | `LiberarFranja` |
 | 4 | Pagos `RetenerPago` (mkt / suscripción) | `PagoRetenido` / `PagoRetencionFallida` | falla → `LiberarFranja` + Trabajo `CANCELADO` (**caso con compensación del video**) |
 | 5 | local `IniciarWorkflow` → `EN_CURSO`; proveedor completa vía BFF → `FINALIZADO` | — | — |
 | 6 | Pagos `LiberarPago` · o Siniestros `FacturarAPartner` | `PagoLiberado` → `PAGADO` / `FacturaEmitida` | — |
@@ -338,7 +338,7 @@ Los comandos llevan `id_comando` (idempotencia en el receptor) y `saga_id` + `co
 | `SolicitudDiagnosticada`, `SiniestroAprobado`, `CicloSuscripcion` | Integración **con carga de estado** | GT crea el Trabajo sin llamar de vuelta al canal (el canal puede estar bajo el mismo pico) |
 | `ElegiblesPublicados` | Integración **con carga de estado** (lista ordenada con franjas y reputación) | El canal presenta las opciones sin consultar a Proveedores por cada candidato |
 | Comandos de la saga (`ReservarFranja`, `RetenerPago`, …) | **Comando** (punto a punto, un solo receptor) | Es una orden del coordinador con un dueño claro de ejecutarla; lleva `id_comando` para idempotencia |
-| Respuestas (`FranjaReservada`, `PagoRetenido`, `PagoRetencionFallida`, …) | Evento de integración **delgado** (ids + resultado + motivo) | El coordinador ya tiene el estado de la saga; solo necesita el resultado del paso |
+| Respuestas (`AgendaConfirmada`, `AgendaRechazada`, `PagoRetenido`, `PagoRetencionFallida`, …) | Evento de integración **delgado** (ids + resultado + motivo) | El coordinador ya tiene el estado de la saga; solo necesita el resultado del paso |
 | `ReputacionPublicada`, `ScoringActualizado`, `DecisionPartner` | Integración **delgado** | Actualizan una proyección del consumidor; no hace falta más estado |
 | `IntentoRegistrado`, `ProveedorVerificado`, `EstadoTrabajoCambiado`, `SubTrabajosCompletos`, `PagoConfirmado`, `SiniestroAprobado` (intra) | Evento **de dominio** | Comunicación entre módulos dentro de un servicio (§8); nunca sale a Pulsar |
 
@@ -425,7 +425,7 @@ Cada JRN hereda los umbrales de su escenario (`escenarios_calidad.md`) y suma me
 | JRN-02 | **ESC-01** | k6 con 4x de siniestros por el BFF (API de Siniestros, SP6) + Marketplace con carga normal; línea base con el atajo (A15) | Aceptación p95 < 2 s; ≥ 99,9 % aceptadas; < 5 % de variación en Marketplace; por consumidor de `trabajos.finalizado`: lag ≤ 120 s, drenado ≤ 15 min, p95 < 2 s, 0 perdidos; 0 trabajos sin elegibles; 0 dobles reservas | Grafana: p95 / req/s por servicio, backlog por suscripción de Pulsar, sagas por minuto y duración por paso (Saga Log) |
 | JRN-03 | **DISP-02** | Durante JRN-02, ráfaga de novedades (incluye no-shows) con `mocks-crm` limitando la tasa | ≥ 99,9 % sin pérdida; ≥ 99 % webhooks < 15 min y 100 % < 1 h; GT ≥ 99,9 % disponible; 100 % de no-shows reasignados; 0 resoluciones de siniestro sin `DecisionPartner(APROBADA)` | Query de novedades por estado (PENDIENTE/ENTREGADA/AGOTADA) y 429 del CRM; Saga Log con la rama de reasignación |
 | JRN-04 | **MOD-02** | Trabajo en región BR pagado con MercadoPago; luego disputa | 0 cambios en Colombia/Stripe/core (diff + suite); región y moneda tomadas del Trabajo; retenido = liberado = compensado; estados de GT y Pagos iguales | Query de Pagos con `patron=Strategy/Adapter`; Saga Log `COMPENSADA` |
-| JRN-05 | MOD-03 | Suscripción mensual (lunes mañana) y otro cliente pidiendo la misma franja | 0 cambios en GT para el consumidor nuevo; mismo proveedor todo el mes; franja rechazada para el segundo cliente | Query por `suscripcion_id`; `FranjaRechazada` en el Saga Log |
+| JRN-05 | MOD-03 | Suscripción mensual (lunes mañana) y otro cliente pidiendo la misma franja | 0 cambios en GT para el consumidor nuevo; mismo proveedor todo el mes; franja rechazada para el segundo cliente | Query por `suscripcion_id`; `AgendaRechazada` en el Saga Log |
 | — | Saga (ítems 2 y 3) | Pasarela en modo falla durante un JRN-01 | Saga `COMPENSADA` con `LiberarFranja` y Trabajo `CANCELADO` | `consultas-saga-log.sql` en Cloud SQL (cliente psql/DBeaver) y panel del Saga Log en Grafana |
 
 ### 11.2 La saga y el Saga Log en los 5 journeys

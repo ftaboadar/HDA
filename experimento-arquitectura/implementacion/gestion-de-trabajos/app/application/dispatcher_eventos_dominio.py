@@ -33,7 +33,7 @@ from app.application.ports.registro_trabajos import (
     RegistroTrabajoElegible,
 )
 from app.common.logging_utils import configurar_logging, log_evento
-from app.domain.seedwork.domain_event import DomainEvent
+from app.seedwork.dominio.domain_event import DomainEvent
 from app.domain.ciclo_vida.eventos import TrabajoFinalizado
 
 logger = configurar_logging("application.dispatcher_eventos_dominio")

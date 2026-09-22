@@ -13,7 +13,7 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 
-from app.domain.seedwork.value_object import ValueObject
+from app.seedwork.dominio.value_object import ValueObject
 
 
 @dataclass(frozen=True)

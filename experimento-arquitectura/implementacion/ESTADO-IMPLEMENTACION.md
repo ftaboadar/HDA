@@ -90,9 +90,28 @@ secretos). No despliega nada: desplegar es manual con los scripts.
 - `k6/README.md`: la tabla de resultados tiene placeholders `TBD`.
 - Imágenes de las vistas: ver `../contexto/diagramas/entrega-5/CORRECCIONES.md`.
 - Validar `../contexto/03-contextos-acotados-TO-BE.cml` con Context Mapper.
-- Diseño cerrado (A21-A27) y plan en `../contexto/16-plan-entrega-5.md`: **Etapa 1 de la Entrega 5 implementada al 100%** (coordinador de saga que involucra GT, Proveedores, Marketplace y Pagos; Saga Log, BFF, servicios satélites nuevos, esquemas en el registry, etc.).
+- Diseño cerrado (A21-A27) y plan en `../contexto/16-plan-entrega-5.md`. La Etapa 1 **no está cerrada**: ver
+  el §7 (avance por paso de `../contexto/18-guia-paso-a-paso-entrega-5.md`).
 
-## 7. Fase 0 de la Entrega 5 (Infra y Contratos) completada
-- **Pulsar Namespace `bff`**: Verificados y agregados `hda/bff` con política `BACKWARD` tanto en GCP (`startup.sh.tpl`) como local (`pulsar-namespaces-local.sh`).
-- **Contratos AsyncAPI**: Incorporados en `asyncapi/hda-asyncapi.yaml` TODOS los canales del catálogo §7 y comandos de la saga §7.1 del diseño.
-- **CI / Quality Gate**: Añadido el job `oasdiff` a `.github/workflows/pr-quality-gate.yml` para garantizar reglas de retrocompatibilidad estricta en contratos REST (`openapi.json`).
+## 7. Avance de la Entrega 5, Etapa 1 (paso a paso)
+
+Estado por paso de la guía, contra su punto de control. **Última verificación: 2026-09-21.** El CI en verde solo
+prueba lint, arranque y las pruebas que existen; no valida estos puntos de control.
+
+| Paso | Estado | Qué falta para el punto de control |
+|---|---|---|
+| 1.1 Base común | **Hecho** (2026-09-21) | AsyncAPI con los 29 canales (válido con `@asyncapi/cli`); plantilla de mensajería (propiedades §3, `JsonSchema` en el registry, idempotencia por `id_evento`, DLQ nativa) probada contra Pulsar local; worker estándar con `/salud`; campos de log del §13; reglas de retrocompatibilidad (CONVENCIONES §3.1); `scripts/exportar-openapi.sh`; prueba de arquitectura. Falta que los demás servicios copien la plantilla (pasos 1.2-1.9) y `terraform validate` de los stacks nuevos (con cada uno) |
+| 1.2 Gestión de Trabajos + saga | En curso | Layout por módulos, máquina de estados §6 completa, handlers de todos los pasos de §7.1, plazos, idempotencia, `saga_log` con las columnas de §7.1, consultas SQL, worker |
+| 1.3 Proveedores | En curso | Reserva de agenda real y atómica, elegibilidad (A9, A10, A12), namespace de `TOPIC_TRABAJOS_FINALIZADO`, cola de Verificación en Pulsar |
+| 1.4 Pagos | En curso | Retener/liberar/compensar con eventos, modo de falla en `mocks-pagos`, worker |
+| 1.5 Reputación | En curso | Reputación compuesta (A10), `ReputacionPublicada`, worker |
+| 1.6 Marketplace | En curso | Esqueleto existe; sin el contrato del AsyncAPI, sin pruebas que colecten |
+| 1.7 Siniestros | En curso | Ídem |
+| 1.8 Suscripciones | En curso | Ídem |
+| 1.9 Scoring | En curso | Esqueleto existe; sin Dockerfile ni `requirements.txt` |
+| 1.10 BFF | En curso | Rutas por actor, `/v1/trabajos`, `openapi.json`, pruebas |
+| 1.11 Journey local | Pendiente | Los 5 tests actuales aceptan `404`/`500`; hay que reescribirlos con aserciones reales |
+| 1.12 Auditoría | Pendiente | Correr `rubrica-auditor` al terminar 1.2-1.11 |
+
+Etapa 2 en paralelo (solo lo que no depende del código): 2.1 (`journey/PLAN-EXPERIMENTOS.md`) y borrador de 2.3
+(`QUERIES-GCP-JOURNEYS.md`, sin probar contra GCP). 2.2 y 2.5-2.7 esperan a que 1.11 esté en verde.

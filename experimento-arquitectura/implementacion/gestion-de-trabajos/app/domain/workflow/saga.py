@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from app.domain.seedwork.aggregate_root import AggregateRoot
+from app.seedwork.dominio.aggregate_root import AggregateRoot
 from app.domain.workflow.value_objects import EstadoSaga, PasoSaga
 from app.domain.ciclo_vida.value_objects import TrabajoId
 
