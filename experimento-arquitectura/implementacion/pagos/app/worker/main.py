@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from app.common.db import Base, engine
 from app.common.logging_utils import configurar_logging

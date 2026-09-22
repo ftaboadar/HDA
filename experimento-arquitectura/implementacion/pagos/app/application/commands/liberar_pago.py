@@ -18,8 +18,6 @@ class LiberarPago:
         self._publicador = publicador
 
     async def ejecutar(self, trabajo_id: str) -> None:
-        from app.infrastructure.messaging.esquemas import PagoLiberadoMensaje
-
         pagos = await asyncio.to_thread(
             self._pago_repo.obtener_por_trabajo, TrabajoId.desde_str(trabajo_id)
         )
@@ -32,13 +30,6 @@ class LiberarPago:
 
         from app.infrastructure.persistence.models_db import TransaccionORM
         from app.common.db import SessionLocal
-
-        evento_msg = PagoLiberadoMensaje(
-            pago_id=str(pago.id),
-            trabajo_id=trabajo_id,
-            monto=float(pago.monto.valor),
-            moneda=pago.monto.moneda,
-        )
 
         # Insertar evento en Outbox en la misma transacción
         import json

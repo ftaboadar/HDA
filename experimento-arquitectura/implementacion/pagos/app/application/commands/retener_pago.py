@@ -37,10 +37,7 @@ class RetenerPago:
         region: str,
         pasarela: str,
     ) -> None:
-        from app.infrastructure.messaging.esquemas import (
-            PagoRetenidoMensaje,
-            PagoRetencionFallidaMensaje,
-        )
+        from app.infrastructure.messaging.esquemas import PagoRetencionFallidaMensaje
 
         try:
             # En la saga, al retener pago puede que el trabajo no exista todavía en el registro local,
@@ -74,15 +71,6 @@ class RetenerPago:
 
             from app.infrastructure.persistence.models_db import TransaccionORM
             from app.common.db import SessionLocal
-
-            evento_msg = PagoRetenidoMensaje(
-                pago_id=str(pago.id),
-                trabajo_id=trabajo_id,
-                monto=float(monto),
-                moneda=moneda,
-                pasarela=pasarela,
-                regla_regional=type(regla).__name__,
-            )
 
             # Registrar transaccion de RETENCION y Outbox
             import json

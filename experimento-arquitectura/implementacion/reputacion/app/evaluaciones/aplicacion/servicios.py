@@ -1,4 +1,3 @@
-from app.evaluaciones.domain.entidades import ReputacionPartner
 from app.evaluaciones.domain.eventos import ReputacionPublicada
 from app.seedwork.infraestructura.pulsar.mensajeria import Mensajeria
 from pulsar.schema import JsonSchema

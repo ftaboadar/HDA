@@ -14,8 +14,6 @@ class CompensarPago:
         self._publicador = publicador
 
     async def ejecutar(self, trabajo_id: str) -> None:
-        from app.infrastructure.messaging.esquemas import PagoCompensadoMensaje
-
         pagos = await asyncio.to_thread(
             self._pago_repo.obtener_por_trabajo, TrabajoId.desde_str(trabajo_id)
         )
@@ -26,8 +24,6 @@ class CompensarPago:
             return
 
         pago = pagos[0]
-
-        evento_msg = PagoCompensadoMensaje(pago_id=str(pago.id), trabajo_id=trabajo_id)
 
         # En la realidad llamamos a la pasarela externa para hacer el refund.
         # Aquí simulamos y registramos la transaccion y el evento en Outbox.

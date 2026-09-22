@@ -19,6 +19,7 @@ import time
 import uuid
 
 from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
 
 from app.application.commands.compensar import Compensar, PagoNoEncontrado
 from app.application.commands.pagar_trabajo import PagarTrabajo, TrabajoNoEncontrado
@@ -182,7 +183,6 @@ async def compensar_pago(pago_id: uuid.UUID):
     return PagoIdOut(id=id_compensado)
 
 
-from pydantic import BaseModel
 class WebhookPayload(BaseModel):
     event_type: str
     reference_id: str

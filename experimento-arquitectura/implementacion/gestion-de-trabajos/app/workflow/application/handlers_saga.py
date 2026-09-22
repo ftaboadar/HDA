@@ -1,6 +1,5 @@
 import uuid
 import logging
-from typing import List
 
 from app.workflow.infrastructure.persistence.saga_repository_sqlalchemy import (
     SagaRepositorySQLAlchemy,
@@ -131,7 +130,7 @@ class SagaHandlers:
 
     async def check_deadlines(self):
         from datetime import datetime, timezone, timedelta
-        from app.workflow.domain.value_objects import PasoSaga, EstadoSaga
+        from app.workflow.domain.value_objects import PasoSaga
         
         # Plazos arbitrarios para este POC
         plazos = {
