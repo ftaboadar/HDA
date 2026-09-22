@@ -5,11 +5,11 @@ import uuid
 
 import pytest
 
-from app.domain.novedades.eventos import NovedadAgotada, NovedadEntregada
-from app.domain.novedades.fabrica import FabricaNovedad
-from app.domain.novedades.novedad import ErrorTransicionInvalida
-from app.domain.novedades.value_objects import EstadoNovedad
-from app.domain.ciclo_vida.value_objects import TrabajoId
+from app.novedades.domain.eventos import NovedadAgotada, NovedadEntregada
+from app.novedades.domain.fabrica import FabricaNovedad
+from app.novedades.domain.novedad import ErrorTransicionInvalida
+from app.novedades.domain.value_objects import EstadoNovedad
+from app.ciclo_vida.domain.value_objects import TrabajoId
 
 
 def _crear_novedad():

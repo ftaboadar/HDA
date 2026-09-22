@@ -33,8 +33,8 @@ import uuid
 from datetime import datetime, timezone
 
 from app.seedwork.dominio.aggregate_root import AggregateRoot
-from app.domain.ciclo_vida.eventos import TrabajoFinalizado
-from app.domain.ciclo_vida.value_objects import (
+from app.ciclo_vida.domain.eventos import TrabajoFinalizado
+from app.ciclo_vida.domain.value_objects import (
     Dinero,
     EstadoTrabajo,
     ProveedorId,
@@ -67,7 +67,7 @@ class Trabajo(AggregateRoot):
         self.estado = estado
         self.fecha_creacion = fecha_creacion or datetime.now(timezone.utc)
 
-    def iniciar_workflow(self) -> None:
+    def esperar_elegibles(self) -> None:
         if self.estado != EstadoTrabajo.SOLICITADO:
             raise ErrorTransicionInvalida(
                 f"Transición inválida de {self.estado} a ESPERANDO_ELEGIBLES"
@@ -75,32 +75,34 @@ class Trabajo(AggregateRoot):
         self.estado = EstadoTrabajo.ESPERANDO_ELEGIBLES
 
     def asignar_proveedor(self, proveedor_id: ProveedorId) -> None:
-        if self.estado != EstadoTrabajo.ESPERANDO_ELEGIBLES:
+        if self.estado not in (EstadoTrabajo.ESPERANDO_ELEGIBLES, EstadoTrabajo.SOLICITADO):
             raise ErrorTransicionInvalida(
                 f"Transición inválida de {self.estado} a ASIGNADO"
             )
         self.proveedor_id = proveedor_id
         self.estado = EstadoTrabajo.ASIGNADO
 
-    def iniciar_curso(self) -> None:
+    def iniciar_workflow(self) -> None:
         if self.estado != EstadoTrabajo.ASIGNADO:
             raise ErrorTransicionInvalida(
                 f"Transición inválida de {self.estado} a EN_CURSO"
             )
         self.estado = EstadoTrabajo.EN_CURSO
 
+    def reasignar_proveedor(self) -> None:
+        if self.estado not in (EstadoTrabajo.ASIGNADO, EstadoTrabajo.EN_CURSO):
+            raise ErrorTransicionInvalida(
+                f"Transición inválida de {self.estado} a ESPERANDO_ELEGIBLES"
+            )
+        self.proveedor_id = None
+        self.estado = EstadoTrabajo.ESPERANDO_ELEGIBLES
+
     def finalizar(self) -> None:
         """Invariante protegido: un Trabajo ya FINALIZADO no puede
-        finalizarse otra vez — evita, por ejemplo, que un reintento del
-        cliente HTTP dispare dos veces el evento de integración
-        `trabajos.finalizado` sobre el mismo trabajo."""
-        if self.estado in (
-            EstadoTrabajo.FINALIZADO,
-            EstadoTrabajo.PAGADO,
-            EstadoTrabajo.CANCELADO,
-        ):
+        finalizarse otra vez."""
+        if self.estado != EstadoTrabajo.EN_CURSO:
             raise ErrorTransicionInvalida(
-                f"El trabajo {self.id} ya está en un estado final ({self.estado}), no puede finalizarse"
+                f"Transición inválida de {self.estado} a FINALIZADO"
             )
         self.estado = EstadoTrabajo.FINALIZADO
         if self.proveedor_id:
@@ -122,22 +124,14 @@ class Trabajo(AggregateRoot):
         self.estado = EstadoTrabajo.PAGADO
 
     def disputar(self) -> None:
-        if self.estado not in (
-            EstadoTrabajo.FINALIZADO,
-            EstadoTrabajo.ASIGNADO,
-            EstadoTrabajo.EN_CURSO,
-        ):
+        if self.estado not in (EstadoTrabajo.FINALIZADO, EstadoTrabajo.PAGADO):
             raise ErrorTransicionInvalida(
                 f"Transición inválida de {self.estado} a EN_DISPUTA"
             )
         self.estado = EstadoTrabajo.EN_DISPUTA
 
     def cancelar(self) -> None:
-        if self.estado in (
-            EstadoTrabajo.FINALIZADO,
-            EstadoTrabajo.PAGADO,
-            EstadoTrabajo.CANCELADO,
-        ):
+        if self.estado not in (EstadoTrabajo.ASIGNADO, EstadoTrabajo.EN_DISPUTA):
             raise ErrorTransicionInvalida(
                 f"Transición inválida de {self.estado} a CANCELADO"
             )

@@ -20,7 +20,7 @@ from __future__ import annotations
 import abc
 from dataclasses import dataclass
 
-from app.domain.novedades.novedad import Novedad
+from app.novedades.domain.novedad import Novedad
 
 
 @dataclass(frozen=True)

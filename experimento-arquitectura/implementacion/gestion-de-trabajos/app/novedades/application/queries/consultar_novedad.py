@@ -7,9 +7,9 @@ carga — hacía falta para poder confirmar, sondeando desde fuera, cuándo el
 acoplar el caso de prueba a inspeccionar la base de datos directamente.
 Mismo patrón que `ConsultarTrabajo`."""
 
-from app.domain.novedades.novedad import Novedad
-from app.domain.novedades.repository import INovedadRepository
-from app.domain.novedades.value_objects import NovedadId
+from app.novedades.domain.novedad import Novedad
+from app.novedades.domain.repository import INovedadRepository
+from app.novedades.domain.value_objects import NovedadId
 
 
 class ConsultarNovedad:

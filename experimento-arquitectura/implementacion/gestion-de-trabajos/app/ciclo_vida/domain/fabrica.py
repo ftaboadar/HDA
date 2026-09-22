@@ -5,8 +5,8 @@ eventos)."""
 import uuid
 from decimal import Decimal
 
-from app.domain.ciclo_vida.trabajo import Trabajo
-from app.domain.ciclo_vida.value_objects import (
+from app.ciclo_vida.domain.trabajo import Trabajo
+from app.ciclo_vida.domain.value_objects import (
     MONEDA_POR_REGION,
     Dinero,
     ProveedorId,

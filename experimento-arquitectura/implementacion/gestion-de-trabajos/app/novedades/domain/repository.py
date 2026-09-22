@@ -5,8 +5,8 @@ nunca de SQLAlchemy directamente. El adaptador concreto vive en
 
 import abc
 
-from app.domain.novedades.novedad import Novedad
-from app.domain.novedades.value_objects import NovedadId
+from app.novedades.domain.novedad import Novedad
+from app.novedades.domain.value_objects import NovedadId
 
 
 class INovedadRepository(abc.ABC):

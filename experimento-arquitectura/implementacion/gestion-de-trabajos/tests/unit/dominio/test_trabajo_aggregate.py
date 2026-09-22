@@ -6,10 +6,10 @@ from decimal import Decimal
 
 import pytest
 
-from app.domain.ciclo_vida.eventos import TrabajoFinalizado
-from app.domain.ciclo_vida.fabrica import FabricaTrabajo
-from app.domain.ciclo_vida.trabajo import ErrorTransicionInvalida
-from app.domain.ciclo_vida.value_objects import EstadoTrabajo, ProveedorId, Region
+from app.ciclo_vida.domain.eventos import TrabajoFinalizado
+from app.ciclo_vida.domain.fabrica import FabricaTrabajo
+from app.ciclo_vida.domain.trabajo import ErrorTransicionInvalida
+from app.ciclo_vida.domain.value_objects import EstadoTrabajo, ProveedorId, Region
 
 
 def _crear_trabajo():

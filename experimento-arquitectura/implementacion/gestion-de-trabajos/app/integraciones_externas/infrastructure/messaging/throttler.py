@@ -50,11 +50,11 @@ from datetime import datetime, timezone
 
 from tenacity import wait_exponential_jitter
 
-from app.application.ports.gestion_agentes import IGestionAgentesPort
+from app.integraciones_externas.application.ports.gestion_agentes import IGestionAgentesPort
 from app.common.config import settings
 from app.common.logging_utils import configurar_logging, log_evento
-from app.domain.novedades.novedad import Novedad
-from app.domain.novedades.repository import INovedadRepository
+from app.novedades.domain.novedad import Novedad
+from app.novedades.domain.repository import INovedadRepository
 
 logger = configurar_logging("infrastructure.messaging.throttler")
 

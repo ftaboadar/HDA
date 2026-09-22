@@ -17,12 +17,12 @@ de colas/reintentos, y viceversa."""
 
 from __future__ import annotations
 
-from app.application.ports.gestion_agentes import (
+from app.integraciones_externas.application.ports.gestion_agentes import (
     IGestionAgentesPort,
     ResultadoEnvioWebhook,
 )
 from app.common.config import settings
-from app.domain.novedades.novedad import Novedad
+from app.novedades.domain.novedad import Novedad
 
 
 class AdaptadorGestionAgentesHttp(IGestionAgentesPort):

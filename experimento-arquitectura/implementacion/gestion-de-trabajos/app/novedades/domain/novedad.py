@@ -29,10 +29,10 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from app.domain.novedades.eventos import NovedadAgotada, NovedadEntregada
-from app.domain.novedades.value_objects import EstadoNovedad, NovedadId
+from app.novedades.domain.eventos import NovedadAgotada, NovedadEntregada
+from app.novedades.domain.value_objects import EstadoNovedad, NovedadId
 from app.seedwork.dominio.aggregate_root import AggregateRoot
-from app.domain.ciclo_vida.value_objects import TrabajoId
+from app.ciclo_vida.domain.value_objects import TrabajoId
 
 
 class ErrorTransicionInvalida(Exception):

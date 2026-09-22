@@ -31,11 +31,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import FastAPI, HTTPException, Request
 
-from app.application.commands.crear_trabajo import CrearTrabajo
-from app.application.commands.publicar_novedad import PublicarNovedad
-from app.application.queries.consultar_novedad import ConsultarNovedad
-from app.application.queries.consultar_saga import ConsultarSaga
-from app.application.queries.consultar_trabajo import ConsultarTrabajo
+from app.ciclo_vida.application.commands.crear_trabajo import CrearTrabajo
+from app.novedades.application.commands.publicar_novedad import PublicarNovedad
+from app.novedades.application.queries.consultar_novedad import ConsultarNovedad
+from app.workflow.application.queries.consultar_saga import ConsultarSaga
+from app.ciclo_vida.application.queries.consultar_trabajo import ConsultarTrabajo
 from app.common.config import settings
 from app.common.db import Base, engine
 from app.common.logging_utils import (
@@ -51,20 +51,20 @@ from app.common.schemas import (
     TrabajoIdOut,
     TrabajoOut,
 )
-from app.domain.ciclo_vida.trabajo import Trabajo
-from app.infrastructure.adapters.throttler_crm import AdaptadorGestionAgentesHttp
+from app.ciclo_vida.domain.trabajo import Trabajo
+from app.integraciones_externas.infrastructure.adapters.throttler_crm import AdaptadorGestionAgentesHttp
 from app.infrastructure.messaging.publicador_pulsar import PublicadorPulsar
-from app.infrastructure.messaging.throttler import ThrottlerCrm
-from app.infrastructure.persistence.novedad_repository_sqlalchemy import (
+from app.integraciones_externas.infrastructure.messaging.throttler import ThrottlerCrm
+from app.novedades.infrastructure.persistence.novedad_repository_sqlalchemy import (
     NovedadRepositorySQLAlchemy,
 )
-from app.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import (
+from app.ciclo_vida.infrastructure.persistence.registro_trabajos_repository_sqlalchemy import (
     RegistroTrabajosRepositorySQLAlchemy,
 )
-from app.infrastructure.persistence.saga_repository_sqlalchemy import (
+from app.workflow.infrastructure.persistence.saga_repository_sqlalchemy import (
     SagaRepositorySQLAlchemy,
 )
-from app.infrastructure.persistence.trabajo_repository_sqlalchemy import (
+from app.ciclo_vida.infrastructure.persistence.trabajo_repository_sqlalchemy import (
     TrabajoRepositorySQLAlchemy,
 )
 

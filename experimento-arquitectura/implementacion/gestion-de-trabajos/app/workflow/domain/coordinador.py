@@ -1,10 +1,10 @@
 import uuid
 from typing import List
 
-from app.domain.workflow.saga import SagaInstancia
-from app.domain.workflow.value_objects import PasoSaga, EstadoSaga, SagaId
-from app.domain.ciclo_vida.trabajo import Trabajo
-from app.domain.workflow.eventos import (
+from app.workflow.domain.saga import SagaInstancia
+from app.workflow.domain.value_objects import PasoSaga, EstadoSaga, SagaId
+from app.ciclo_vida.domain.trabajo import Trabajo
+from app.workflow.domain.eventos import (
     ComandoSaga,
     PublicarElegibles,
     ReservarFranja,
@@ -132,3 +132,45 @@ class CoordinadorSaga:
     def on_pago_liberado(saga: SagaInstancia, trabajo: Trabajo) -> None:
         saga.completar()
         trabajo.pagar()
+
+    @staticmethod
+    def on_novedad_disputa(
+        saga: SagaInstancia, trabajo: Trabajo, pago_id: str
+    ) -> List[ComandoSaga]:
+        """Alt: Novedad disputa -> CompensarPago"""
+        trabajo.disputar()
+        from app.workflow.domain.eventos import CompensarPago
+        comando = CompensarPago(
+            comando_id=str(uuid.uuid4()),
+            saga_id=str(saga.id),
+            correlation_id=str(saga.trabajo_id),
+            pago_id=pago_id,
+        )
+        return [comando]
+
+    @staticmethod
+    def on_pago_compensado(saga: SagaInstancia, trabajo: Trabajo) -> None:
+        """Alt: Pago compensado -> CANCELADO"""
+        saga.compensar()
+        trabajo.cancelar()
+
+    @staticmethod
+    def on_novedad_no_show(
+        saga: SagaInstancia, trabajo: Trabajo, reserva_id: str, origen: str, origen_id: str
+    ) -> List[ComandoSaga]:
+        """Alt: Novedad no-show -> LiberarFranja y pedir elegibles de nuevo"""
+        trabajo.reasignar_proveedor()
+        comando_liberar = LiberarFranja(
+            comando_id=str(uuid.uuid4()),
+            saga_id=str(saga.id),
+            correlation_id=str(saga.trabajo_id),
+            reserva_id=reserva_id,
+        )
+        comando_elegibles = PublicarElegibles(
+            comando_id=str(uuid.uuid4()),
+            saga_id=str(saga.id),
+            correlation_id=str(saga.trabajo_id),
+            origen=origen,
+            origen_id=origen_id,
+        )
+        return [comando_liberar, comando_elegibles]

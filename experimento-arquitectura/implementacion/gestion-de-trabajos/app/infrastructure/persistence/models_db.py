@@ -79,26 +79,26 @@ class NovedadORM(Base):
 class SagaInstanciaORM(Base):
     __tablename__ = "saga_instancia"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    correlation_id = Column(String, nullable=False, unique=True)
+    saga_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trabajo_id = Column(UUID(as_uuid=True), nullable=False, unique=True)
+    origen = Column(String, nullable=False)
     estado = Column(String, nullable=False, default="INICIADA")
     paso_actual = Column(String, nullable=False)
-    creado_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
-    actualizado_en = Column(
+    iniciada_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
+    actualizada_en = Column(
         DateTime(timezone=True), default=_ahora_utc, onupdate=_ahora_utc, nullable=False
     )
-    datos_contexto = Column(
-        String, nullable=True
-    )  # JSON para estado interno de la saga
-
 
 class SagaLogORM(Base):
     __tablename__ = "saga_log"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     saga_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    secuencia = Column(Integer, nullable=False)
     paso = Column(String, nullable=False)
-    evento = Column(String, nullable=False)
-    mensaje_id = Column(String, nullable=True)  # ID del mensaje en Pulsar si aplica
+    tipo = Column(String, nullable=False) # COMANDO_ENVIADO | EVENTO_RECIBIDO | COMPENSACION_ENVIADA | PASO_EXPIRADO | SAGA_COMPLETADA | SAGA_COMPENSADA
+    servicio = Column(String, nullable=False)
+    mensaje = Column(String, nullable=False)
+    id_mensaje = Column(String, nullable=True)
+    payload = Column(String, nullable=True) # jsonb (usamos String para compatibilidad aquí)
     ocurrido_en = Column(DateTime(timezone=True), default=_ahora_utc, nullable=False)
-    detalles = Column(String, nullable=True)  # JSON para datos extra

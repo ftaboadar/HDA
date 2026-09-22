@@ -1,9 +1,9 @@
 import uuid
 from typing import Optional
-from app.infrastructure.persistence.saga_repository_sqlalchemy import (
+from app.workflow.infrastructure.persistence.saga_repository_sqlalchemy import (
     SagaRepositorySQLAlchemy,
 )
-from app.domain.workflow.saga import SagaInstancia
+from app.workflow.domain.saga import SagaInstancia
 
 
 class ConsultarSaga:

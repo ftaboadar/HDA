@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from app.seedwork.dominio.domain_event import DomainEvent
-from app.domain.ciclo_vida.value_objects import ProveedorId, Region, TrabajoId
+from app.ciclo_vida.domain.value_objects import ProveedorId, Region, TrabajoId
 
 
 @dataclass(frozen=True)

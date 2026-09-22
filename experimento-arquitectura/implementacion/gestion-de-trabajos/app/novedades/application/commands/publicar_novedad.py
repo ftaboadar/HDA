@@ -18,10 +18,10 @@ from __future__ import annotations
 import asyncio
 import uuid
 
-from app.domain.novedades.fabrica import FabricaNovedad
-from app.domain.novedades.repository import INovedadRepository
-from app.domain.ciclo_vida.value_objects import TrabajoId
-from app.infrastructure.messaging.throttler import ThrottlerCrm
+from app.novedades.domain.fabrica import FabricaNovedad
+from app.novedades.domain.repository import INovedadRepository
+from app.ciclo_vida.domain.value_objects import TrabajoId
+from app.integraciones_externas.infrastructure.messaging.throttler import ThrottlerCrm
 
 
 class PublicarNovedad:

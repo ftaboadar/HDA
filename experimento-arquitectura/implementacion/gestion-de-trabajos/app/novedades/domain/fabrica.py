@@ -4,8 +4,8 @@ sin eventos). Mismo principio que `FabricaTrabajo`."""
 
 import uuid
 
-from app.domain.novedades.novedad import Novedad
-from app.domain.ciclo_vida.value_objects import TrabajoId
+from app.novedades.domain.novedad import Novedad
+from app.ciclo_vida.domain.value_objects import TrabajoId
 
 
 class FabricaNovedad:

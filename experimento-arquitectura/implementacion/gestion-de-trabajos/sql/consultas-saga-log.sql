@@ -1,12 +1,34 @@
--- Consultas para el log de la saga
--- 1. Ver el estado actual de una saga
-SELECT * FROM saga_instancia WHERE id = :saga_id;
+-- Consultas básicas al Saga Log
 
--- 2. Ver el historial de eventos de una saga (Saga Log)
-SELECT * FROM saga_log WHERE saga_id = :saga_id ORDER BY timestamp ASC;
+-- 1. Línea de tiempo de una saga
+SELECT secuencia, paso, tipo, servicio, mensaje, ocurrido_en
+FROM saga_log
+WHERE saga_id = 'AQUI_UUID_DE_LA_SAGA'
+ORDER BY secuencia ASC;
 
--- 3. Ver sagas fallidas
-SELECT * FROM saga_instancia WHERE estado = 'FALLIDA';
+-- 2. Sagas compensadas
+SELECT saga_id, origen, iniciada_en, actualizada_en
+FROM saga_instancia
+WHERE estado = 'COMPENSADA';
 
--- 4. Ver sagas compensadas
-SELECT * FROM saga_instancia WHERE estado = 'COMPENSADA';
+-- 3. Pasos expirados
+SELECT id, saga_id, paso, ocurrido_en
+FROM saga_log
+WHERE tipo = 'PASO_EXPIRADO'
+ORDER BY ocurrido_en DESC;
+
+-- 4. Duración por paso (Diferencia de tiempo entre pasos consecutivos)
+WITH OrderedLogs AS (
+    SELECT 
+        saga_id, 
+        paso, 
+        ocurrido_en,
+        LAG(ocurrido_en) OVER (PARTITION BY saga_id ORDER BY secuencia) as paso_anterior_en
+    FROM saga_log
+)
+SELECT 
+    saga_id, 
+    paso, 
+    EXTRACT(EPOCH FROM (ocurrido_en - paso_anterior_en)) as duracion_segundos
+FROM OrderedLogs
+WHERE paso_anterior_en IS NOT NULL;

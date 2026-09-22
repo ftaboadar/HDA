@@ -51,7 +51,7 @@ from app.common.logging_utils import (
     describir_mensaje,
     log_evento,
 )
-from app.domain.ciclo_vida.eventos import TrabajoFinalizado
+from app.ciclo_vida.domain.eventos import TrabajoFinalizado
 
 
 logger = configurar_logging("infrastructure.messaging.publicador_pulsar")

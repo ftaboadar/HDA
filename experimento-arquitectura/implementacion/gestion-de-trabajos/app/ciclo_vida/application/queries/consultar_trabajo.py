@@ -1,8 +1,8 @@
 """Query — solo lee, no muta estado (CQS). Reemplaza `GET /trabajos/{id}`."""
 
-from app.domain.ciclo_vida.repository import ITrabajoRepository
-from app.domain.ciclo_vida.trabajo import Trabajo
-from app.domain.ciclo_vida.value_objects import TrabajoId
+from app.ciclo_vida.domain.repository import ITrabajoRepository
+from app.ciclo_vida.domain.trabajo import Trabajo
+from app.ciclo_vida.domain.value_objects import TrabajoId
 
 
 class ConsultarTrabajo:

@@ -5,10 +5,10 @@
 `domain/` conocen SQLAlchemy."""
 
 from app.common.db import SessionLocal
-from app.domain.novedades.novedad import Novedad
-from app.domain.novedades.repository import INovedadRepository
-from app.domain.novedades.value_objects import EstadoNovedad, NovedadId
-from app.domain.ciclo_vida.value_objects import TrabajoId
+from app.novedades.domain.novedad import Novedad
+from app.novedades.domain.repository import INovedadRepository
+from app.novedades.domain.value_objects import EstadoNovedad, NovedadId
+from app.ciclo_vida.domain.value_objects import TrabajoId
 from app.infrastructure.persistence.models_db import NovedadORM
 
 
