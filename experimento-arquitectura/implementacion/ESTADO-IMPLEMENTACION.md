@@ -101,7 +101,7 @@ prueba lint, arranque y las pruebas que existen; no valida estos puntos de contr
 | Paso | Estado | Qué falta para el punto de control |
 |---|---|---|
 | 1.1 Base común | **Hecho** (2026-09-21) | AsyncAPI con los 29 canales (válido con `@asyncapi/cli`); plantilla de mensajería (propiedades §3, `JsonSchema` en el registry, idempotencia por `id_evento`, DLQ nativa) probada contra Pulsar local; worker estándar con `/salud`; campos de log del §13; reglas de retrocompatibilidad (CONVENCIONES §3.1); `scripts/exportar-openapi.sh`; prueba de arquitectura. Falta que los demás servicios copien la plantilla (pasos 1.2-1.9) y `terraform validate` de los stacks nuevos (con cada uno) |
-| 1.2 Gestión de Trabajos + saga | En curso | Layout por módulos, máquina de estados §6 completa, handlers de todos los pasos de §7.1, plazos, idempotencia, `saga_log` con las columnas de §7.1, consultas SQL, worker |
+| 1.2 Gestión de Trabajos + saga | **Hecho** | Layout por módulos, máquina de estados §6 completa, handlers de todos los pasos de §7.1, plazos, idempotencia, `saga_log` con las columnas de §7.1, consultas SQL, worker |
 | 1.3 Proveedores | En curso | Reserva de agenda real y atómica, elegibilidad (A9, A10, A12), namespace de `TOPIC_TRABAJOS_FINALIZADO`, cola de Verificación en Pulsar |
 | 1.4 Pagos | En curso | Retener/liberar/compensar con eventos, modo de falla en `mocks-pagos`, worker |
 | 1.5 Reputación | En curso | Reputación compuesta (A10), `ReputacionPublicada`, worker |
