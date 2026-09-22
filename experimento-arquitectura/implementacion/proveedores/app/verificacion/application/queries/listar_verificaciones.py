@@ -1,8 +1,8 @@
 """Query — reemplaza `GET /verificaciones`."""
 
-from app.domain.verificacion.repository import IVerificacionRepository
-from app.domain.verificacion.value_objects import ProveedorId
-from app.domain.verificacion.verificacion import Verificacion
+from app.verificacion.domain.repository import IVerificacionRepository
+from app.verificacion.domain.value_objects import ProveedorId
+from app.verificacion.domain.verificacion import Verificacion
 
 
 class ListarVerificaciones:

@@ -1,5 +1,5 @@
 from app.common.config import settings
-from app.infrastructure.external._base_http import _AdaptadorHttpGenerico
+from app.verificacion.infrastructure.external._base_http import _AdaptadorHttpGenerico
 
 
 class AdaptadorRUES(_AdaptadorHttpGenerico):

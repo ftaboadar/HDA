@@ -5,19 +5,19 @@ agregado, no en un handler HTTP o un `if` disperso en la infraestructura."""
 
 import pytest
 
-from app.domain.verificacion.eventos import (
+from app.verificacion.domain.eventos import (
     IntentoRegistrado,
     VerificacionAgotoReintentos,
     VerificacionCompletada,
 )
-from app.domain.verificacion.fabrica import FabricaVerificacion
-from app.domain.verificacion.value_objects import (
+from app.verificacion.domain.fabrica import FabricaVerificacion
+from app.verificacion.domain.value_objects import (
     EstadoVerificacion,
     ProveedorId,
     ResultadoIntento,
     TipoVerificador,
 )
-from app.domain.verificacion.verificacion import ErrorTransicionInvalida
+from app.verificacion.domain.verificacion import ErrorTransicionInvalida
 
 
 def _nueva():

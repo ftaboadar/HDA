@@ -19,12 +19,12 @@ de este PoC."""
 
 import asyncio
 
-from app.application.commands.reprocesar_desde_dlq import ReprocesarDesdeDLQ
-from app.application.queries.listar_dlq import ListarDLQ
 from app.common.config import settings
 from app.common.logging_utils import configurar_logging, log_evento
 from app.common.publicador import PublicadorPulsar
-from app.infrastructure.persistence.verificacion_repository_sqlalchemy import (
+from app.verificacion.application.commands.reprocesar_desde_dlq import ReprocesarDesdeDLQ
+from app.verificacion.application.queries.listar_dlq import ListarDLQ
+from app.verificacion.infrastructure.persistence.verificacion_repository_sqlalchemy import (
     VerificacionRepositorySQLAlchemy,
 )
 

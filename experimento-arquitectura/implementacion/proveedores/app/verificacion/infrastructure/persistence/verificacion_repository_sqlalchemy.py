@@ -12,15 +12,15 @@ from datetime import datetime, timezone
 
 from app.common.db import SessionLocal
 from app.common.models_db import IntentoVerificacionORM, VerificacionORM
-from app.domain.verificacion.repository import IVerificacionRepository
-from app.domain.verificacion.value_objects import (
+from app.verificacion.domain.repository import IVerificacionRepository
+from app.verificacion.domain.value_objects import (
     EstadoVerificacion,
     ProveedorId,
     ResultadoIntento,
     TipoVerificador,
     VerificacionId,
 )
-from app.domain.verificacion.verificacion import IntentoVerificacion, Verificacion
+from app.verificacion.domain.verificacion import IntentoVerificacion, Verificacion
 
 
 def _a_dominio(fila: VerificacionORM) -> Verificacion:

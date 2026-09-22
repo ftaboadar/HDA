@@ -7,8 +7,8 @@ evento de INTEGRACIÓN distinto)."""
 
 from dataclasses import dataclass
 
-from app.domain.seedwork.domain_event import DomainEvent
-from app.domain.verificacion.value_objects import ProveedorId, ResultadoIntento, VerificacionId
+from app.seedwork.dominio.domain_event import DomainEvent
+from app.verificacion.domain.value_objects import ProveedorId, ResultadoIntento, VerificacionId
 
 
 @dataclass(frozen=True)

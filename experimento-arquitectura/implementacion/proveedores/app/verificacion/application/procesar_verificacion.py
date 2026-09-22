@@ -25,10 +25,10 @@ from tenacity import (
     wait_exponential_jitter,
 )
 
-from app.application.ports.verificacion_externa import FallaVerificacionExterna
 from app.common.config import settings
 from app.common.logging_utils import configurar_logging, log_evento
-from app.infrastructure.config import resolver_adaptador_externo
+from app.verificacion.application.ports.verificacion_externa import FallaVerificacionExterna
+from app.verificacion.infrastructure.config import resolver_adaptador_externo
 
 logger = configurar_logging("worker.core")
 

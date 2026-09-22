@@ -10,7 +10,7 @@ import time
 
 import httpx
 
-from app.application.ports.verificacion_externa import (
+from app.verificacion.application.ports.verificacion_externa import (
     FallaVerificacionExterna,
     IVerificacionExternaPort,
     ResultadoVerificacionExterna,

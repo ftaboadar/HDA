@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from app.domain.verificacion.value_objects import ProveedorId, VerificacionId
+from app.verificacion.domain.value_objects import ProveedorId, VerificacionId
 
 
 def test_verificacion_id_nueva_es_unica():

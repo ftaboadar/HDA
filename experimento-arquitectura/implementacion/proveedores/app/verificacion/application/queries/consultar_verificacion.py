@@ -1,9 +1,9 @@
 """Query — solo lee, no muta estado (CQS). Reemplaza
 `GET /verificaciones/{id}`."""
 
-from app.domain.verificacion.repository import IVerificacionRepository
-from app.domain.verificacion.value_objects import VerificacionId
-from app.domain.verificacion.verificacion import Verificacion
+from app.verificacion.domain.repository import IVerificacionRepository
+from app.verificacion.domain.value_objects import VerificacionId
+from app.verificacion.domain.verificacion import Verificacion
 
 
 class ConsultarVerificacion:

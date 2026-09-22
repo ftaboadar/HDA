@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import uuid
 
-from app.domain.seedwork.domain_event import DomainEvent
-from app.domain.seedwork.entity import Entity
+from app.seedwork.dominio.domain_event import DomainEvent
+from app.seedwork.dominio.entity import Entity
 
 
 class AggregateRoot(Entity):

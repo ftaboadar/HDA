@@ -5,8 +5,8 @@ nota de alcance: aquí se simplifica a un booleano ("¿todas completadas?"),
 no al motor de reglas de habilitación por servicio/zona completo — eso es
 negocio adicional, no patrón DDD adicional, y no lo exige la Regla 5."""
 
-from app.domain.verificacion.repository import IVerificacionRepository
-from app.domain.verificacion.value_objects import EstadoVerificacion, ProveedorId
+from app.verificacion.domain.repository import IVerificacionRepository
+from app.verificacion.domain.value_objects import EstadoVerificacion, ProveedorId
 
 
 class ServicioDeElegibilidad:

@@ -4,8 +4,8 @@ intentos)."""
 
 import uuid
 
-from app.domain.verificacion.value_objects import ProveedorId, TipoVerificador
-from app.domain.verificacion.verificacion import Verificacion
+from app.verificacion.domain.value_objects import ProveedorId, TipoVerificador
+from app.verificacion.domain.verificacion import Verificacion
 
 
 class FabricaVerificacion:

@@ -8,14 +8,14 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from app.domain.seedwork.aggregate_root import AggregateRoot
-from app.domain.seedwork.entity import Entity
-from app.domain.verificacion.eventos import (
+from app.seedwork.dominio.aggregate_root import AggregateRoot
+from app.seedwork.dominio.entity import Entity
+from app.verificacion.domain.eventos import (
     IntentoRegistrado,
     VerificacionAgotoReintentos,
     VerificacionCompletada,
 )
-from app.domain.verificacion.value_objects import (
+from app.verificacion.domain.value_objects import (
     EstadoVerificacion,
     ProveedorId,
     ResultadoIntento,
