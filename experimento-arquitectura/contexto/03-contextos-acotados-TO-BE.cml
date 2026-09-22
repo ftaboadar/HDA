@@ -15,7 +15,7 @@
 import "./01-dominios-subdominios.cml"
 
 BoundedContext ContextoGestionDeTrabajos implements GestionDeTrabajos {
-  domainVisionStatement = "El motor de orquestación de HdA: dueño único del 'Trabajo'. Publica eventos (OHS/PL) y consume servicios externos vía ACL."
+  domainVisionStatement = "Contiene el Coordinador de Sagas (Motor de Workflow) y es dueño único del 'Trabajo'. Publica comandos y eventos (OHS/PL)."
 }
 
 BoundedContext ContextoMarketplace implements Marketplace {
@@ -47,6 +47,11 @@ BoundedContext ContextoScoring implements ScoringYCredito {
 }
 
 /* --- Sistemas Genéricos Externos (Comprados/SaaS) --- */
+
+
+BoundedContext ContextoBFF implements Marketplace {
+  domainVisionStatement = "API Gateway / Backend For Frontend. Fachada única para clientes (dueños, proveedores, partners, operador). Sin estado ni lógica de dominio."
+}
 
 BoundedContext ContextoGestionAgentes implements OperacionDeAgentes {
   domainVisionStatement = "Plataforma SaaS (CRM) para los agentes humanos."
@@ -87,6 +92,14 @@ ContextMap HogarDeLosAlpesTOBE {
   contains ContextoGestorDocumental
   contains ContextoNotificaciones
   contains ContextoPasarelaDePagos
+  contains ContextoBFF
+
+  
+  /* Entrega 5: BFF como fachada de APIs síncronas */
+  ContextoMarketplace [U, OHS, PL] -> [D, ACL] ContextoBFF { implementationTechnology = "API REST / gRPC" }
+  ContextoSiniestros [U, OHS, PL] -> [D, ACL] ContextoBFF { implementationTechnology = "API REST / gRPC" }
+  ContextoGestionDeTrabajos [U, OHS, PL] -> [D, ACL] ContextoBFF { implementationTechnology = "API REST / gRPC" }
+  ContextoSuscripciones [U, OHS, PL] -> [D, ACL] ContextoBFF { implementationTechnology = "API REST / gRPC" }
 
   /* Relaciones Core -> Core (Basadas en Eventos) */
   ContextoMarketplace [U, OHS, PL] -> [D, ACL] ContextoGestionDeTrabajos { implementationTechnology = "Eventos de integración (Pulsar): SolicitudDiagnosticada, ProveedorSeleccionado" }
