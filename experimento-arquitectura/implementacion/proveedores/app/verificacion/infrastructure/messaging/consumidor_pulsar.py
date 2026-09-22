@@ -24,10 +24,18 @@ duplicaría, con un comando que sigue siendo un stub, un consumidor que ya
 existe y funciona con un comando real — se prefirió consolidar en uno
 solo (menos superficie, mismo patrón DDD/hexagonal: el adaptador de
 entrada llama a un comando de `application/`, nunca al ORM ni a la cola
-directamente) en vez de arreglar y wire-ar el duplicado."""
+directamente) en vez de arreglar y wire-ar el duplicado.
+
+Imports corregidos solo para que el módulo sea estáticamente válido
+(ruff F821) — el fallo real en tiempo de ejecución sigue siendo el
+descrito arriba (`Mensajeria` no tiene `subscribe`), a propósito."""
 
 import json
 import logging
+
+from app.seedwork.infraestructura.pulsar.mensajeria import Mensajeria
+from app.verificacion.application.commands.revalidar_proveedor import RevalidarProveedor
+from app.verificacion.domain.value_objects import MotivoRevalidacion
 
 def _procesar_mensaje(consumer, msg, repo, publicador):
     try:
@@ -53,7 +61,7 @@ def _procesar_mensaje(consumer, msg, repo, publicador):
         raise e
 
 def iniciar_consumidor(service_url: str, repo, publicador):
-    mensajeria = PulsarMensajeria(service_url)
+    mensajeria = Mensajeria(service_url)
     def cb(consumer, msg):
         _procesar_mensaje(consumer, msg, repo, publicador)
         

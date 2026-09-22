@@ -20,7 +20,6 @@ correspondiente, hacer ack) es código real."""
 from __future__ import annotations
 
 import json
-import uuid
 
 import pytest
 
