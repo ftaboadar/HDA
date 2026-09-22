@@ -138,7 +138,7 @@ resource "google_cloud_run_v2_service" "worker" {
     containers {
       image   = local.imagen_app
       command = ["uvicorn"]
-      args    = ["app.worker.push_handler:app", "--host", "0.0.0.0", "--port", "8080"]
+      args    = ["app.worker.main:app", "--host", "0.0.0.0", "--port", "8080"]
 
       resources {
         startup_cpu_boost = true

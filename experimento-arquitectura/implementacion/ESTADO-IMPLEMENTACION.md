@@ -10,18 +10,22 @@ Si los dos no coinciden, no es un error: el diseño va adelante de la implementa
 - **Regla:** todo PR que implemente, despliegue o destruya algo **actualiza este archivo en el mismo PR**
   (fila del servicio + "Última verificación").
 
-**Última verificación: 2026-09-21** (rama `feature/entrega-5-journey-saga`; cambios de infra respecto a `main`: backend GCS en los 9 stacks, namespaces automáticos en la VM de Pulsar, `scripts/`, CI ampliado).
+**Última verificación: 2026-09-21** (rama `feature/entrega-5-journey-saga`). El despliegue de los servicios base está activo en GCP en el proyecto `hogaralpes`.
 
 ## 1. Qué hay desplegado en GCP ahora mismo
 
-**Nada.** Verificado el 2026-09-21 en el proyecto `hogaralpes`: 0 servicios de Cloud Run y 0 VMs, y los
-states locales de Terraform de los 8 stacks tienen 0 recursos. Todo se destruyó después de la última demo.
+**Todos los servicios y mocks listados abajo están desplegados** en el proyecto `hogaralpes` vía Cloud Run, con su infraestructura de datos (Cloud SQL) y mensajería (Pulsar en VM). El state de Terraform vive en `gs://hogaralpes-tfstate`.
 
-Desde el 2026-09-21 el state de Terraform vive en **`gs://<PROYECTO>-tfstate`** (un bucket por proyecto,
-lo crea `scripts/desplegar-todo.sh`): cualquiera con acceso al proyecto puede desplegar o destruir lo que
-desplegó otro. Otro proyecto (por ejemplo, si se acaban los créditos) parte de cero con su propio bucket.
-Los `terraform.tfstate` locales que queden en las carpetas de los stacks son de antes del cambio (0 recursos)
-y se ignoran.
+**URLs de los servicios:**
+- **Proveedores API:** https://disp03-poc-api-kgt57ziq4a-rj.a.run.app
+- **Proveedores Worker:** https://disp03-poc-worker-kgt57ziq4a-rj.a.run.app
+- **Gestión de Trabajos API:** https://gestion-trabajos-poc-api-kgt57ziq4a-rj.a.run.app
+- **Pagos API:** https://pagos-poc-api-kgt57ziq4a-rj.a.run.app
+- **Reputación API:** https://reputacion-poc-api-kgt57ziq4a-rj.a.run.app
+- **Mocks Proveedores:** Certificadora (https://disp03-poc-mock-certificadora-kgt57ziq4a-rj.a.run.app), Policía (https://disp03-poc-mock-policia-kgt57ziq4a-rj.a.run.app), RUES (https://disp03-poc-mock-rues-kgt57ziq4a-rj.a.run.app)
+- **Mocks CRM:** https://mocks-crm-poc-mock-crm-kgt57ziq4a-rj.a.run.app
+- **Mocks Pagos:** MercadoPago (https://mocks-pagos-poc-mock-mercadopago-kgt57ziq4a-rj.a.run.app), Stripe (https://mocks-pagos-poc-mock-stripe-kgt57ziq4a-rj.a.run.app)
+- **Grafana:** https://observabilidad-poc-grafana-kgt57ziq4a-rj.a.run.app (user: `admin`, pass en Secret Manager `observabilidad-poc-grafana-admin-password`)
 
 ## 2. Servicios y stacks
 
@@ -47,8 +51,8 @@ y se ignoran.
 | Script | Estado |
 |---|---|
 | `verificar-nada-facturando.sh` | **Probado** contra `hogaralpes` (2026-09-21): 0 recursos, código 0 |
-| `desplegar-todo.sh`, `destruir-todo.sh` | Validados (bash -n, shellcheck, `terraform validate` de los 10 stacks); **no corridos todavía contra GCP**. Reproducen la receta probada |
-| Namespaces de Pulsar en GCP | Automáticos en el arranque de la VM (antes eran a mano); no probado aún en una VM real |
+| `desplegar-todo.sh`, `destruir-todo.sh` | **Corridos exitosamente** contra GCP (proyecto `hogaralpes`, 2026-09-21) |
+| Namespaces de Pulsar en GCP | Automáticos en el arranque de la VM, **probados en VM real** exitosamente |
 
 Receta completa, **probada** de punta a punta (despliegue y destroy) en `hogaralpes`:
 [`DESPLIEGUE-GCP-INTEGRAL.md`](DESPLIEGUE-GCP-INTEGRAL.md), sección **"Receta vigente"**. Orden: imágenes →
