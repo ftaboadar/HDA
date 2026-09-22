@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 
 from app.common.config import settings
 from app.common.logging_utils import configurar_logging, log_evento
@@ -64,12 +65,50 @@ class _ConsumidorEnHilo:
         self._corutina_principal = corutina_principal
         self._hilo: threading.Thread | None = None
 
+    # BUG REAL encontrado el 2026-09-22 en CI real (no local): el `pulsar
+    # standalone` de docker-compose.yml puede reportar su healthcheck en
+    # verde (admin API responde) antes de que un namespace recién creado
+    # por `pulsar-init` esté listo para aceptar `subscribe()` — un
+    # `cliente.subscribe()` que llega en esa ventana revienta, y como este
+    # hilo nunca reintentaba, el consumidor moría para siempre en el resto
+    # de la vida del contenedor (nada en docker-compose reinicia el
+    # contenedor: el proceso uvicorn sigue vivo, solo murió este hilo
+    # daemon). Confirmado con evidencia real: el mismo commit pasó 7/7 en
+    # una corrida de CI y falló con el mismo síntoma (los 7 CP en timeout)
+    # en la siguiente, sin cambios de código de por medio. Reintentar con
+    # backoff en el arranque cubre esta ventana de carrera — y cualquier
+    # otra falla transitoria de arranque real (DNS, red) — sin depender de
+    # que algo externo reinicie el contenedor.
+    MAX_REINTENTOS_ARRANQUE = 5
+    BACKOFF_BASE_S = 2.0
+    BACKOFF_MAX_S = 15.0
+
     def iniciar_en_hilo(self) -> None:
         def _ejecutar() -> None:
-            try:
-                asyncio.run(self._corutina_principal())
-            except Exception:  # noqa: BLE001 — el hilo muere; vivo() -> False -> /salud 503
-                logger.exception("consumidor_crasheo: %s", self.suscripcion)
+            intento = 0
+            while intento < self.MAX_REINTENTOS_ARRANQUE:
+                intento += 1
+                try:
+                    asyncio.run(self._corutina_principal())
+                    return  # main() solo retorna por cancelación limpia, no por éxito de un mensaje
+                except Exception:  # noqa: BLE001 — reintenta antes de dar el hilo por muerto
+                    if intento >= self.MAX_REINTENTOS_ARRANQUE:
+                        logger.exception(
+                            "consumidor_crasheo_definitivo: %s (agotados %d intentos)",
+                            self.suscripcion,
+                            intento,
+                        )
+                        return
+                    espera_s = min(self.BACKOFF_BASE_S * (2 ** (intento - 1)), self.BACKOFF_MAX_S)
+                    logger.warning(
+                        "consumidor_crasheo_reintentando: %s (intento %d/%d, esperando %.1fs)",
+                        self.suscripcion,
+                        intento,
+                        self.MAX_REINTENTOS_ARRANQUE,
+                        espera_s,
+                        exc_info=True,
+                    )
+                    time.sleep(espera_s)
 
         self._hilo = threading.Thread(target=_ejecutar, name=self.suscripcion, daemon=True)
         self._hilo.start()
