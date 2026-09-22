@@ -42,13 +42,24 @@ for fila in "${IMAGENES[@]}"; do
   log "Imagen ${imagen}"
   tf_init "$stack"
   # shellcheck disable=SC2046
-  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" $(vars_extra "$stack") \
+
+  # Determinar región específica para este stack (estrategia multi-región)
+  STACK_REGION="${REGION}"
+  case "$stack" in
+    gestion-de-trabajos/infra|proveedores/infra|scoring/infra|marketplace/infra) STACK_REGION="us-east1" ;;
+    siniestros/infra) STACK_REGION="us-central1" ;;
+  esac
+  
+  # Sobrescribir AR con la región correcta para la imagen
+  STACK_AR="${STACK_REGION}-docker.pkg.dev/${PROJECT}"
+  
+  tf "$stack" apply -auto-approve -input=false "${VARS_BASE[@]}" -var "region=${STACK_REGION}" $(vars_extra "$stack") \
     -target=google_artifact_registry_repository.hda
   if [ "${SALTAR_IMAGENES:-0}" = 1 ] &&
-    gcloud artifacts docker images describe "${AR}/${repo}/${imagen}:latest" --project "$PROJECT" >/dev/null 2>&1; then
+    gcloud artifacts docker images describe "${STACK_AR}/${repo}/${imagen}:latest" --project "$PROJECT" >/dev/null 2>&1; then
     aviso "SALTAR_IMAGENES=1 y la imagen ya existe: no se reconstruye"
   else
-    gcloud builds submit "$IMPL/$carpeta" --tag "${AR}/${repo}/${imagen}:latest" --project "$PROJECT" --quiet
+    gcloud builds submit "$IMPL/$carpeta" --tag "${STACK_AR}/${repo}/${imagen}:latest" --project "$PROJECT" --quiet
   fi
 done
 
