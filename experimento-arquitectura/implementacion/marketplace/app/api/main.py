@@ -12,6 +12,15 @@ class SolicitudRequest(BaseModel):
 repositorio = RepositorioSolicitudes()
 servicio_crear_solicitud = CrearSolicitud(repositorio)
 
+
+@app.get("/salud")
+def salud():
+    """Healthcheck de Cloud Run (CONVENCIONES-SERVICIO-Y-DESPLIEGUE.md §5).
+    Antes de este cambio este servicio no lo exponía — Cloud Run no tenía
+    forma de verificar que el contenedor estuviera realmente sirviendo."""
+    return {"status": "ok", "service": "marketplace-api"}
+
+
 @app.post("/solicitudes")
 def crear_solicitud(req: SolicitudRequest):
     try:
